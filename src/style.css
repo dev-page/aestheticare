@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Palette sampled from home_picture.jpg (skin tones + highlights + shadow) */
+  --color-gold-50: #fff8eb;
+  --color-gold-100: #f8e5bd;
+  --color-gold-200: #f1d4aa;
+  --color-gold-300: #e6c196;
+  --color-gold-400: #d7aa7d;
+  --color-gold-500: #c6946c;
+  --color-gold-600: #b57f5c;
+  --color-gold-700: #956344;
+  --color-gold-800: #7b4f37;
+  --color-gold-900: #362216;
+
+  --color-cream-50: #fffbf4;
+  --color-cream-100: #fdf3e2;
+  --color-cream-200: #f8e5bd;
+  --color-cream-300: #efd3ac;
+  --color-cream-400: #e4bf95;
+  --color-cream-500: #d6a97b;
+  --color-cream-600: #bc8a65;
+  --color-cream-700: #a77856;
+  --color-cream-800: #8b5f43;
+  --color-cream-900: #6d482f;
+
+  --color-rose-50: #fff7f1;
+  --color-rose-100: #fdeade;
+  --color-rose-200: #f6cfbb;
+  --color-rose-300: #eab09a;
+  --color-rose-400: #d79179;
+  --color-rose-500: #c2765f;
+  --color-rose-600: #a35f4d;
+  --color-rose-700: #84493d;
+  --color-rose-800: #69382f;
+  --color-rose-900: #4f2a24;
+
+  --color-lavender-50: #fbf6f0;
+  --color-lavender-100: #f3e8da;
+  --color-lavender-200: #e5d0b8;
+  --color-lavender-300: #d3b08f;
+  --color-lavender-400: #bc926f;
+  --color-lavender-500: #a37658;
+  --color-lavender-600: #845b43;
+  --color-lavender-700: #664532;
+  --color-lavender-800: #4f3428;
+  --color-lavender-900: #38241b;
+
+  --color-charcoal-50: #f7f2eb;
+  --color-charcoal-100: #ebdfd1;
+  --color-charcoal-200: #d2bda7;
+  --color-charcoal-300: #b09075;
+  --color-charcoal-400: #8c6d55;
+  --color-charcoal-500: #72573f;
+  --color-charcoal-600: #5b432f;
+  --color-charcoal-700: #473223;
+  --color-charcoal-800: #342419;
+  --color-charcoal-900: #24180f;
+}
