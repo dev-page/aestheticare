@@ -6,6 +6,8 @@ import App from './App.vue'
 import router from './router'
 import Vue3Toastify from 'vue3-toastify'
 import 'vue3-toastify/dist/index.css'
+import VueSweetalert2 from 'vue-sweetalert2'
+import 'sweetalert2/dist/sweetalert2.min.css'
 
 createApp(App)
 //.use(createPinia())
@@ -13,5 +15,5 @@ createApp(App)
 .use(Vue3Toastify, {
   autoClose: 3000,
 })
+.use(VueSweetalert2)
 .mount('#app')
-
