@@ -1,5 +1,6 @@
 <script>
 import { ref, onMounted } from 'vue'
+import { auth } from '@/config/firebaseConfig'
 import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore'
 import { getApp } from 'firebase/app'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
@@ -28,16 +29,26 @@ export default {
 
     const loadDashboardData = async () => {
       try {
-        const branchSnapshot = await getDocs(collection(db, "clinics"))
+        const user = auth.currentUser
+        if (!user) return
+
+        const branchQuery = query(
+          collection(db, "clinics"),
+          where("ownerId", "==", user.uid)
+        )
+
+        const branchSnapshot = await getDocs(branchQuery)
         const branchData = branchSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
 
         branches.value = branchData
         totalBranches.value = branches.value.length
 
+        const branchIds = branches.value.map(b => b.branchId)
+
         const staffSnapshot = await getDocs(collection(db, "users"))
         const staffData = staffSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(u => u.userType === 'Staff')
+          .filter(u => u.userType === 'Staff' && branchIds.includes(u.branchId))
 
         staff.value = staffData
         totalEmployees.value = staff.value.length
@@ -97,14 +108,18 @@ export default {
 const renderEmployeeChart = () => {
   if (!employeeChartRef.value) return
 
-  const roleCounts = {}
+  const branchCounts = {}
+  let totalStaff = 0
+
   staff.value.forEach(s => {
-    const key = `${s.clinicBranch} - ${s.role}`
-    roleCounts[key] = (roleCounts[key] || 0) + 1
+    const clinic = branches.value.find(b => b.branchId === s.branchId)
+    const branchName = clinic ? clinic.clinicBranch : 'Unknown Branch'
+    branchCounts[branchName] = (branchCounts[branchName] || 0) + 1
+    totalStaff++
   })
 
-  const labels = Object.keys(roleCounts)
-  const data = Object.values(roleCounts)
+  const labels = Object.keys(branchCounts)
+  const data = Object.values(branchCounts)
 
   if (employeeChartInstance) employeeChartInstance.destroy()
 
@@ -149,18 +164,42 @@ const renderEmployeeChart = () => {
 
   employeeChartInstance = new Chart(employeeChartRef.value, {
     type: 'pie',
-    data: chartData,
+    data: {
+      labels,
+      datasets: [{
+        label: 'Employees by Branch',
+        data,
+        backgroundColor: [
+          'rgba(30,144,255,0.7)',
+          'rgba(255,99,132,0.7)',
+          'rgba(255,206,86,0.7)',
+          'rgba(75,192,192,0.7)',
+          'rgba(153,102,255,0.7)'
+        ],
+        borderColor: [
+          'rgba(30,144,255,1)',
+          'rgba(255,99,132,1)',
+          'rgba(255,206,86,1)',
+          'rgba(75,192,192,1)',
+          'rgba(153,102,255,1)'
+        ],
+        borderWidth: 1
+      }]
+    },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1,
       plugins: {
-        title: {
-          display: true,
-          text: 'Employees Distribution by Branch & Role',
-          color: '#fff'
-        },
-        legend: { labels: { color: '#fff' } }
+        title: { display: true, text: 'Employees Distribution by Branch', color: '#fff' },
+        legend: { labels: { color: '#fff' } },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const value = context.raw
+              const percentage = ((value / totalStaff) * 100).toFixed(1)
+              return `${context.label}: ${value} (${percentage}%)`
+            }
+          }
+        }
       }
     }
   })

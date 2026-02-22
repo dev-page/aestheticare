@@ -1,8 +1,9 @@
 <script>
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue';
 import { ref, onMounted } from 'vue';
-import { getFirestore, collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
+import { auth } from '@/config/firebaseConfig';
 
 export default {
   name: 'OwnerReports',
@@ -10,17 +11,24 @@ export default {
   setup() {
     const db = getFirestore(getApp());
 
-    const totalBranches = ref(3);
-    const totalEmployees = ref(45);
-    const monthlyRevenue = ref(152300);
-    const newInquiries = ref(28);
+    const totalBranches = ref(0);
+    const totalEmployees = ref(0);
+    const monthlyRevenue = ref(0);
+    const newInquiries = ref(0);
 
     const branches = ref([]);
     const activityLogs = ref([]); 
-    // 🔹 Load activity logs from Firestore
+
     const loadActivityLogs = async () => {
       try {
-        const logsQuery = query(collection(db, "logs"), orderBy("date", "desc"));
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const logsQuery = query(
+          collection(db, "logs"),
+          where("ownerId", "==", user.uid),
+          orderBy("date", "desc")
+        );
         const snapshot = await getDocs(logsQuery);
         activityLogs.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       } catch (error) {
@@ -29,14 +37,35 @@ export default {
     };
 
     const loadReports = async () => {
-      const snapshot = await getDocs(collection(db, "clinics"));
-      const branchData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      branches.value = branchData;
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-      totalBranches.value = branchData.length;
-      totalEmployees.value = branchData.reduce((sum, b) => sum + (b.employees || 0), 0);
-      monthlyRevenue.value = branchData.reduce((sum, b) => sum + (b.revenue || 0), 0);
-      newInquiries.value = branchData.reduce((sum, b) => sum + (b.newInquiries || 0), 0);
+        const branchQuery = query(
+          collection(db, "clinics"),
+          where("ownerId", "==", user.uid)
+        );
+
+        const snapshot = await getDocs(branchQuery);
+        const branchData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        branches.value = branchData;
+        totalBranches.value = branchData.length;
+
+        const branchIds = branchData.map(b => b.branchId);
+
+        const staffSnapshot = await getDocs(collection(db, "users"));
+        const staffData = staffSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(u => u.userType === 'Staff' && branchIds.includes(u.branchId));
+
+        totalEmployees.value = staffData.length; 
+        monthlyRevenue.value = branchData.reduce((sum, b) => sum + (b.revenue || 0), 0);
+        newInquiries.value = branchData.reduce((sum, b) => sum + (b.inquiries || 0), 0);
+        
+      } catch (error) {
+        console.error("Error loading reports:", error);
+      }
     };
 
     onMounted(async () => {
@@ -84,7 +113,7 @@ export default {
 
         <div class="bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-700">
           <h3 class="text-slate-400 text-xs sm:text-sm mb-1">Monthly Revenue</h3>
-          <p class="text-2xl sm:text-3xl font-bold text-white">${{ monthlyRevenue }}</p>
+          <p class="text-2xl sm:text-3xl font-bold text-white">₱{{ monthlyRevenue }}</p>
         </div>
 
         <div class="bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-700">
