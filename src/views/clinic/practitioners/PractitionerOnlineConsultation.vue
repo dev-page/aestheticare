@@ -6,18 +6,6 @@
       <div class="mb-8">
         <h1 class="text-3xl font-bold text-white mb-2">Online Consultation</h1>
         <p class="text-slate-400">Generate and manage Google Meet links for your assigned appointments.</p>
-        <div class="mt-4">
-          <!--
-          <button
-            type="button"
-            class="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm hover:bg-violet-500 disabled:opacity-60"
-            :disabled="isSeedingDemo || !currentBranchId || !currentUserId"
-            @click="seedDemoConsultation"
-          >
-            {{ isSeedingDemo ? 'Seeding demo...' : 'Seed Demo Consultation Data' }}
-          </button>
-          -->
-        </div>
       </div>
 
       <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-6">
