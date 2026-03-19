@@ -1,136 +1,155 @@
 <template>
-  <div class="flex bg-slate-900 min-h-screen">
-    <CRMSidebar />
-    
+  <div class="flex module-theme bg-slate-900 min-h-screen">
+    <ManagerSidebar />
+
     <main class="flex-1 p-8">
-      <!-- Header -->
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-white mb-2">CRM Dashboard</h1>
-        <p class="text-slate-400">Overview of customer relations and inquiries</p>
+        <h1 class="text-3xl font-bold text-white mb-2">Manager Dashboard</h1>
+        <p class="text-slate-400">Overview of staff, supplies, products, and branch operations.</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <div class="flex items-center justify-between mb-4">
-            <div class="h-12 w-12 rounded-lg bg-purple-500/20 flex items-center justify-center">
-              <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <h3 class="text-slate-400 text-sm mb-1">Total Clients</h3>
-          <p class="text-3xl font-bold text-white">{{ totalClients }}</p>
-          <p class="text-xs text-green-500 mt-1">+12% from last month</p>
+          <h3 class="text-slate-400 text-sm mb-1">Total Staff</h3>
+          <p class="text-3xl font-bold text-white">{{ totalStaff }}</p>
+          <p class="text-xs text-slate-500 mt-1">{{ activeStaff }} active</p>
         </div>
 
         <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <div class="flex items-center justify-between mb-4">
-            <div class="h-12 w-12 rounded-lg bg-blue-500/20 flex items-center justify-center">
-              <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
-              </svg>
-            </div>
-          </div>
-          <h3 class="text-slate-400 text-sm mb-1">New Inquiries</h3>
-          <p class="text-3xl font-bold text-white">{{ newInquiries }}</p>
-          <p class="text-xs text-orange-500 mt-1">Requires attention</p>
+          <h3 class="text-slate-400 text-sm mb-1">Catalog Products</h3>
+          <p class="text-3xl font-bold text-white">{{ totalProducts }}</p>
+          <p class="text-xs text-yellow-400 mt-1">{{ lowStockCount }} low stock</p>
         </div>
 
-        <!-- Active Clients -->
         <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <div class="flex items-center justify-between mb-4">
-            <div class="h-12 w-12 rounded-lg bg-green-500/20 flex items-center justify-center">
-              <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <h3 class="text-slate-400 text-sm mb-1">Active Clients</h3>
-          <p class="text-3xl font-bold text-white">{{ activeClients }}</p>
-          <p class="text-xs text-slate-500 mt-1">Currently engaged</p>
+          <h3 class="text-slate-400 text-sm mb-1">Suppliers</h3>
+          <p class="text-3xl font-bold text-white">{{ totalSuppliers }}</p>
+          <p class="text-xs text-slate-500 mt-1">{{ activeSuppliers }} active</p>
         </div>
 
-        <!-- Conversion Rate -->
         <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <div class="flex items-center justify-between mb-4">
-            <div class="h-12 w-12 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-              <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-              </svg>
-            </div>
-          </div>
-          <h3 class="text-slate-400 text-sm mb-1">Conversion Rate</h3>
-          <p class="text-3xl font-bold text-white">{{ conversionRate }}%</p>
-          <p class="text-xs text-green-500 mt-1">+3% improvement</p>
+          <h3 class="text-slate-400 text-sm mb-1">Purchase Requests</h3>
+          <p class="text-3xl font-bold text-white">{{ totalRequests }}</p>
+          <p class="text-xs text-orange-400 mt-1">{{ pendingRequests }} pending</p>
         </div>
       </div>
 
       <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-8">
-        <h2 class="text-xl font-semibold text-white mb-6">Recent Inquiries</h2>
-        <div class="space-y-3">
-          <div v-for="inquiry in recentInquiries" :key="inquiry.id" class="flex items-center justify-between p-4 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors cursor-pointer">
-            <div class="flex items-center gap-4 flex-1">
-              <div class="h-10 w-10 rounded-full bg-purple-500 flex items-center justify-center text-white font-semibold">
-                {{ inquiry.name.charAt(0) }}
-              </div>
-              <div class="flex-1">
-                <p class="text-white font-medium">{{ inquiry.name }}</p>
-                <p class="text-slate-400 text-sm">{{ inquiry.email }}</p>
-              </div>
-              <div class="text-right">
-                <p class="text-white text-sm">{{ inquiry.service }}</p>
-                <p class="text-slate-400 text-xs">{{ inquiry.date }}</p>
+        <h2 class="text-xl font-semibold text-white mb-1">My Shift Assignment</h2>
+        <p class="text-slate-400 text-sm mb-4">My Work Schedule</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+            <p class="text-slate-400 text-xs uppercase tracking-wide">Today</p>
+            <p class="text-lg font-semibold text-white mt-1">{{ todayDayName }}</p>
+            <p class="text-emerald-300 text-sm mt-1">{{ todayShiftLabel }}</p>
+          </div>
+
+          <div class="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+            <p class="text-slate-400 text-xs uppercase tracking-wide mb-2">This Week</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div
+                v-for="entry in weeklyShiftAssignments"
+                :key="entry.day"
+                class="rounded-md border border-slate-700 bg-slate-800 px-3 py-2"
+              >
+                <p class="text-slate-300 text-xs">{{ entry.day }}</p>
+                <p class="text-white text-sm font-medium">{{ entry.shift }}</p>
               </div>
             </div>
-            <span 
-              :class="[
-                'px-3 py-1 rounded-full text-xs font-medium ml-4',
-                inquiry.status === 'New' ? 'bg-blue-500/20 text-blue-400' :
-                inquiry.status === 'Contacted' ? 'bg-yellow-500/20 text-yellow-400' :
-                inquiry.status === 'Converted' ? 'bg-green-500/20 text-green-400' :
-                'bg-red-500/20 text-red-400'
-              ]"
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <h2 class="text-xl font-semibold text-white mb-6">Staff by Role</h2>
+          <div class="space-y-4">
+            <div v-for="entry in staffByRole" :key="entry.role" class="space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="text-white text-sm">{{ entry.role }}</span>
+                <span class="text-slate-400 text-sm">{{ entry.count }}</span>
+              </div>
+              <div class="w-full bg-slate-700 rounded-full h-2">
+                <div
+                  class="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                  :style="{ width: `${staffByRoleMax > 0 ? (entry.count / staffByRoleMax) * 100 : 0}%` }"
+                ></div>
+              </div>
+            </div>
+            <p v-if="staffByRole.length === 0" class="text-slate-400 text-sm">No staff data available.</p>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <h2 class="text-xl font-semibold text-white mb-6">Low Stock Items</h2>
+          <div class="space-y-3">
+            <div
+              v-for="item in lowStockItems.slice(0, 6)"
+              :key="item.id"
+              class="flex items-center justify-between p-3 bg-slate-700 rounded-lg"
             >
-              {{ inquiry.status }}
-            </span>
+              <div>
+                <p class="text-white text-sm font-medium">{{ item.name }}</p>
+                <p class="text-slate-400 text-xs">{{ item.supplier || '-' }}</p>
+              </div>
+              <p class="text-yellow-400 text-sm font-semibold">
+                {{ item.currentStock || 0 }} / {{ getEffectiveMaxStock(item) || 0 }} {{ item.unit || 'units' }}
+              </p>
+            </div>
+            <p v-if="lowStockItems.length === 0" class="text-slate-400 text-sm">No low stock items.</p>
           </div>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Status Breakdown -->
         <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 class="text-xl font-semibold text-white mb-6">Client Status</h2>
-          <div class="space-y-4">
-            <div v-for="status in clientStatus" :key="status.name" class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-white font-medium">{{ status.name }}</span>
-                <span class="text-slate-400">{{ status.count }} clients</span>
+          <h2 class="text-xl font-semibold text-white mb-6">Recent Purchase Requests</h2>
+          <div class="space-y-3">
+            <div
+              v-for="request in recentRequests.slice(0, 6)"
+              :key="request.id"
+              class="flex items-center justify-between p-3 bg-slate-700 rounded-lg"
+            >
+              <div>
+                <p class="text-white text-sm font-medium">{{ request.item || '-' }}</p>
+                <p class="text-slate-400 text-xs">{{ request.supplier || '-' }} • {{ request.quantity || 0 }} {{ request.unit || 'units' }}</p>
               </div>
-              <div class="w-full bg-slate-700 rounded-full h-2">
-                <div 
-                  :class="['h-2 rounded-full transition-all duration-500', status.color]"
-                  :style="{ width: `${(status.count / totalClients) * 100}%` }"
-                ></div>
-              </div>
+              <span
+                :class="[
+                  'px-2 py-1 rounded-full text-xs font-medium',
+                  request.status === 'Pending' ? 'bg-orange-500/20 text-orange-400' :
+                  request.status === 'Delivered' ? 'bg-green-500/20 text-green-400' :
+                  request.status === 'Delayed' ? 'bg-yellow-500/20 text-yellow-400' :
+                  'bg-slate-600 text-slate-300'
+                ]"
+              >
+                {{ request.status || 'Pending' }}
+              </span>
             </div>
+            <p v-if="recentRequests.length === 0" class="text-slate-400 text-sm">No purchase requests yet.</p>
           </div>
         </div>
 
         <div class="bg-slate-800 rounded-xl p-6 border border-slate-700">
           <h2 class="text-xl font-semibold text-white mb-6">Recent Activity</h2>
           <div class="space-y-4">
-            <div v-for="activity in recentActivity" :key="activity.id" class="flex items-start gap-4 pb-4 border-b border-slate-700 last:border-0">
+            <div
+              v-for="activity in recentActivity.slice(0, 8)"
+              :key="activity.id"
+              class="flex items-start gap-4 pb-4 border-b border-slate-700 last:border-0"
+            >
               <div class="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
                 <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                 </svg>
               </div>
               <div class="flex-1">
-                <p class="text-white text-sm">{{ activity.action }}</p>
+                <p class="text-white text-sm">{{ activity.action || 'Activity recorded' }}</p>
                 <p class="text-slate-400 text-xs mt-1">{{ activity.time }}</p>
               </div>
             </div>
+            <p v-if="recentActivity.length === 0" class="text-slate-400 text-sm">No recent activity yet.</p>
           </div>
         </div>
       </div>
@@ -139,47 +158,231 @@
 </template>
 
 <script>
-import { ref } from 'vue'
-import CRMSidebar from '@/components/manager/ManagerSidebar.vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { getFirestore, collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore'
+import { getAuth, onAuthStateChanged } from 'firebase/auth'
+import { getApp } from 'firebase/app'
+import ManagerSidebar from '@/components/sidebar/ManagerSidebar.vue'
+import { toast } from 'vue3-toastify'
+import { logActivity } from '@/utils/activityLogger'
 
 export default {
   name: 'ManagerDashboard',
-  components: {
-    CRMSidebar
-  },
+  components: { ManagerSidebar },
   setup() {
-    const totalClients = ref(342)
-    const newInquiries = ref(28)
-    const activeClients = ref(256)
-    const conversionRate = ref(68)
+    const db = getFirestore(getApp())
+    const auth = getAuth(getApp())
 
-    const recentInquiries = ref([
-      { id: 1, name: 'Sarah Johnson', email: 'sarah@email.com', service: 'Botox Treatment', date: '2 hours ago', status: 'New' },
-      { id: 2, name: 'Michael Chen', email: 'michael@email.com', service: 'Facial Treatment', date: '5 hours ago', status: 'Contacted' },
-      { id: 3, name: 'Emma Wilson', email: 'emma@email.com', service: 'Laser Treatment', date: '1 day ago', status: 'Converted' },
-      { id: 4, name: 'David Brown', email: 'david@email.com', service: 'Consultation', date: '2 days ago', status: 'New' }
-    ])
+    const currentUserId = ref('')
+    const currentBranchId = ref('')
+    const todayShiftLabel = ref('Off')
+    const weeklyShiftAssignments = ref([])
 
-    const clientStatus = ref([
-      { name: 'Active', count: 256, color: 'bg-green-500' },
-      { name: 'Potential', count: 52, color: 'bg-blue-500' },
-      { name: 'Inactive', count: 34, color: 'bg-yellow-500' }
-    ])
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    const todayDayName = computed(() =>
+      new Date().toLocaleDateString('en-US', { weekday: 'long' })
+    )
 
-    const recentActivity = ref([
-      { id: 1, action: 'New client registered: Sarah Johnson', time: '2 hours ago' },
-      { id: 2, action: 'Inquiry converted to client: Michael Chen', time: '5 hours ago' },
-      { id: 3, action: 'Follow-up scheduled: Emma Wilson', time: '1 day ago' },
-      { id: 4, action: 'Client status updated: David Brown', time: '2 days ago' }
-    ])
+    const staff = ref([])
+    const items = ref([])
+    const suppliers = ref([])
+    const requests = ref([])
+    const deliveredTotals = ref({})
+    const recentActivity = ref([])
+
+    const totalStaff = computed(() => staff.value.length)
+    const activeStaff = computed(() => staff.value.filter((s) => (s.status || '') === 'Active').length)
+    const totalProducts = computed(() => items.value.length)
+
+    const buildDeliveredTotals = (entries) => {
+      const map = {}
+      entries.forEach((entry) => {
+        if (String(entry.status || '').toLowerCase() !== 'delivered') return
+        const name = String(entry.item || '').trim().toLowerCase()
+        const supplier = String(entry.supplier || '').trim().toLowerCase()
+        if (!name) return
+        const key = `${name}::${supplier}`
+        const quantity = Number(entry.quantity || 0)
+        if (!Number.isFinite(quantity) || quantity <= 0) return
+        map[key] = (map[key] || 0) + quantity
+      })
+      return map
+    }
+
+    const getEffectiveMaxStock = (item) => {
+      const maxStock = Number(item?.maxStock || 0)
+      if (maxStock > 0) return maxStock
+      const key = `${String(item?.name || '').trim().toLowerCase()}::${String(item?.supplier || '').trim().toLowerCase()}`
+      const deliveredMax = Number(deliveredTotals.value[key] || 0)
+      if (deliveredMax > 0) return deliveredMax
+      return Number(item?.currentStock || 0)
+    }
+
+    const lowStockItems = computed(() =>
+      items.value.filter((item) => {
+        const current = Number(item.currentStock || 0)
+        const maxStock = Number(getEffectiveMaxStock(item) || 0)
+        if (current <= 0) return true
+        if (maxStock <= 0) return false
+        return current < maxStock * 0.5
+      })
+    )
+    const lowStockCount = computed(() => lowStockItems.value.length)
+    const totalSuppliers = computed(() => suppliers.value.length)
+    const activeSuppliers = computed(() => suppliers.value.filter((s) => (s.status || 'Active') === 'Active').length)
+    const totalRequests = computed(() => requests.value.length)
+    const pendingRequests = computed(() => requests.value.filter((r) => (r.status || 'Pending') === 'Pending').length)
+
+    const staffByRole = computed(() => {
+      const map = {}
+      staff.value.forEach((member) => {
+        const role = member.role || 'Unassigned'
+        map[role] = (map[role] || 0) + 1
+      })
+      return Object.entries(map)
+        .map(([role, count]) => ({ role, count }))
+        .sort((a, b) => b.count - a.count)
+    })
+
+    const staffByRoleMax = computed(() => {
+      return staffByRole.value.length > 0 ? Math.max(...staffByRole.value.map((r) => r.count)) : 0
+    })
+
+    const recentRequests = computed(() => {
+      return [...requests.value].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    })
+
+    const getWeekStartKey = (baseDate = new Date()) => {
+      const currentDay = baseDate.getDay()
+      const diffToMonday = (currentDay + 6) % 7
+      const monday = new Date(baseDate)
+      monday.setDate(baseDate.getDate() - diffToMonday)
+      const yyyy = monday.getFullYear()
+      const mm = String(monday.getMonth() + 1).padStart(2, '0')
+      const dd = String(monday.getDate()).padStart(2, '0')
+      return `${yyyy}-${mm}-${dd}`
+    }
+
+    const loadCurrentUserShift = async (profile = {}) => {
+      const fallbackShift =
+        String(profile.shiftStart || '').trim() && String(profile.shiftEnd || '').trim()
+          ? `${profile.shiftStart} - ${profile.shiftEnd}`
+          : 'Off'
+
+      try {
+        const weekKey = getWeekStartKey(new Date())
+        const schedulesSnap = await getDocs(collection(db, 'users', currentUserId.value, 'schedules'))
+        const schedules = schedulesSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }))
+        const currentWeek = schedules.find((entry) => String(entry.id) === weekKey)
+        const assignments = currentWeek?.assignments || {}
+
+        weeklyShiftAssignments.value = daysOfWeek.map((day) => ({
+          day,
+          shift: String(assignments[day] || '').trim() || 'Off'
+        }))
+
+        const todayEntry = weeklyShiftAssignments.value.find((entry) => entry.day === todayDayName.value)
+        todayShiftLabel.value = todayEntry?.shift || fallbackShift
+      } catch (error) {
+        weeklyShiftAssignments.value = daysOfWeek.map((day) => ({ day, shift: 'Off' }))
+        todayShiftLabel.value = fallbackShift
+      }
+    }
+
+
+    const loadManagerData = async () => {
+      if (!currentBranchId.value || !currentUserId.value) return
+
+      const staffQuery = query(
+        collection(db, 'users'),
+        where('branchId', '==', currentBranchId.value),
+        where('userType', '==', 'Staff')
+      )
+      const staffSnapshot = await getDocs(staffQuery)
+      staff.value = staffSnapshot.docs
+        .map((snap) => ({ id: snap.id, ...snap.data() }))
+        .filter((member) => !member.archived)
+
+      const itemQuery = query(collection(db, 'inventoryItems'), where('branchId', '==', currentBranchId.value))
+      const itemSnapshot = await getDocs(itemQuery)
+      items.value = itemSnapshot.docs.map((snap) => ({ id: snap.id, ...snap.data() }))
+
+      const supplierQuery = query(collection(db, 'suppliers'), where('branchId', '==', currentBranchId.value))
+      const supplierSnapshot = await getDocs(supplierQuery)
+      suppliers.value = supplierSnapshot.docs.map((snap) => ({ id: snap.id, ...snap.data() }))
+
+      const requestQuery = query(collection(db, 'purchaseRequests'), where('branchId', '==', currentBranchId.value))
+      const requestSnapshot = await getDocs(requestQuery)
+      requests.value = requestSnapshot.docs.map((snap) => ({ id: snap.id, ...snap.data() }))
+      deliveredTotals.value = buildDeliveredTotals(requests.value)
+
+      const activityQuery = query(collection(db, 'activities'), where('actorId', '==', currentUserId.value))
+      const activitySnapshot = await getDocs(activityQuery)
+      recentActivity.value = activitySnapshot.docs
+        .map((snap) => ({ id: snap.id, ...snap.data() }))
+        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+        .map((activity) => ({
+          ...activity,
+          time: activity.createdAt?.toDate?.().toLocaleString() || 'Unknown time'
+        }))
+    }
+
+    let unsubscribeAuth = null
+
+    onMounted(() => {
+      unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          currentUserId.value = ''
+          currentBranchId.value = ''
+          staff.value = []
+          items.value = []
+          suppliers.value = []
+          requests.value = []
+          recentActivity.value = []
+          return
+        }
+
+        currentUserId.value = user.uid
+        const userSnap = await getDoc(doc(db, 'users', user.uid))
+        const profile = userSnap.exists() ? userSnap.data() : {}
+        currentBranchId.value = profile.branchId || ''
+
+        if (!currentBranchId.value) {
+          toast.error('Your account has no branch assignment.', { toastId: 'missing-branch-assignment' })
+          return
+        }
+
+        await loadCurrentUserShift(profile)
+        await loadManagerData()
+        await logActivity(db, {
+          module: 'Manager',
+          action: 'Viewed manager dashboard',
+          details: 'Opened manager dashboard overview.'
+        })
+      })
+    })
+
+    onUnmounted(() => {
+      if (unsubscribeAuth) unsubscribeAuth()
+    })
 
     return {
-      totalClients,
-      newInquiries,
-      activeClients,
-      conversionRate,
-      recentInquiries,
-      clientStatus,
+      totalStaff,
+      activeStaff,
+      totalProducts,
+      lowStockCount,
+      totalSuppliers,
+      activeSuppliers,
+      totalRequests,
+      pendingRequests,
+      todayDayName,
+      todayShiftLabel,
+      weeklyShiftAssignments,
+      staffByRole,
+      staffByRoleMax,
+      lowStockItems,
+      getEffectiveMaxStock,
+      recentRequests,
       recentActivity
     }
   }

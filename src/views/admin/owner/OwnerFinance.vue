@@ -75,7 +75,9 @@ export default {
       branches.value = clinicData;
 
       const staffSnapshot = await getDocs(collection(db, "users"));
-      const staffData = staffSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter(u => u.userType === 'Staff');
+      const staffData = staffSnapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((u) => u.userType === 'Staff' && !u.archived);
 
       reports.value = staffData.map(s => {
         const clinic = clinicData.value.find(c => c.clinicBranch === s.clinicBranch && c.clinicLocation === s.clinicLocation);
@@ -204,7 +206,7 @@ export default {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row bg-slate-900 min-h-screen">
+  <div class="flex flex-col md:flex-row owner-theme bg-slate-900 min-h-screen">
     <OwnerSidebar />
 
     <main class="flex-1 p-4 md:p-8 overflow-x-hidden">

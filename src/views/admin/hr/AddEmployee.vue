@@ -1,11 +1,16 @@
 <script>
-import { ref, onMounted } from 'vue'
-import { getFirestore, collection, doc, getDocs, setDoc } from 'firebase/firestore'
-import { getApp } from 'firebase/app'
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
+import { ref, onMounted, watch, computed } from 'vue'
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore'
+import { deleteApp, getApp, initializeApp } from 'firebase/app'
+import { getAuth, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth'
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { toast } from 'vue3-toastify'
 import Swal from 'sweetalert2'
 import HRSidebar from '@/components/sidebar/HRSidebar.vue'
+import { logActivity } from '@/utils/activityLogger'
+import { generateAttendancePin } from '@/utils/attendancePin'
+import { sendAttendancePinEmail } from '@/utils/attendancePinMailer'
+import { storage } from '@/config/firebaseConfig'
 
 export default {
   name: 'AddEmployee',
@@ -13,136 +18,401 @@ export default {
   setup() {
     const db = getFirestore(getApp())
     const auth = getAuth(getApp())
-    const branches = ref([])
+    const currentBranchLabel = ref('')
+    const assignedBranchId = ref('')
 
     const currentStaff = ref({
-        firstName: '',
-        lastName: '',
-        email: '',
-        role: '',
-        userType: 'Staff',
-        level: 'Branch',   
-        branch: '',
-        status: 'Inactive'
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      address: '',
+      role: '',
+      employmentType: '',
+      userType: 'Staff',
+      branchId: '',   // ✅ store branchId instead of branch name
+      status: 'Active'
     })
+    const practitionerIdFile = ref(null)
 
-    // Load branches from Firestore
-    const loadBranches = async () => {
-        const snapshot = await getDocs(collection(db, "clinics"))
-        branches.value = snapshot.docs.map(doc => ({
-            id: doc.id,
-            branch: doc.data().clinicBranch,
-            location: doc.data().clinicLocation
-    }))
+    const setAssignedBranch = async (user) => {
+      if (!user) {
+        assignedBranchId.value = ''
+        currentStaff.value.branchId = ''
+        currentBranchLabel.value = ''
+        return
+      }
+
+      const userSnap = await getDoc(doc(db, 'users', user.uid))
+      if (!userSnap.exists()) {
+        assignedBranchId.value = ''
+        currentStaff.value.branchId = ''
+        currentBranchLabel.value = ''
+        return
+      }
+
+      const branchId = userSnap.data().branchId || ''
+      assignedBranchId.value = branchId
+      currentStaff.value.branchId = branchId
+
+      if (!branchId) {
+        currentBranchLabel.value = 'No branch assigned'
+        return
+      }
+
+      const clinicSnap = await getDoc(doc(db, 'clinics', branchId))
+      if (!clinicSnap.exists()) {
+        currentBranchLabel.value = 'Unknown branch'
+        return
+      }
+
+      const clinic = clinicSnap.data()
+      currentBranchLabel.value = `${clinic.clinicBranch || 'Branch'}${clinic.clinicLocation ? ` - ${clinic.clinicLocation}` : ''}`
     }
 
     onMounted(() => {
-      loadBranches()
+      onAuthStateChanged(auth, async (user) => {
+        await setAssignedBranch(user)
+      })
     })
 
+    const roles = ['Manager', 'Receptionist', 'Practitioner', 'Finance']
 
-    const officeRoles = ['HR', 'CRM', 'Supply', 'Finance']
-    const branchRoles = ['Manager', 'Cashier', 'Practitioner']
+    const normalizeLocalPhone = (value) => {
+      const digitsOnly = String(value || '').replace(/\D/g, '')
+      const withoutLeadingZero = digitsOnly.startsWith('0') ? digitsOnly.slice(1) : digitsOnly
+      return withoutLeadingZero.slice(0, 10)
+    }
 
-    const resetForm = () => {
-      currentStaff.value = {
-        name: '',
-        email: '',
-        role: '',
-        userType: 'Staff',
-        level: '',
-        branch: '',
-        status: 'Inactive'
+    const onPhoneInput = () => {
+      currentStaff.value.phoneNumber = normalizeLocalPhone(currentStaff.value.phoneNumber)
+      if (touchedFields.value.phoneNumber) {
+        validateField('phoneNumber')
       }
     }
 
-    const saveStaff = async () => {
-    if (!currentStaff.value.name.trim() || !currentStaff.value.email.trim() || !currentStaff.value.role.trim()) {
-        toast.error('Name, email, and role are required.')
-        return
+    const resetForm = () => {
+      currentStaff.value = {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        address: '',
+        role: '',
+        employmentType: '',
+        userType: 'Staff',
+        branchId: assignedBranchId.value,
+        status: 'Active'
+      }
+      practitionerIdFile.value = null
+      fieldErrors.value = {}
+      touchedFields.value = {}
     }
 
-    try {
+    const fieldErrors = ref({})
+    const touchedFields = ref({})
+
+    const hasLetter = (value) => /[A-Za-z]/.test(String(value || ''))
+    const isValidName = (value) => {
+      const trimmed = String(value || '').trim()
+      if (!trimmed) return false
+      if (!hasLetter(trimmed)) return false
+      return /^[A-Za-z][A-Za-z\s]*$/.test(trimmed)
+    }
+
+    const isValidAddress = (value) => {
+      const trimmed = String(value || '').trim()
+      if (!trimmed) return false
+      if (!hasLetter(trimmed)) return false
+      return /^[A-Za-z0-9\s.,'-]+$/.test(trimmed)
+    }
+
+    const isValidEmail = (value) => {
+      const trimmed = String(value || '').trim()
+      if (!trimmed) return false
+      // Allow only letters, numbers, dot, underscore, and @. Must include letters in local and domain.
+      if (!/^[A-Za-z0-9._@]+$/.test(trimmed)) return false
+      const parts = trimmed.split('@')
+      if (parts.length !== 2) return false
+      const [local, domain] = parts
+      if (!local || !domain) return false
+      if (!hasLetter(local) || !hasLetter(domain)) return false
+      if (!/^[A-Za-z0-9._]+$/.test(local)) return false
+      if (!/^[A-Za-z0-9.]+$/.test(domain)) return false
+      if (!domain.includes('.')) return false
+      return true
+    }
+
+    const validateField = (field) => {
+      const errors = { ...fieldErrors.value }
+      const value = currentStaff.value[field]
+
+      switch (field) {
+        case 'firstName':
+          if (!String(value || '').trim()) errors.firstName = 'First name is required.'
+          else if (!isValidName(value)) errors.firstName = 'Only letters and spaces are allowed.'
+          else errors.firstName = ''
+          break
+        case 'lastName':
+          if (!String(value || '').trim()) errors.lastName = 'Last name is required.'
+          else if (!isValidName(value)) errors.lastName = 'Only letters and spaces are allowed.'
+          else errors.lastName = ''
+          break
+        case 'email':
+          if (!String(value || '').trim()) errors.email = 'Email is required.'
+          else if (!isValidEmail(value)) errors.email = 'Only letters, numbers, ., _, and @ are allowed.'
+          else errors.email = ''
+          break
+        case 'phoneNumber': {
+          const localPhone = normalizeLocalPhone(value)
+          if (!localPhone) errors.phoneNumber = 'Phone number is required.'
+          else if (localPhone.length !== 10) errors.phoneNumber = 'Enter 10 digits after +63.'
+          else errors.phoneNumber = ''
+          break
+        }
+        case 'address':
+          if (!String(value || '').trim()) errors.address = 'Address is required.'
+          else if (!isValidAddress(value)) errors.address = 'Only letters, numbers, spaces, comma, period, apostrophe, and hyphen are allowed.'
+          else errors.address = ''
+          break
+        case 'role':
+          errors.role = String(value || '').trim() ? '' : 'Role is required.'
+          break
+        case 'employmentType':
+          errors.employmentType = String(value || '').trim() ? '' : 'Employment type is required.'
+          break
+        case 'branchId':
+          errors.branchId = String(value || '').trim() ? '' : 'Branch assignment is required.'
+          break
+        case 'practitionerId':
+          if (isPractitionerRole.value && !practitionerIdFile.value) {
+            errors.practitionerId = 'Practitioner ID attachment is required.'
+          } else {
+            errors.practitionerId = ''
+          }
+          break
+        default:
+          break
+      }
+
+      fieldErrors.value = errors
+      return !errors[field]
+    }
+
+    const markTouched = (field) => {
+      touchedFields.value = { ...touchedFields.value, [field]: true }
+      validateField(field)
+    }
+
+    const isPractitionerRole = computed(() => String(currentStaff.value.role || '').toLowerCase() === 'practitioner')
+
+    const handlePractitionerFile = (event) => {
+      const file = event?.target?.files?.[0] || null
+      if (!file) {
+        practitionerIdFile.value = null
+        return
+      }
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Allowed file types: JPG, PNG, WEBP, PDF.')
+        event.target.value = ''
+        practitionerIdFile.value = null
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File must be 5MB or smaller.')
+        event.target.value = ''
+        practitionerIdFile.value = null
+        return
+      }
+      practitionerIdFile.value = file
+    }
+
+    const validateForm = () => {
+      const fields = ['firstName', 'lastName', 'email', 'phoneNumber', 'address', 'role', 'employmentType', 'branchId']
+      let isValid = true
+      fields.forEach((field) => {
+        touchedFields.value = { ...touchedFields.value, [field]: true }
+        if (!validateField(field)) isValid = false
+      })
+      if (isPractitionerRole.value) {
+        touchedFields.value = { ...touchedFields.value, practitionerId: true }
+        if (!validateField('practitionerId')) isValid = false
+      }
+      return isValid
+    }
+
+    watch(
+      () => currentStaff.value.role,
+      (next) => {
+        if (String(next || '').toLowerCase() !== 'practitioner') {
+          practitionerIdFile.value = null
+          fieldErrors.value = { ...fieldErrors.value, practitionerId: '' }
+          touchedFields.value = { ...touchedFields.value, practitionerId: false }
+        }
+      }
+    )
+
+    watch(
+      () => ({ ...currentStaff.value }),
+      (next) => {
+        Object.keys(touchedFields.value).forEach((field) => {
+          if (touchedFields.value[field]) {
+            validateField(field)
+          }
+        })
+      },
+      { deep: true }
+    )
+
+    const saveStaff = async () => {
+      if (!validateForm()) {
+        toast.error('Please fix the highlighted fields.')
+        return
+      }
+
+      try {
+        const actorId = auth.currentUser?.uid || ''
+        const localPhone = normalizeLocalPhone(currentStaff.value.phoneNumber)
+        const formattedPhone = `+63${localPhone}`
+
         const result = await Swal.fire({
-        title: 'Confirm Staff Creation',
-        text: `Do you want to create an account for ${currentStaff.value.name} (${currentStaff.value.email})?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#aaa',
-        confirmButtonText: 'Yes, create',
-        cancelButtonText: 'Cancel'
+          title: 'Confirm Staff Creation',
+          text: `Do you want to create an account for ${currentStaff.value.firstName} ${currentStaff.value.lastName} (${currentStaff.value.email})?`,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Yes, create',
+          cancelButtonText: 'Cancel'
         })
 
         if (!result.isConfirmed) {
-        toast.info("Staff creation cancelled.")
-        return
+          toast.info("Staff creation cancelled.")
+          return
         }
 
         const defaultPassword = 'password123'
         let userCredential
+        let creatorApp = null
+        let creatorAuth = null
 
         try {
-        // Step 1: Create Auth user
-        userCredential = await createUserWithEmailAndPassword(auth, currentStaff.value.email, defaultPassword)
+          // Step 1: Create Auth user using a secondary app so current session is preserved.
+          const appName = `staff-creator-${Date.now()}-${Math.random().toString(36).slice(2)}`
+          creatorApp = initializeApp(getApp().options, appName)
+          creatorAuth = getAuth(creatorApp)
+          userCredential = await createUserWithEmailAndPassword(creatorAuth, currentStaff.value.email, defaultPassword)
         } catch (error) {
-        if (error.code === 'auth/email-already-in-use') {
+          if (error.code === 'auth/email-already-in-use') {
             toast.error("This email is already registered.")
             return
-        } else {
+          } else {
             toast.error("Failed to create staff account.")
             console.error(error)
             return
-        }
+          }
         }
 
         const uid = userCredential.user.uid
 
         try {
-        // Step 2: Save to Firestore
-        await setDoc(doc(db, "users", uid), {
+          const attendancePin = generateAttendancePin()
+          let practitionerLicenseUrl = ''
+          let practitionerLicenseName = ''
+
+          if (isPractitionerRole.value && practitionerIdFile.value) {
+            const uploaderId = auth.currentUser?.uid || 'unknown'
+            const safeName = practitionerIdFile.value.name.replace(/[^\w.\-]+/g, '_')
+            const filePath = `practitioner-licenses/${uploaderId}/${uid}/${Date.now()}-${safeName}`
+            const fileRef = storageRef(storage, filePath)
+            await uploadBytes(fileRef, practitionerIdFile.value)
+            practitionerLicenseUrl = await getDownloadURL(fileRef)
+            practitionerLicenseName = practitionerIdFile.value.name
+          }
+
+
+          // Step 2: Save to Firestore
+          await setDoc(doc(db, "users", uid), {
             firstName: currentStaff.value.firstName,
             lastName: currentStaff.value.lastName,
             fullName: `${currentStaff.value.firstName} ${currentStaff.value.lastName}`,
             email: currentStaff.value.email,
+            phoneNumber: formattedPhone,
+            address: currentStaff.value.address,
             role: currentStaff.value.role,
+            employmentType: currentStaff.value.employmentType,
             userType: 'Staff',
-            level: 'Branch',
-            branch: currentStaff.value.branch || null,
+            branchId: currentStaff.value.branchId,   // ✅ consistent schema
             status: currentStaff.value.status ?? "Inactive",
+            attendancePin,
+            practitionerLicenseUrl: practitionerLicenseUrl || null,
+            practitionerLicenseName: practitionerLicenseName || null,
+            practitionerLicenseUploadedBy: practitionerLicenseUrl ? (auth.currentUser?.uid || null) : null,
             mustChangePassword: true,
             createdAt: new Date()
-        })
+          })
 
-        toast.success('Staff member added successfully!')
-        resetForm()
+          const emailResult = await sendAttendancePinEmail({
+            recipient: currentStaff.value.email,
+            fullName: `${currentStaff.value.firstName} ${currentStaff.value.lastName}`,
+            attendancePin
+          })
+
+          await logActivity(db, {
+            actorId,
+            module: 'HR',
+            action: 'Added employee',
+            details: `Created staff account for ${currentStaff.value.firstName} ${currentStaff.value.lastName} (${currentStaff.value.role}).`,
+            targetUserId: uid,
+            targetUserName: `${currentStaff.value.firstName} ${currentStaff.value.lastName}`
+          })
+
+          if (emailResult.success && emailResult.sent) {
+            toast.success('Staff member added successfully. Attendance PIN email sent.')
+          } else if (emailResult.success && emailResult.skipped) {
+            toast.success(`Staff member added successfully. Attendance PIN generated: ${attendancePin}`)
+          } else {
+            toast.warning(`Staff created, but PIN email failed: ${emailResult.error}`)
+          }
+          resetForm()
         } catch (firestoreError) {
-        // Step 3: Rollback Auth if Firestore fails
-        await userCredential.user.delete()
-        console.error("Error saving staff to Firestore:", firestoreError)
-        toast.error("Failed to save staff record. Auth user was rolled back.")
+          // Step 3: Rollback Auth if Firestore fails
+          await userCredential.user.delete()
+          console.error("Error saving staff to Firestore:", firestoreError)
+          toast.error("Failed to save staff record. Auth user was rolled back.")
+        } finally {
+          if (creatorAuth) {
+            await signOut(creatorAuth).catch(() => {})
+          }
+          if (creatorApp) {
+            await deleteApp(creatorApp).catch(() => {})
+          }
         }
-    } catch (err) {
+      } catch (err) {
         console.error(err)
         toast.error("Unexpected error while saving staff.")
-    }
+      }
     }
 
     return {
       currentStaff,
-      officeRoles,
-      branchRoles,
+      currentBranchLabel,
+      roles,
+      onPhoneInput,
       saveStaff,
       resetForm,
-      branches,
-      loadBranches
+      fieldErrors,
+      touchedFields,
+      markTouched,
+      handlePractitionerFile,
+      practitionerIdFile,
+      isPractitionerRole
     }
   }
 }
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row bg-slate-900 min-h-screen">
+  <div class="flex flex-col md:flex-row module-theme bg-slate-900 min-h-screen">
     <HRSidebar />
 
     <main class="flex-1 p-6 md:p-10 text-white">
@@ -159,8 +429,12 @@ export default {
                 type="text"
                 v-model="currentStaff.firstName"
                 placeholder="Enter first name"
+                @blur="markTouched('firstName')"
                 class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <p v-if="touchedFields.firstName && fieldErrors.firstName" class="mt-1 text-xs text-rose-400">
+                {{ fieldErrors.firstName }}
+              </p>
             </div>
             <div>
               <label class="block text-slate-400 mb-1">Last Name</label>
@@ -168,8 +442,12 @@ export default {
                 type="text"
                 v-model="currentStaff.lastName"
                 placeholder="Enter last name"
+                @blur="markTouched('lastName')"
                 class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <p v-if="touchedFields.lastName && fieldErrors.lastName" class="mt-1 text-xs text-rose-400">
+                {{ fieldErrors.lastName }}
+              </p>
             </div>
           </div>
 
@@ -179,48 +457,107 @@ export default {
               type="email"
               v-model="currentStaff.email"
               placeholder="Enter staff email"
+              @blur="markTouched('email')"
               class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <p v-if="touchedFields.email && fieldErrors.email" class="mt-1 text-xs text-rose-400">
+              {{ fieldErrors.email }}
+            </p>
           </div>
 
-        <div>
-            <label class="block text-slate-400 mb-1">Level</label>
-            <input
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-slate-400 mb-1">Phone</label>
+              <div class="flex items-center rounded-lg border border-slate-600 bg-slate-700 focus-within:ring-2 focus-within:ring-blue-500">
+                <span class="px-3 py-2 text-slate-300 border-r border-slate-600">+63</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="10"
+                  v-model="currentStaff.phoneNumber"
+                  @input="onPhoneInput"
+                  @blur="markTouched('phoneNumber')"
+                  placeholder="9XXXXXXXXX"
+                  class="w-full px-3 py-2 bg-transparent text-white focus:outline-none"
+                />
+              </div>
+              <p v-if="touchedFields.phoneNumber && fieldErrors.phoneNumber" class="mt-1 text-xs text-rose-400">
+                {{ fieldErrors.phoneNumber }}
+              </p>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Address</label>
+              <input
                 type="text"
-                v-model="currentStaff.level"
-                readonly
-                class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 cursor-not-allowed"
-            />
-        </div>
+                v-model="currentStaff.address"
+                placeholder="Enter staff address"
+                @blur="markTouched('address')"
+                class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p v-if="touchedFields.address && fieldErrors.address" class="mt-1 text-xs text-rose-400">
+                {{ fieldErrors.address }}
+              </p>
+            </div>
+          </div>
 
           <div>
             <label class="block text-slate-400 mb-1">Role</label>
             <select
               v-model="currentStaff.role"
+              @blur="markTouched('role')"
               class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option disabled value="">Select Role</option>
-              <option v-for="role in (currentStaff.level === 'Office' ? officeRoles : branchRoles)" :key="role">
+              <option v-for="role in roles" :key="role" :value="role">
                 {{ role }}
               </option>
             </select>
+            <p v-if="touchedFields.role && fieldErrors.role" class="mt-1 text-xs text-rose-400">
+              {{ fieldErrors.role }}
+            </p>
           </div>
 
-        <div v-if="currentStaff.level === 'Branch'">
-            <label class="block text-slate-400 mb-1">Branch</label>
+          <div>
+            <label class="block text-slate-400 mb-1">Employment Type</label>
             <select
-                v-model="currentStaff.branch"
-                class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              v-model="currentStaff.employmentType"
+              @blur="markTouched('employmentType')"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-                <option disabled value="">Select Branch</option>
-                <option
-                v-for="branch in branches"
-                :key="branch.id"
-                :value="branch.branch"
-                >
-                {{ branch.branch }} - {{ branch.location }}
-                </option>
+              <option disabled value="">Select type</option>
+              <option value="Full-time">Full-time</option>
+              <option value="Part-time">Part-time</option>
             </select>
+            <p v-if="touchedFields.employmentType && fieldErrors.employmentType" class="mt-1 text-xs text-rose-400">
+              {{ fieldErrors.employmentType }}
+            </p>
+          </div>
+
+          <div v-if="isPractitionerRole">
+            <label class="block text-slate-400 mb-1">Practitioner ID Attachment</label>
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.pdf"
+              @change="(event) => { handlePractitionerFile(event); markTouched('practitionerId') }"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p v-if="touchedFields.practitionerId && fieldErrors.practitionerId" class="mt-1 text-xs text-rose-400">
+              {{ fieldErrors.practitionerId }}
+            </p>
+          </div>
+
+        <div>
+            <label class="block text-slate-400 mb-1">Branch</label>
+            <input
+              type="text"
+              :value="currentBranchLabel || 'No branch assigned'"
+              readonly
+              @blur="markTouched('branchId')"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 cursor-not-allowed"
+            />
+            <p v-if="touchedFields.branchId && fieldErrors.branchId" class="mt-1 text-xs text-rose-400">
+              {{ fieldErrors.branchId }}
+            </p>
         </div>
 
         <div>
@@ -254,3 +591,8 @@ export default {
     </main>
   </div>
 </template>
+
+
+
+
+

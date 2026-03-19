@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { auth } from '@/config/firebaseConfig'
 import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore'
 import { getApp } from 'firebase/app'
+import { onAuthStateChanged } from 'firebase/auth'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import { Chart, registerables } from 'chart.js'
 
@@ -43,12 +44,12 @@ export default {
         branches.value = branchData
         totalBranches.value = branches.value.length
 
-        const branchIds = branches.value.map(b => b.branchId)
+        const branchIds = branches.value.map(b => b.id)
 
         const staffSnapshot = await getDocs(collection(db, "users"))
         const staffData = staffSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(u => u.userType === 'Staff' && branchIds.includes(u.branchId))
+          .filter(u => u.userType === 'Staff' && branchIds.includes(u.branchId) && !u.archived)
 
         staff.value = staffData
         totalEmployees.value = staff.value.length
@@ -108,92 +109,52 @@ export default {
 const renderEmployeeChart = () => {
   if (!employeeChartRef.value) return
 
-  const branchCounts = {}
+  const roleCounts = {}
   let totalStaff = 0
 
-  staff.value.forEach(s => {
-    const clinic = branches.value.find(b => b.branchId === s.branchId)
-    const branchName = clinic ? clinic.clinicBranch : 'Unknown Branch'
-    branchCounts[branchName] = (branchCounts[branchName] || 0) + 1
-    totalStaff++
+  staff.value.forEach((member) => {
+    const rawRole = String(member.role || '').trim()
+    const normalizedRole = rawRole
+      ? `${rawRole.charAt(0).toUpperCase()}${rawRole.slice(1).toLowerCase()}`
+      : 'Unassigned'
+    roleCounts[normalizedRole] = (roleCounts[normalizedRole] || 0) + 1
+    totalStaff += 1
   })
 
-  const labels = Object.keys(branchCounts)
-  const data = Object.values(branchCounts)
+  const labels = Object.keys(roleCounts)
+  const data = Object.values(roleCounts)
+  const chartColors = labels.map((_label, index) => {
+    const hue = (index * 47) % 360
+    return `hsla(${hue}, 70%, 55%, 0.75)`
+  })
+  const borderColors = labels.map((_label, index) => {
+    const hue = (index * 47) % 360
+    return `hsla(${hue}, 70%, 55%, 1)`
+  })
 
   if (employeeChartInstance) employeeChartInstance.destroy()
-
-  // 🔹 If no data, show placeholder chart
-  const chartData = labels.length > 0
-    ? {
-        labels,
-        datasets: [
-          {
-            label: 'Employees by Role',
-            data,
-            backgroundColor: [
-              'rgba(30, 144, 255, 0.7)',
-              'rgba(255, 99, 132, 0.7)',
-              'rgba(255, 206, 86, 0.7)',
-              'rgba(75, 192, 192, 0.7)',
-              'rgba(153, 102, 255, 0.7)'
-            ],
-            borderColor: [
-              'rgba(30, 144, 255, 1)',
-              'rgba(255, 99, 132, 1)',
-              'rgba(255, 206, 86, 1)',
-              'rgba(75, 192, 192, 1)',
-              'rgba(153, 102, 255, 1)'
-            ],
-            borderWidth: 1
-          }
-        ]
-      }
-    : {
-        labels: ['No Data'],
-        datasets: [
-          {
-            label: 'Employees by Role',
-            data: [1],
-            backgroundColor: ['rgba(128,128,128,0.5)'],
-            borderColor: ['rgba(128,128,128,1)'],
-            borderWidth: 1
-          }
-        ]
-      }
 
   employeeChartInstance = new Chart(employeeChartRef.value, {
     type: 'pie',
     data: {
-      labels,
+      labels: labels.length > 0 ? labels : ['No Data'],
       datasets: [{
-        label: 'Employees by Branch',
-        data,
-        backgroundColor: [
-          'rgba(30,144,255,0.7)',
-          'rgba(255,99,132,0.7)',
-          'rgba(255,206,86,0.7)',
-          'rgba(75,192,192,0.7)',
-          'rgba(153,102,255,0.7)'
-        ],
-        borderColor: [
-          'rgba(30,144,255,1)',
-          'rgba(255,99,132,1)',
-          'rgba(255,206,86,1)',
-          'rgba(75,192,192,1)',
-          'rgba(153,102,255,1)'
-        ],
+        label: 'Employees by Role',
+        data: data.length > 0 ? data : [1],
+        backgroundColor: data.length > 0 ? chartColors : ['rgba(128,128,128,0.5)'],
+        borderColor: data.length > 0 ? borderColors : ['rgba(128,128,128,1)'],
         borderWidth: 1
       }]
     },
     options: {
       responsive: true,
       plugins: {
-        title: { display: true, text: 'Employees Distribution by Branch', color: '#fff' },
+        title: { display: true, text: 'Employees Distribution by Role', color: '#fff' },
         legend: { labels: { color: '#fff' } },
         tooltip: {
           callbacks: {
             label: function(context) {
+              if (data.length === 0) return 'No data'
               const value = context.raw
               const percentage = ((value / totalStaff) * 100).toFixed(1)
               return `${context.label}: ${value} (${percentage}%)`
@@ -205,10 +166,11 @@ const renderEmployeeChart = () => {
   })
 }
 
-    onMounted(async () => {
-      await loadDashboardData()
-      renderRevenueChart()
-      renderEmployeeChart()
+    onMounted(() => {
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) return
+        await loadDashboardData()
+      })
     })
 
     return {
@@ -226,14 +188,14 @@ const renderEmployeeChart = () => {
 </script>
 
 <template>
-  <div class="flex bg-slate-900 min-h-screen">
+  <div class="flex owner-theme bg-slate-900 min-h-screen">
     <OwnerSidebar />
 
     <main class="flex-1 p-8">
       <!-- Header -->
       <div class="mb-8">
         <h1 class="text-3xl font-bold text-white mb-2">Branch Overview</h1>
-        <p class="text-slate-400">Monitor clinic locations, staff, and revenue performance</p>
+        <p class="text-slate-400">Monitor clinic locations, employees, and revenue performance</p>
       </div>
 
       <!-- KPI Cards -->

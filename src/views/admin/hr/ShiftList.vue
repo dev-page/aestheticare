@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col md:flex-row bg-slate-900 min-h-screen">
+  <div class="flex flex-col md:flex-row module-theme bg-slate-900 min-h-screen">
     <HRSidebar />
 
     <main class="flex-1 p-6 md:p-10 text-white">
@@ -24,7 +24,6 @@
         <table class="w-full text-left border-collapse">
           <thead>
             <tr class="text-slate-400">
-              <th class="p-2">Day</th>
               <th class="p-2">Shift Type</th>
               <th class="p-2">Start</th>
               <th class="p-2">End</th>
@@ -35,7 +34,6 @@
           </thead>
           <tbody>
             <tr v-for="shift in filteredShifts" :key="shift.id" class="border-t border-slate-700">
-              <td class="p-2">{{ shift.dayOfWeek }}</td>
               <td class="p-2">{{ shift.shiftType }}</td>
               <td class="p-2">{{ shift.start }}</td>
               <td class="p-2">{{ shift.end }}</td>
@@ -53,44 +51,11 @@
         </table>
       </div>
 
-      <!-- Add Shift Modal -->
-      <div v-if="showAddModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-        <div class="bg-slate-800 p-6 rounded-lg shadow-lg w-96">
-          <h3 class="text-xl mb-4">Add Weekly Shift</h3>
-          <form @submit.prevent="addShift" class="space-y-3">
-            <select v-model="currentShift.dayOfWeek" class="w-full px-3 py-2 rounded bg-slate-700 text-white" required>
-              <option disabled value="">Select Day</option>
-              <option v-for="day in daysOfWeek" :key="day" :value="day">{{ day }}</option>
-            </select>
-
-            <select v-model="currentShift.shiftType" class="w-full px-3 py-2 rounded bg-slate-700 text-white" required>
-              <option disabled value="">Select Shift Type</option>
-              <option v-for="type in shiftTypes" :key="type" :value="type">{{ type }}</option>
-            </select>
-
-            <input type="time" v-model="currentShift.start" class="w-full px-3 py-2 rounded bg-slate-700 text-white" required />
-            <input type="time" v-model="currentShift.end" class="w-full px-3 py-2 rounded bg-slate-700 text-white" required />
-            <input type="text" v-model="currentShift.branch" placeholder="Branch" class="w-full px-3 py-2 rounded bg-slate-700 text-white" required />
-            <input type="number" min="1" v-model="currentShift.capacity" placeholder="Capacity" class="w-full px-3 py-2 rounded bg-slate-700 text-white" />
-
-            <div class="flex justify-end space-x-2">
-              <button type="button" @click="showAddModal = false" class="bg-slate-600 px-3 py-1 rounded">Cancel</button>
-              <button type="submit" class="bg-blue-600 px-3 py-1 rounded">Save</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
       <!-- Edit Shift Modal -->
       <div v-if="showEditModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
         <div class="bg-slate-800 p-6 rounded-lg shadow-lg w-96">
           <h3 class="text-xl mb-4">Edit Weekly Shift</h3>
           <form @submit.prevent="saveShift" class="space-y-3">
-            <select v-model="currentShift.dayOfWeek" class="w-full px-3 py-2 rounded bg-slate-700 text-white" required>
-              <option disabled value="">Select Day</option>
-              <option v-for="day in daysOfWeek" :key="day" :value="day">{{ day }}</option>
-            </select>
-
             <select v-model="currentShift.shiftType" class="w-full px-3 py-2 rounded bg-slate-700 text-white" required>
               <option disabled value="">Select Shift Type</option>
               <option v-for="type in shiftTypes" :key="type" :value="type">{{ type }}</option>
@@ -119,6 +84,7 @@ import { getApp } from 'firebase/app'
 import HRSidebar from '@/components/sidebar/HRSidebar.vue'
 import { toast } from 'vue3-toastify'
 import Swal from 'sweetalert2'
+import { logActivity } from '@/utils/activityLogger'
 
 export default {
   name: 'ShiftList',
@@ -126,15 +92,46 @@ export default {
   setup() {
     const db = getFirestore(getApp())
     const shifts = ref([])
-    const showAddModal = ref(false)
     const showEditModal = ref(false)
-    const currentShift = ref({ id: null, dayOfWeek: '', shiftType: '', start: '', end: '', branch: '', capacity: 1, employees: [] })
+    const currentShift = ref({ id: null, dayOfWeek: '', shiftType: '', start: '', end: '', branch: '', capacity: '', employees: [] })
 
-    const daysOfWeek = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
     const shiftTypes = ['Morning', 'Afternoon', 'Evening']
 
     const selectedBranch = ref('')
     const selectedShiftType = ref('')
+
+    const timeToMinutes = (value) => {
+      if (!value) return null
+      const parts = String(value).split(':')
+      if (parts.length < 2) return null
+      const hours = Number(parts[0])
+      const minutes = Number(parts[1])
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+      return hours * 60 + minutes
+    }
+
+    const validateShiftInput = () => {
+      if (!currentShift.value.shiftType || !currentShift.value.start || !currentShift.value.end || !currentShift.value.branch) {
+        toast.error('Shift type, start time, end time, and branch are required.')
+        return false
+      }
+      const startMinutes = timeToMinutes(currentShift.value.start)
+      const endMinutes = timeToMinutes(currentShift.value.end)
+      if (startMinutes === null || endMinutes === null) {
+        toast.error('Please provide a valid start and end time.')
+        return false
+      }
+      if (endMinutes <= startMinutes) {
+        toast.error('End time must be later than start time.')
+        return false
+      }
+      const capacity = Number(currentShift.value.capacity || 0)
+      if (!Number.isFinite(capacity) || capacity < 1) {
+        toast.error('Capacity must be at least 1.')
+        return false
+      }
+      return true
+    }
 
     const loadShifts = async () => {
       try {
@@ -161,17 +158,15 @@ export default {
 
     const addShift = async () => {
       if (!currentShift.value.dayOfWeek || !currentShift.value.shiftType || !currentShift.value.start || !currentShift.value.end || !currentShift.value.branch) {
-        toast.error("Day, shift type, start, end, and branch are required.")
+        toast.error("Shift type, start, end, and branch are required.")
         return
       }
       try {
         const result = await Swal.fire({
-          title: 'Confirm Weekly Shift',
-          text: `Create ${currentShift.value.shiftType} shift every ${currentShift.value.dayOfWeek} (${currentShift.value.start} - ${currentShift.value.end}) at ${currentShift.value.branch}?`,
+          title: 'Confirm Shift',
+          text: `Create ${currentShift.value.shiftType} shift (${currentShift.value.start} - ${currentShift.value.end}) at ${currentShift.value.branch}?`,
           icon: 'question',
           showCancelButton: true,
-          confirmButtonColor: '#3085d6',
-          cancelButtonColor: '#aaa',
           confirmButtonText: 'Yes, create',
           cancelButtonText: 'Cancel'
         })
@@ -180,7 +175,7 @@ export default {
         await addDoc(collection(db, "shifts"), { ...currentShift.value })
         toast.success("Shift added successfully!")
         showAddModal.value = false
-        currentShift.value = { id: null, dayOfWeek: '', shiftType: '', start: '', end: '', branch: '', capacity: 1, employees: [] }
+        currentShift.value = { id: null, shiftType: '', start: '', end: '', branch: '', capacity: 1, employees: [] }
         await loadShifts()
       } catch (err) {
         console.error("Error adding shift:", err)
@@ -195,12 +190,18 @@ export default {
 
     const saveShift = async () => {
       if (!currentShift.value.id) return
+      if (!validateShiftInput()) return
       try {
         const shiftRef = doc(db, "shifts", currentShift.value.id)
         await updateDoc(shiftRef, { ...currentShift.value })
+        await logActivity(db, {
+          module: 'HR',
+          action: 'Updated shift',
+          details: `Updated ${currentShift.value.shiftType} shift (${currentShift.value.start} - ${currentShift.value.end}) for ${currentShift.value.branch}.`
+        })
         toast.success("Shift updated successfully!")
         showEditModal.value = false
-        currentShift.value = { id: null, dayOfWeek: '', shiftType: '', start: '', end: '', branch: '', capacity: 1, employees: [] }
+        currentShift.value = { id: null, shiftType: '', start: '', end: '', branch: '', capacity: 1, employees: [] }
         await loadShifts()
       } catch (err) {
         console.error("Error updating shift:", err)
@@ -211,16 +212,20 @@ export default {
     const deleteShift = async (id) => {
       try {
         const result = await Swal.fire({
-          title: 'Delete Weekly Shift?',
+          title: 'Delete Shift?',
           text: "This recurring schedule will be removed.",
           icon: 'warning',
           showCancelButton: true,
-          confirmButtonColor: '#d33',
           confirmButtonText: 'Delete'
         })
         if (!result.isConfirmed) return
 
         await deleteDoc(doc(db, "shifts", id))
+        await logActivity(db, {
+          module: 'HR',
+          action: 'Deleted shift',
+          details: `Deleted shift schedule with id ${id}.`
+        })
         toast.success("Shift deleted successfully!")
         await loadShifts()
       } catch (err) {
@@ -231,16 +236,13 @@ export default {
 
     return {
       shifts,
-      showAddModal,
       showEditModal,
       currentShift,
-      daysOfWeek,
       shiftTypes,
       selectedBranch,
       selectedShiftType,
       branchOptions,
       filteredShifts,
-      addShift,
       editShift,
       saveShift,
       deleteShift

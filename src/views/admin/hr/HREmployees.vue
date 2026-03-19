@@ -1,5 +1,5 @@
 <template>
-  <div class="flex bg-slate-900 min-h-screen">
+  <div class="flex module-theme bg-slate-900 min-h-screen">
     <HRSidebar />
     
     <main class="flex-1 p-8">
@@ -138,6 +138,7 @@
                 <label class="block text-slate-400 text-sm mb-2">Full Name</label>
                 <input 
                   type="text" 
+                  v-model="addEmployeeForm.fullName"
                   required
                   class="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:border-purple-500 focus:outline-none"
                 />
@@ -146,6 +147,7 @@
                 <label class="block text-slate-400 text-sm mb-2">Email</label>
                 <input 
                   type="email" 
+                  v-model="addEmployeeForm.email"
                   required
                   class="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:border-purple-500 focus:outline-none"
                 />
@@ -153,6 +155,7 @@
               <div>
                 <label class="block text-slate-400 text-sm mb-2">Position</label>
                 <select 
+                  v-model="addEmployeeForm.position"
                   required
                   class="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:border-purple-500 focus:outline-none"
                 >
@@ -166,6 +169,7 @@
               <div>
                 <label class="block text-slate-400 text-sm mb-2">Branch</label>
                 <select 
+                  v-model="addEmployeeForm.branch"
                   required
                   class="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:border-yellow-500 focus:outline-none"
                 >
@@ -206,6 +210,7 @@ import { getFirestore, collection, getDocs, doc, updateDoc } from 'firebase/fire
 import { getApp } from 'firebase/app';
 import HRSidebar from '@/components/sidebar/HRSidebar.vue'
 import { toast } from 'vue3-toastify'
+import { logActivity } from '@/utils/activityLogger'
 
 export default {
   name: 'HREmployees',
@@ -221,6 +226,13 @@ export default {
     const selectedBranch = ref('')
     const selectedPosition = ref('')
 
+    const addEmployeeForm = ref({
+      fullName: '',
+      email: '',
+      position: '',
+      branch: ''
+    })
+
     const employees = ref([])
     const currentEmployee = ref({
       id: null,
@@ -234,7 +246,9 @@ export default {
     const loadEmployees = async () => {
       try {
         const staffSnapshot = await getDocs(collection(db, "users"))
-        const staffData = staffSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(u => u.userType === 'Staff')
+        const staffData = staffSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(u => u.userType === 'Staff' && !u.archived)
       } catch (err) {
         console.error("Error loading employees:", err)
       }
@@ -253,9 +267,34 @@ export default {
       })
     })
 
+    const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
+
     const addEmployee = () => {
-      // Add employee logic here
+      if (!addEmployeeForm.value.fullName.trim()) {
+        toast.error('Full name is required.')
+        return
+      }
+      if (!isValidEmail(addEmployeeForm.value.email)) {
+        toast.error('Please enter a valid email address.')
+        return
+      }
+      if (!addEmployeeForm.value.position) {
+        toast.error('Please select a position.')
+        return
+      }
+      if (!addEmployeeForm.value.branch) {
+        toast.error('Please select a branch.')
+        return
+      }
+
+      toast.info('Employee form validated. Use the Add Employee page to create actual accounts.')
       showAddModal.value = false
+      addEmployeeForm.value = {
+        fullName: '',
+        email: '',
+        position: '',
+        branch: ''
+      }
     }
 
     const editEmployee = (employee) => {
@@ -265,6 +304,14 @@ export default {
 
     const saveEmployee = async () => {
       try {
+        if (!currentEmployee.value.name || !currentEmployee.value.email || !currentEmployee.value.branch || !currentEmployee.value.position) {
+          toast.error('Name, email, branch, and position are required.')
+          return
+        }
+        if (!isValidEmail(currentEmployee.value.email)) {
+          toast.error('Please enter a valid email address.')
+          return
+        }
         if (!currentEmployee.value.id) return
         const employeeRef = doc(db, "users", currentEmployee.value.id)
         await updateDoc(employeeRef, {
@@ -273,6 +320,13 @@ export default {
           branch: currentEmployee.value.branch,
           position: currentEmployee.value.position,
           status: currentEmployee.value.status
+        })
+        await logActivity(db, {
+          module: 'HR',
+          action: 'Updated employee profile',
+          details: `Updated profile details of ${currentEmployee.value.name}.`,
+          targetUserId: currentEmployee.value.id,
+          targetUserName: currentEmployee.value.name
         })
         toast.success("Employee updated successfully!")
         showEditModal.value = false
@@ -289,6 +343,7 @@ export default {
       searchQuery,
       selectedBranch,
       selectedPosition,
+      addEmployeeForm,
       employees,
       filteredEmployees,
       currentEmployee,

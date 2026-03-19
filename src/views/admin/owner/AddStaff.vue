@@ -1,11 +1,16 @@
 <script>
-import { ref, onMounted, computed } from 'vue'
-import { getFirestore, collection, doc, getDocs, setDoc } from 'firebase/firestore'
-import { getApp } from 'firebase/app'
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
+import { ref, onMounted, computed, watch } from 'vue'
+import { getFirestore, collection, doc, getDocs, setDoc, query, where } from 'firebase/firestore'
+import { deleteApp, getApp, initializeApp } from 'firebase/app'
+import { getAuth, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth'
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { toast } from 'vue3-toastify'
 import Swal from 'sweetalert2'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
+import { generateAttendancePin } from '@/utils/attendancePin'
+import { sendAttendancePinEmail } from '@/utils/attendancePinMailer'
+import { useSubscription } from '@/composables/useSubscription'
+import { storage } from '@/config/firebaseConfig'
 
 export default {
   name: 'AddStaff',
@@ -14,31 +19,59 @@ export default {
     const db = getFirestore(getApp())
     const auth = getAuth(getApp())
     const branches = ref([])
+    const { initSubscription, activePlan } = useSubscription()
 
     const currentStaff = ref({
       firstName: '',
       lastName: '',
       email: '',
       phoneNumber: '',
-      role: 'HR',
+      role: '',
+      employmentType: '',
       userType: 'Staff',
       clinicBranch: '',   // will hold branchId
       clinicLocation: '',
       status: 'Active'
     })
+    const practitionerIdFile = ref(null)
+
+    const isBasicPlan = computed(() => String(activePlan.value || '').trim().toLowerCase() === 'basic')
+    const roleOptions = computed(() => (
+      isBasicPlan.value
+        ? ['Receptionist', 'Practitioner', 'Manager']
+        : ['Manager', 'Receptionist', 'Practitioner', 'Finance']
+    ))
 
     // Load branches from Firestore
     const loadBranches = async () => {
-      const snapshot = await getDocs(collection(db, "clinics"))
+      const user = auth.currentUser
+      if (!user) {
+        branches.value = []
+        return
+      }
+
+      const ownerBranchesQuery = query(
+        collection(db, "clinics"),
+        where("ownerId", "==", user.uid)
+      )
+      const snapshot = await getDocs(ownerBranchesQuery)
       branches.value = snapshot.docs.map(doc => ({
         id: doc.id, // branchId reference
         branch: doc.data().clinicBranch,
         location: doc.data().clinicLocation
       }))
+
+      if (isBasicPlan.value && branches.value.length > 0) {
+        currentStaff.value.clinicBranch = branches.value[0].id
+        updateLocation()
+      }
     }
 
-    onMounted(() => {
-      loadBranches()
+    onMounted(async () => {
+      await initSubscription()
+      onAuthStateChanged(auth, () => {
+        loadBranches()
+      })
     })
 
     const resetForm = () => {
@@ -47,11 +80,17 @@ export default {
         lastName: '',
         email: '',
         phoneNumber: '',
-        role: 'HR',
+        role: roleOptions.value[0] || '',
+        employmentType: '',
         userType: 'Staff',
         clinicBranch: '',
         clinicLocation: '',
         status: 'Active'
+      }
+      practitionerIdFile.value = null
+      if (isBasicPlan.value && branches.value.length > 0) {
+        currentStaff.value.clinicBranch = branches.value[0].id
+        updateLocation()
       }
     }
 
@@ -61,47 +100,156 @@ export default {
       currentStaff.value.clinicLocation = selected ? selected.location : ""
     }
 
+    watch(roleOptions, (next) => {
+      if (!currentStaff.value.role || !next.includes(currentStaff.value.role)) {
+        currentStaff.value.role = next[0] || ''
+      }
+    }, { immediate: true })
+
+    const sanitizeName = (value) => value.replace(/[^A-Za-z\s]/g, '')
+    const sanitizeEmail = (value) => value.replace(/[^A-Za-z0-9@._]/g, '')
+    const sanitizePhone = (value) => value.replace(/\D/g, '')
+
+    const handleFirstNameInput = (event) => {
+      const value = event?.target?.value ?? ''
+      currentStaff.value.firstName = sanitizeName(value)
+    }
+
+    const handleLastNameInput = (event) => {
+      const value = event?.target?.value ?? ''
+      currentStaff.value.lastName = sanitizeName(value)
+    }
+
+    const handleEmailInput = (event) => {
+      const value = event?.target?.value ?? ''
+      currentStaff.value.email = sanitizeEmail(value)
+    }
+
+    const handlePhoneInput = (event) => {
+      const value = event?.target?.value ?? ''
+      currentStaff.value.phoneNumber = sanitizePhone(value).slice(0, 10)
+    }
+
+    const fieldErrors = computed(() => {
+      const errors = {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        clinicBranch: '',
+        clinicLocation: '',
+        employmentType: '',
+        practitionerId: ''
+      }
+
+      const nameRegex = /^[A-Za-z\s]+$/
+      const emailRegex = /^[A-Za-z0-9._]+@[A-Za-z0-9._]+\.[A-Za-z]{2,}$/
+
+      if (!currentStaff.value.firstName.trim()) {
+        errors.firstName = 'First name is required.'
+      } else if (!nameRegex.test(currentStaff.value.firstName.trim())) {
+        errors.firstName = 'Only letters and spaces are allowed.'
+      }
+
+      if (!currentStaff.value.lastName.trim()) {
+        errors.lastName = 'Last name is required.'
+      } else if (!nameRegex.test(currentStaff.value.lastName.trim())) {
+        errors.lastName = 'Only letters and spaces are allowed.'
+      }
+
+      if (!currentStaff.value.email.trim()) {
+        errors.email = 'Email is required.'
+      } else if (!emailRegex.test(currentStaff.value.email.trim())) {
+        errors.email = 'Use letters, numbers, and @ . _ only.'
+      }
+
+      if (!currentStaff.value.phoneNumber.trim()) {
+        errors.phoneNumber = 'Phone number is required.'
+      } else if (currentStaff.value.phoneNumber.length !== 10) {
+        errors.phoneNumber = 'Enter a 10-digit mobile number.'
+      }
+
+      if (!currentStaff.value.clinicBranch.trim()) {
+        errors.clinicBranch = 'Branch is required.'
+      }
+
+      if (!currentStaff.value.clinicLocation.trim()) {
+        errors.clinicLocation = 'Clinic location is required.'
+      }
+      if (!currentStaff.value.employmentType.trim()) {
+        errors.employmentType = 'Employment type is required.'
+      }
+      if (String(currentStaff.value.role || '').toLowerCase() === 'practitioner' && !practitionerIdFile.value) {
+        errors.practitionerId = 'Practitioner ID attachment is required.'
+      }
+
+      return errors
+    })
+
+    const hasErrors = computed(() => Object.values(fieldErrors.value).some(Boolean))
+    const isPractitionerRole = computed(() => String(currentStaff.value.role || '').toLowerCase() === 'practitioner')
+
+    const handlePractitionerFile = (event) => {
+      const file = event?.target?.files?.[0] || null
+      if (!file) {
+        practitionerIdFile.value = null
+        return
+      }
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Allowed file types: JPG, PNG, WEBP, PDF.')
+        event.target.value = ''
+        practitionerIdFile.value = null
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File must be 5MB or smaller.')
+        event.target.value = ''
+        practitionerIdFile.value = null
+        return
+      }
+      practitionerIdFile.value = file
+    }
+
     const saveStaff = async () => {
-      if (!currentStaff.value.firstName.trim() || 
-          !currentStaff.value.lastName.trim() || 
-          !currentStaff.value.email.trim() || 
-          !currentStaff.value.phoneNumber.trim() || 
-          !currentStaff.value.role.trim() || 
-          !currentStaff.value.clinicBranch.trim() || 
-          !currentStaff.value.clinicLocation.trim()) {
-        toast.error('All fields are required.')
+      if (hasErrors.value) {
+        const firstError = Object.values(fieldErrors.value).find(Boolean)
+        toast.error(firstError || 'Please fix the highlighted fields.')
         return
       }
 
       try {
         const result = await Swal.fire({
-          title: 'Confirm Staff Creation',
+          title: 'Confirm Employee Creation',
           text: `Do you want to create an account for ${currentStaff.value.firstName} ${currentStaff.value.lastName} (${currentStaff.value.email})?`,
           icon: 'question',
           showCancelButton: true,
-          confirmButtonColor: '#3085d6',
-          cancelButtonColor: '#aaa',
           confirmButtonText: 'Yes, create',
           cancelButtonText: 'Cancel'
         })
 
         if (!result.isConfirmed) {
-          toast.info("Staff creation cancelled.")
+          toast.info("Employee creation cancelled.")
           return
         }
 
         const defaultPassword = 'password123'
         let userCredential
+        let creatorApp = null
+        let creatorAuth = null
 
         try {
-          // Step 1: Create Auth user
-          userCredential = await createUserWithEmailAndPassword(auth, currentStaff.value.email, defaultPassword)
+          // Step 1: Create Auth user using a secondary app so current session is preserved.
+          const appName = `staff-creator-${Date.now()}-${Math.random().toString(36).slice(2)}`
+          creatorApp = initializeApp(getApp().options, appName)
+          creatorAuth = getAuth(creatorApp)
+          userCredential = await createUserWithEmailAndPassword(creatorAuth, currentStaff.value.email, defaultPassword)
         } catch (error) {
           if (error.code === 'auth/email-already-in-use') {
             toast.error("This email is already registered.")
             return
           } else {
-            toast.error("Failed to create staff account.")
+            toast.error("Failed to create employee account.")
             console.error(error)
             return
           }
@@ -110,33 +258,71 @@ export default {
         const uid = userCredential.user.uid
 
         try {
+          const attendancePin = generateAttendancePin()
+          let practitionerLicenseUrl = ''
+          let practitionerLicenseName = ''
+
+          if (isPractitionerRole.value && practitionerIdFile.value) {
+            const ownerId = auth.currentUser?.uid || 'unknown'
+            const safeName = practitionerIdFile.value.name.replace(/[^\w.\-]+/g, '_')
+            const filePath = `practitioner-licenses/${ownerId}/${uid}/${Date.now()}-${safeName}`
+            const fileRef = storageRef(storage, filePath)
+            await uploadBytes(fileRef, practitionerIdFile.value)
+            practitionerLicenseUrl = await getDownloadURL(fileRef)
+            practitionerLicenseName = practitionerIdFile.value.name
+          }
+
           // Step 2: Save to Firestore
           await setDoc(doc(db, "users", uid), {
             firstName: currentStaff.value.firstName,
             lastName: currentStaff.value.lastName,
             fullName: `${currentStaff.value.firstName} ${currentStaff.value.lastName}`,
             email: currentStaff.value.email,
-            phoneNumber: currentStaff.value.phoneNumber,
-            role: 'HR',
+            phoneNumber: `+63${currentStaff.value.phoneNumber}`,
+            role: currentStaff.value.role,
+            employmentType: currentStaff.value.employmentType,
             userType: 'Staff',
             branchId: currentStaff.value.clinicBranch,   // ✅ store branchId reference
             clinicLocation: currentStaff.value.clinicLocation,
             status: currentStaff.value.status ?? "Active",
+            attendancePin,
+            practitionerLicenseUrl: practitionerLicenseUrl || null,
+            practitionerLicenseName: practitionerLicenseName || null,
+            practitionerLicenseUploadedBy: practitionerLicenseUrl ? (auth.currentUser?.uid || null) : null,
             mustChangePassword: true,
             createdAt: new Date()
           })
 
-          toast.success('Staff member added successfully!')
+          const emailResult = await sendAttendancePinEmail({
+            recipient: currentStaff.value.email,
+            fullName: `${currentStaff.value.firstName} ${currentStaff.value.lastName}`,
+            attendancePin
+          })
+
+          if (emailResult.success && emailResult.sent) {
+          toast.success('Employee added successfully. Attendance PIN email sent.')
+          } else if (emailResult.success && emailResult.skipped) {
+          toast.success(`Employee added successfully. Attendance PIN generated: ${attendancePin}`)
+          } else {
+          toast.warning(`Employee created, but PIN email failed: ${emailResult.error}`)
+          }
           resetForm()
         } catch (firestoreError) {
           // Step 3: Rollback Auth if Firestore fails
           await userCredential.user.delete()
           console.error("Error saving staff to Firestore:", firestoreError)
-          toast.error("Failed to save staff record. Auth user was rolled back.")
+          toast.error("Failed to save employee record. Auth user was rolled back.")
+        } finally {
+          if (creatorAuth) {
+            await signOut(creatorAuth).catch(() => {})
+          }
+          if (creatorApp) {
+            await deleteApp(creatorApp).catch(() => {})
+          }
         }
       } catch (err) {
         console.error(err)
-        toast.error("Unexpected error while saving staff.")
+        toast.error("Unexpected error while saving employee.")
       }
     }
 
@@ -157,71 +343,172 @@ export default {
       branches,
       loadBranches,
       updateLocation,
-      isFormEmpty
+      fieldErrors,
+      hasErrors,
+      handleFirstNameInput,
+      handleLastNameInput,
+      handleEmailInput,
+      handlePhoneInput,
+      handlePractitionerFile,
+      practitionerIdFile,
+      isPractitionerRole,
+      isFormEmpty,
+      roleOptions,
+      isBasicPlan
     }
   }
 }
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row bg-slate-900 min-h-screen">
+  <div class="flex flex-col md:flex-row owner-theme bg-slate-900 min-h-screen">
     <OwnerSidebar />
 
     <main class="flex-1 p-6 md:p-10 text-white">
-      <h1 class="text-2xl font-bold mb-6">Add Staff</h1>
+      <h1 class="text-2xl font-bold mb-6">Add Employee</h1>
 
       <div class="bg-slate-800 rounded-xl shadow-lg p-6 md:p-8 border border-slate-700 max-w-2xl mx-auto">
         <form class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-slate-400 mb-1">First Name</label>
-              <input type="text" v-model="currentStaff.firstName" placeholder="Enter first name"
-                class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <input
+                type="text"
+                v-model="currentStaff.firstName"
+                placeholder="Enter first name"
+                @input="handleFirstNameInput"
+                :class="[
+                  'w-full px-3 py-2 rounded-lg bg-slate-700 text-white border focus:outline-none focus:ring-2',
+                  fieldErrors.firstName ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+                ]"
               />
+              <p v-if="fieldErrors.firstName" class="mt-1 text-xs text-red-400">{{ fieldErrors.firstName }}</p>
             </div>
             <div>
               <label class="block text-slate-400 mb-1">Last Name</label>
-              <input type="text" v-model="currentStaff.lastName" placeholder="Enter last name"
-                class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <input
+                type="text"
+                v-model="currentStaff.lastName"
+                placeholder="Enter last name"
+                @input="handleLastNameInput"
+                :class="[
+                  'w-full px-3 py-2 rounded-lg bg-slate-700 text-white border focus:outline-none focus:ring-2',
+                  fieldErrors.lastName ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+                ]"
               />
+              <p v-if="fieldErrors.lastName" class="mt-1 text-xs text-red-400">{{ fieldErrors.lastName }}</p>
             </div>
           </div>
 
           <div>
             <label class="block text-slate-400 mb-1">Email</label>
-            <input type="email" v-model="currentStaff.email" placeholder="Enter staff email"
-              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <input
+              type="email"
+              v-model="currentStaff.email"
+              placeholder="Enter employee email"
+              @input="handleEmailInput"
+              :class="[
+                'w-full px-3 py-2 rounded-lg bg-slate-700 text-white border focus:outline-none focus:ring-2',
+                fieldErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+              ]"
             />
+            <p v-if="fieldErrors.email" class="mt-1 text-xs text-red-400">{{ fieldErrors.email }}</p>
           </div>
 
           <div>
             <label class="block text-slate-400 mb-1">Phone Number</label>
-            <input type="text" v-model="currentStaff.phoneNumber" placeholder="Enter staff phone number"
-              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm">+63</span>
+              <input
+                type="text"
+                v-model="currentStaff.phoneNumber"
+                placeholder="Enter 10-digit mobile number"
+                @input="handlePhoneInput"
+                inputmode="numeric"
+                :class="[
+                  'w-full px-3 py-2 rounded-lg bg-slate-700 text-white border focus:outline-none focus:ring-2 pl-12',
+                  fieldErrors.phoneNumber ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+                ]"
+              />
+            </div>
+            <p v-if="fieldErrors.phoneNumber" class="mt-1 text-xs text-red-400">{{ fieldErrors.phoneNumber }}</p>
           </div>
 
           <div>
             <label class="block text-slate-400 mb-1">Role</label>
-            <input type="text" v-model="currentStaff.role" readonly
-              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 cursor-not-allowed"/>
+            <select
+              v-model="currentStaff.role"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:ring-2 focus:ring-blue-500"
+            >
+              <option disabled value="">Select role</option>
+              <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 mb-1">Employment Type</label>
+            <select
+              v-model="currentStaff.employmentType"
+              :class="[
+                'w-full px-3 py-2 rounded-lg bg-slate-700 text-white border focus:ring-2',
+                fieldErrors.employmentType ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+              ]"
+            >
+              <option disabled value="">Select type</option>
+              <option value="Full-time">Full-time</option>
+              <option value="Part-time">Part-time</option>
+            </select>
+            <p v-if="fieldErrors.employmentType" class="mt-1 text-xs text-red-400">{{ fieldErrors.employmentType }}</p>
+          </div>
+
+          <div v-if="isPractitionerRole">
+            <label class="block text-slate-400 mb-1">Practitioner ID Attachment</label>
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.pdf"
+              @change="handlePractitionerFile"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:ring-2 focus:ring-blue-500"
+            />
+            <p v-if="fieldErrors.practitionerId" class="mt-1 text-xs text-red-400">{{ fieldErrors.practitionerId }}</p>
           </div>
 
           <div>
             <label class="block text-slate-400 mb-1">Branch</label>
-            <select v-model="currentStaff.clinicBranch" @change="updateLocation"
-              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:ring-2 focus:ring-blue-500">
+            <select
+              v-if="!isBasicPlan"
+              v-model="currentStaff.clinicBranch"
+              @change="updateLocation"
+              :class="[
+                'w-full px-3 py-2 rounded-lg bg-slate-700 text-white border focus:ring-2',
+                fieldErrors.clinicBranch ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+              ]">
               <option disabled value="">Select Branch</option>
               <option v-for="branch in branches" :key="branch.id" :value="branch.id">
                 {{ branch.branch }} - {{ branch.location }}
               </option>
             </select>
+            <input
+              v-else
+              type="text"
+              readonly
+              :value="branches.find(b => b.id === currentStaff.clinicBranch)?.branch || ''"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 cursor-not-allowed"
+            />
+            <p v-if="fieldErrors.clinicBranch" class="mt-1 text-xs text-red-400">{{ fieldErrors.clinicBranch }}</p>
           </div>
 
            <div>
             <label class="block text-slate-400 mb-1">Clinic Location</label>
-            <input type="text" v-model="currentStaff.clinicLocation" placeholder="Enter clinic location"
-              class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="text"
+              v-model="currentStaff.clinicLocation"
+              readonly
+              :class="[
+                'w-full px-3 py-2 rounded-lg bg-slate-700 text-white border focus:ring-2 cursor-not-allowed',
+                fieldErrors.clinicLocation ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+              ]"
+            />
+            <p v-if="fieldErrors.clinicLocation" class="mt-1 text-xs text-red-400">{{ fieldErrors.clinicLocation }}</p>
           </div>
 
           <div>
@@ -238,7 +525,7 @@ export default {
               Cancel
             </button>
             <button type="button" @click="saveStaff" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition">
-              Add Staff
+              Add Employee
             </button>
           </div>
         </form>

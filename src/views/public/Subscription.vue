@@ -10,6 +10,8 @@
       </div>
     </div>
 
+    <p v-if="error" class="popup-subtitle" style="color:#b91c1c;">{{ error }}</p>
+
     <div class="plan-grid">
       <button
         v-for="plan in plans"
@@ -39,22 +41,46 @@
     </div>
 
     <div class="popup-actions">
-      <button type="button" class="btn-secondary" @click="emit('close')">Maybe Later</button>
+      <button type="button" class="btn-secondary" @click="maybeLater">Maybe Later</button>
+      <button type="button" class="btn-outline" @click="toggleResume">
+        Continue Registration
+      </button>
       <button type="button" class="btn-primary" @click="continueWithPlan">
-        {{ selectedPlan === "free-trial" ? "Proceed to 14-day Free Trial" : "Continue with Selected Plan" }}
+        {{ ctaLabel }}
+      </button>
+    </div>
+
+    <div v-if="showResume" class="resume-card">
+      <label class="resume-label">Use the email you paid with</label>
+      <input v-model="resumeEmail" type="email" placeholder="you@email.com" class="resume-input" />
+      <p v-if="resumeError" class="resume-error">{{ resumeError }}</p>
+      <button type="button" class="btn-primary" :disabled="resumeLoading" @click="resumeRegistration">
+        {{ resumeLoading ? 'Checking...' : 'Continue to Registration' }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/config/firebaseConfig";
 
 const emit = defineEmits(["close"]);
 const router = useRouter();
+const route = useRoute();
 
-const plans = [
+const plans = ref([]);
+const error = ref("");
+
+const selectedPlan = ref(String(route.query.plan || "free-trial").trim().toLowerCase() || "free-trial");
+const showResume = ref(false);
+const resumeEmail = ref("");
+const resumeError = ref("");
+const resumeLoading = ref(false);
+
+const defaultPlans = () => [
   {
     id: "free-trial",
     name: "Free Trial",
@@ -62,35 +88,199 @@ const plans = [
     cycle: "",
     description: "Try all core features for 14 days. No card required.",
     features: ["14-day full access", "All clinic essentials", "Cancel anytime"],
+    trialDays: 14,
+    isActive: true,
+    recommended: false,
   },
   {
     id: "basic",
     name: "Basic",
-    price: "PHP 499",
+    price: "PHP 999",
     cycle: "/month",
     description: "For single-branch clinics with streamlined daily operations.",
-    features: ["1 branch", "Scheduling & billing", "Inventory basics"],
+    features: ["Scheduling & billing", "Staff management", "Reports"],
+    trialDays: 0,
+    isActive: true,
+    recommended: false,
   },
   {
     id: "premium",
     name: "Premium",
-    price: "PHP 999",
+    price: "PHP 2499",
     cycle: "/month",
     description: "For multi-branch clinics that need complete operational control.",
-    features: ["Multi-branch support", "Advanced analytics", "Priority growth tools"],
+    features: ["Everything in Basic", "Advanced analytics", "Priority support"],
+    trialDays: 0,
+    isActive: true,
     recommended: true,
   },
 ];
 
-const selectedPlan = ref("free-trial");
+const formatCurrency = (amount) => {
+  const value = Number(amount);
+  const safeValue = Number.isFinite(value) ? value : 0;
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    maximumFractionDigits: 0,
+  }).format(safeValue);
+};
+
+const formatCycle = (cycle) => {
+  const normalized = String(cycle || "").trim().toLowerCase();
+  if (!normalized || normalized === "trial") return "";
+  if (normalized.startsWith("/")) return normalized;
+  return `/${normalized}`;
+};
+
+const mergePlans = (dbPlansMap) => {
+  return defaultPlans().map((basePlan) => {
+    const dbPlan = dbPlansMap.get(basePlan.id) || {};
+    const merged = {
+      ...basePlan,
+      ...dbPlan,
+      id: basePlan.id,
+      recommended: basePlan.id === "premium",
+      features: Array.isArray(dbPlan.features) ? dbPlan.features : basePlan.features,
+    };
+
+    return {
+      ...merged,
+      name: merged.name || basePlan.name,
+      price: formatCurrency(merged.price),
+      cycle: formatCycle(merged.billingCycle),
+      description: merged.description || basePlan.description,
+      trialDays: Number(merged.trialDays || 0),
+      isActive: merged.isActive !== false,
+    };
+  });
+};
+
+const loadPlans = async () => {
+  error.value = "";
+  try {
+    const snapshot = await getDocs(collection(db, "subscriptionPlans"));
+    const dbPlans = new Map(snapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()]));
+    const merged = mergePlans(dbPlans);
+    const activePlans = merged.filter((plan) => plan.isActive);
+    plans.value = activePlans.length ? activePlans : merged;
+
+    if (!plans.value.some((plan) => plan.id === selectedPlan.value)) {
+      selectedPlan.value = plans.value[0]?.id || "free-trial";
+    }
+  } catch (err) {
+    console.error("Failed to load public subscription plans:", err);
+    error.value = "Unable to load latest plans right now.";
+    plans.value = defaultPlans();
+  }
+};
+
+const selectedPlanData = computed(() => plans.value.find((plan) => plan.id === selectedPlan.value) || null);
+
+const ctaLabel = computed(() => {
+  const current = selectedPlanData.value;
+  if (!current) return "Continue";
+  if (current.id === "free-trial") {
+    const days = Number(current.trialDays || 14);
+    return `Proceed to ${days}-day Free Trial`;
+  }
+  return "Continue with Selected Plan";
+});
 
 const continueWithPlan = () => {
   if (selectedPlan.value === "free-trial") {
     router.push({ name: "register-clinic" });
     return;
   }
-  router.push({ path: "/subscription-features", query: { plan: selectedPlan.value } });
+  router.push({ path: "/subscription/checkout", query: { plan: selectedPlan.value, from: route.query.from } });
 };
+
+const maybeLater = () => {
+  emit("close");
+  const fallback = route.query.from === "owner" ? "/owner/account/subscription" : "/";
+  router.back();
+  setTimeout(() => {
+    if (router.currentRoute.value.path === route.path) {
+      router.replace({ path: fallback });
+    }
+  }, 0);
+};
+
+const toggleResume = () => {
+  showResume.value = !showResume.value;
+  resumeError.value = "";
+};
+
+const resumeRegistration = async () => {
+  const normalizedEmail = String(resumeEmail.value || "").trim().toLowerCase();
+  resumeError.value = "";
+
+  if (!normalizedEmail) {
+    resumeError.value = "Email is required.";
+    return;
+  }
+
+  resumeLoading.value = true;
+  try {
+    const userSnap = await getDocs(query(
+      collection(db, "users"),
+      where("email", "==", normalizedEmail)
+    ));
+    if (!userSnap.empty) {
+      resumeError.value = "Account already registered.";
+      return;
+    }
+
+    const paymentsSnap = await getDocs(query(
+      collection(db, "planPayments"),
+      where("payerEmail", "==", normalizedEmail),
+      where("status", "==", "Paid")
+    ));
+
+    if (paymentsSnap.empty) {
+      resumeError.value = "No paid subscription found for that email.";
+      return;
+    }
+
+    let latestPayment = null;
+    paymentsSnap.forEach((docSnap) => {
+      const data = docSnap.data() || {};
+      const createdAt = data.createdAt?.seconds || 0;
+      if (!latestPayment || createdAt > latestPayment.createdAt) {
+        latestPayment = {
+          id: docSnap.id,
+          planId: String(data.planId || data.planName || "").trim().toLowerCase(),
+          firstName: data.payerFirstName || "",
+          lastName: data.payerLastName || "",
+        };
+      }
+    });
+
+    if (!latestPayment?.planId) {
+      resumeError.value = "Payment record missing plan data.";
+      return;
+    }
+
+    router.push({
+      name: "register-clinic",
+      query: {
+        plan: latestPayment.planId,
+        paymentId: latestPayment.id,
+        paymentStatus: "paid",
+        firstName: latestPayment.firstName,
+        lastName: latestPayment.lastName,
+        email: normalizedEmail,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to resume registration:", err);
+    resumeError.value = "Unable to resume right now. Please try again.";
+  } finally {
+    resumeLoading.value = false;
+  }
+};
+
+onMounted(loadPlans);
 </script>
 
 <style scoped>
@@ -266,6 +456,56 @@ const continueWithPlan = () => {
   gap: 0.6rem;
 }
 
+.btn-outline {
+  width: 100%;
+  border-radius: 0.8rem;
+  padding: 0.72rem 0.95rem;
+  font-weight: 600;
+  border: 1px solid rgba(198, 148, 108, 0.6);
+  color: #7b4e35;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 248, 235, 0.6);
+}
+
+.resume-card {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(198, 148, 108, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.resume-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #7b4e35;
+}
+
+.resume-input {
+  height: 44px;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(198, 148, 108, 0.5);
+  padding: 0 0.75rem;
+  font-size: 0.9rem;
+  color: #4a2c1e;
+  background: #fff;
+  outline: none;
+}
+
+.resume-input:focus {
+  border-color: rgba(159, 105, 70, 0.8);
+}
+
+.resume-error {
+  color: #b91c1c;
+  font-size: 0.75rem;
+}
+
 .btn-secondary,
 .btn-primary {
   width: 100%;
@@ -296,6 +536,10 @@ const continueWithPlan = () => {
   transform: translateY(-1px);
 }
 
+.resume-card {
+  margin-top: 1rem;
+}
+
 @media (min-width: 768px) {
   .subscription-popup {
     padding: 0.95rem;
@@ -309,6 +553,9 @@ const continueWithPlan = () => {
   }
   .btn-secondary {
     width: 170px;
+  }
+  .btn-outline {
+    width: 220px;
   }
   .btn-primary {
     width: 290px;

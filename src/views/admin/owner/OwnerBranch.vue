@@ -49,8 +49,6 @@ export default {
           text: `Are you sure you want to deactivate ${branch.clinicBranch}?`,
           icon: 'warning',
           showCancelButton: true,
-          confirmButtonColor: '#d33',
-          cancelButtonColor: '#3085d6',
           confirmButtonText: 'Yes, deactivate',
           cancelButtonText: 'Cancel'
         });
@@ -94,8 +92,6 @@ export default {
         text: `Are you sure you want to delete ${branch.clinicBranch}? This action cannot be undone.`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
         confirmButtonText: 'Yes, delete it!'
       })
 
@@ -128,8 +124,6 @@ export default {
             text: 'Are you sure you want to update this branch?',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#aaa',
             confirmButtonText: 'Yes, update!'
           })
 
@@ -193,7 +187,7 @@ export default {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row bg-slate-900 min-h-screen">
+  <div class="flex flex-col md:flex-row owner-theme bg-slate-900 min-h-screen">
     <OwnerSidebar />
 
     <main class="flex-1 p-4 md:p-8">
@@ -201,7 +195,7 @@ export default {
       <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
         <div>
           <h1 class="text-2xl md:text-3xl font-bold text-white mb-1">Branch Management</h1>
-          <p class="text-slate-400 text-sm md:text-base">Monitor branch locations, staff, and revenue performance</p>
+          <p class="text-slate-400 text-sm md:text-base">Monitor branch locations, employees, and revenue performance</p>
         </div>
         <button
           @click="openAddModal"

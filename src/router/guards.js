@@ -31,13 +31,14 @@ export const requirePermission = (permission) => {
 }
 
 export const requireFeature = (feature) => {
-  return (to, from, next) => {
-    const { hasFeature } = useSubscription()
+  return async (to, from, next) => {
+    const { hasFeature, initSubscription } = useSubscription()
+    await initSubscription()
 
     if (hasFeature(feature)) {
       next()
     } else {
-      next('/upgrade')
+      next('/subscription-features')
     }
   }
 }

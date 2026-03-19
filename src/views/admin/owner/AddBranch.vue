@@ -22,6 +22,31 @@ export default {
       status: 'Active',
       location: '',
     })
+    const caviteLocations = [
+      'Alfonso',
+      'Amadeo',
+      'Bacoor City',
+      'Carmona',
+      'Cavite City',
+      'Dasmarinas City',
+      'General Emilio Aguinaldo',
+      'General Mariano Alvarez',
+      'General Trias City',
+      'Imus City',
+      'Indang',
+      'Kawit',
+      'Magallanes',
+      'Maragondon',
+      'Mendez',
+      'Naic',
+      'Noveleta',
+      'Rosario',
+      'Silang',
+      'Tagaytay City',
+      'Tanza',
+      'Ternate',
+      'Trece Martires City'
+    ]
 
     const resetForm = () => {
       currentBranch.value = { id: null, name: '', revenue: 0, status: 'Active', location: '' }
@@ -34,9 +59,31 @@ export default {
               (b.revenue || b.revenue === 0)
     })
 
+    const branchNameError = computed(() => {
+      const rawName = currentBranch.value.name || ''
+      const trimmed = rawName.trim()
+      if (!trimmed) return 'Branch name is required.'
+      if (!/^[A-Za-z][A-Za-z\s'.-]*$/.test(trimmed)) return 'Only letters, spaces, apostrophes, periods, and hyphens are allowed.'
+      return ''
+    })
+
+    const handleBranchNameInput = (event) => {
+      const value = event?.target?.value ?? ''
+      const sanitized = value.replace(/[^A-Za-z\s'.-]/g, '')
+      currentBranch.value.name = sanitized
+    }
+
     const saveBranch = async () => {
-      if (!currentBranch.value.name || !currentBranch.value.name.trim()) {
-        toast.error('Branch name is required')
+      if (branchNameError.value) {
+        toast.error(branchNameError.value)
+        return
+      }
+      if (!currentBranch.value.location || !currentBranch.value.location.trim()) {
+        toast.error('Please select a location in Cavite.')
+        return
+      }
+      if (currentBranch.value.revenue < 0) {
+        toast.error('Revenue cannot be negative.')
         return
       }
 
@@ -46,8 +93,6 @@ export default {
           text: `Are you sure you want to add the branch "${currentBranch.value.name.trim()}"?`,
           icon: 'question',
           showCancelButton: true,
-          confirmButtonColor: '#3085d6',
-          cancelButtonColor: '#aaa',
           confirmButtonText: 'Yes, add!',
           cancelButtonText: 'Cancel'
         })
@@ -69,6 +114,7 @@ export default {
           clinicLocation: currentBranch.value.location.trim(),
           revenue: currentBranch.value.revenue,
           status: currentBranch.value.status,
+          isPublished: false,
           ownerId: ownerId,
           createdAt: serverTimestamp()
         })
@@ -78,6 +124,7 @@ export default {
           ...currentBranch.value,
           clinicBranch: currentBranch.value.name.trim(),
           clinicLocation: currentBranch.value.location.trim(),
+          isPublished: false,
           ownerId: ownerId
         })
 
@@ -92,6 +139,9 @@ export default {
     return {
       branches,
       currentBranch,
+      caviteLocations,
+      branchNameError,
+      handleBranchNameInput,
       saveBranch,
       resetForm,
       isFormEmpty
@@ -101,7 +151,7 @@ export default {
 </script>
 
 <template>
-  <div class="flex flex-col md:flex-row bg-slate-900 min-h-screen">
+  <div class="flex flex-col md:flex-row owner-theme bg-slate-900 min-h-screen">
     <OwnerSidebar />
 
     <main class="flex-1 p-6 max-w-2xl mx-auto text-white">
@@ -117,25 +167,35 @@ export default {
             type="text"
             v-model="currentBranch.name"
             placeholder="Enter branch name"
-            class="w-full px-3 py-2 rounded-lg bg-slate-800 text-white border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            @input="handleBranchNameInput"
+            :class="[
+              'w-full px-3 py-2 rounded-lg bg-slate-800 text-white border focus:outline-none focus:ring-2',
+              branchNameError ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-blue-500'
+            ]"
           />
+          <p v-if="branchNameError" class="mt-1 text-xs text-red-400">{{ branchNameError }}</p>
         </div>
 
         <div>
           <label class="block text-slate-400 mb-1">Location</label>
-          <input
-            type="text"
+          <select
             v-model="currentBranch.location"
-            placeholder="Enter location"
             class="w-full px-3 py-2 rounded-lg bg-slate-800 text-white border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          >
+            <option value="" disabled>Select city/municipality in Cavite</option>
+            <option v-for="location in caviteLocations" :key="location" :value="location">
+              {{ location }}
+            </option>
+          </select>
         </div>
 
         <div>
           <label class="block text-slate-400 mb-1">Revenue</label>
           <input
             type="number"
-            v-model="currentBranch.revenue"
+            v-model.number="currentBranch.revenue"
+            min="0"
+            step="0.01"
             placeholder="Revenue"
             class="w-full px-3 py-2 rounded-lg bg-slate-800 text-white border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -168,3 +228,4 @@ export default {
     </main>
   </div>
 </template> 
+

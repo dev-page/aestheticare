@@ -1,6 +1,6 @@
 
 <script setup>
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { auth, db } from '@/config/firebaseConfig'
 import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, browserLocalPersistence, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth'
@@ -16,24 +16,75 @@ const password = ref('')
 const isRememberMe = ref(false)
 const isSubmitting = ref(false)
 const passwordVisible = ref(false)
+let redirectTimeout = null
+const REDIRECT_DELAY = 1700
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_REGEX = /^[A-Za-z0-9._]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
 const roleRoutes = {
+  Superadmin: "/superadmin/dashboard",
   Owner: "/owner/dashboard",
+  Manager: "/manager/dashboard",
+  Receptionist: "/receptionist/dashboard",
   Practitioner: "/practitioner/dashboard",
   Admin: "/admin/dashboard",
   HR: "/hr/dashboard",
+  Finance: "/finance/dashboard",
   Supply: "/supply/dashboard",
-  Customer: "/dashboard"
+  Customer: "/customer/home"
+}
+
+const normalizeRoleKey = (value) => {
+  const compact = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '')
+
+  if (!compact) return 'Customer'
+  if (compact === 'hr') return 'HR'
+  if (compact === 'crm') return 'CRM'
+  if (compact === 'superadmin' || compact === 'systemadmin' || compact === 'sysadmin') {
+    return 'Superadmin'
+  }
+  return `${compact.charAt(0).toUpperCase()}${compact.slice(1)}`
+}
+
+const resolveRedirectPath = (userData) => {
+  const userType = String(userData?.userType || '').trim().toLowerCase()
+  if (userType === 'staff' && userData?.mustChangePassword === true) {
+    return '/change-password'
+  }
+  const role = normalizeRoleKey(userData?.role)
+  return roleRoutes[role] || '/customer/home'
 }
 
 const togglePassword = () => { passwordVisible.value = !passwordVisible.value }
+
+const handleEmailInput = (event) => {
+  email.value = event.target.value
+}
+
+const handlePasswordInput = (event) => {
+  password.value = event.target.value
+}
 
 const clearFormFields = () => {
   email.value = ''
   password.value = ''
   isRememberMe.value = false
+}
+
+const setProcessLoading = (active, label) => {
+  window.dispatchEvent(new CustomEvent('app-process-loading', { detail: { active, label } }))
+}
+
+const startRedirectFlow = (redirectPath) => {
+  setProcessLoading(true, 'Redirecting to your panel...')
+  if (redirectTimeout) clearTimeout(redirectTimeout)
+  redirectTimeout = setTimeout(async () => {
+    await router.push(redirectPath)
+    setProcessLoading(false)
+  }, REDIRECT_DELAY)
 }
 
 const handleLogin = async () => {
@@ -53,6 +104,7 @@ const handleLogin = async () => {
     }
 
     isSubmitting.value = true
+    setProcessLoading(true, 'Redirecting to your panel...')
 
     try {
       await setPersistence(
@@ -71,25 +123,25 @@ const handleLogin = async () => {
 
         if (userData.status === 'Pending') {
           toast.error('Your account is still pending verification. Please check your email for the OTP.')
+          setProcessLoading(false)
           return
         }
 
-        const role = userSnap.data().role || 'Customer'
-        const redirectPath = roleRoutes[role] || '/dashboard'
+        const redirectPath = resolveRedirectPath(userData)
 
-        toast.success('Login successful! Redirecting...')
         clearFormFields()
-        setTimeout(() => {
-          router.push(redirectPath)
-        }, 2000)
+        startRedirectFlow(redirectPath)
       }
     } catch (err) {
       console.error(err)
       const friendlyMessages = {
-          'auth/user-not-found': 'No account found with this email.',
-          'auth/too-many-requests': 'Too many failed login attempts. Please try again later.'
+        'auth/user-not-found': 'No account found with this email.',
+        'auth/invalid-credential': 'Invalid email or password.',
+        'auth/too-many-requests': 'Too many failed login attempts. Please try again later.',
+        'auth/network-request-failed': 'Connection error. Please check your internet and try again.'
       }
-      toast .error(friendlyMessages[err.code] || 'Invalid email or password.')
+      toast.error(friendlyMessages[err.code] || 'Login failed. Please try again.')
+      setProcessLoading(false)
     } finally {
       isSubmitting.value = false
     }
@@ -102,11 +154,12 @@ const handleForgotPassword = async () => {
 const handleGoogleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider()
+      setProcessLoading(true, 'Redirecting to your panel...')
       const userCredentials = await signInWithPopup(auth, provider)
       await userCredentials.user.reload()
 
       const userRef = doc(db, 'users', userCredentials.user.uid)
-      const userSnap = await getDoc(userRef)
+      let userSnap = await getDoc(userRef)
 
       if (!userSnap.exists()) {
         await setDoc(userRef, {
@@ -118,27 +171,25 @@ const handleGoogleLogin = async () => {
         userSnap = await getDoc(userRef)
       }
 
-      const role = userSnap.data()?.role || 'Customer'
-      const redirectPath = roleRoutes[role] || '/dashboard'
+      const redirectPath = resolveRedirectPath(userSnap.data())
 
-      toast.success('Logged in with Google! Redirecting...')
-      setTimeout(() => {
-        router.push(redirectPath)
-      }, 2000)
+      startRedirectFlow(redirectPath)
     } catch (err) {
       console.error(err)
       toast.error('Failed to login with Google.')
+      setProcessLoading(false)
     }
 }
 
 const handleFacebookLogin = async () => {
     try {
       const provider = new FacebookAuthProvider()
+      setProcessLoading(true, 'Redirecting to your panel...')
       const userCredentials = await signInWithPopup(auth, provider)
       await userCredentials.user.reload()
 
       const userRef = doc(db, 'users', userCredentials.user.uid)
-      const userSnap = await getDoc(userRef)
+      let userSnap = await getDoc(userRef)
 
       if (!userSnap.exists()) {
         await setDoc(userRef, {
@@ -150,18 +201,20 @@ const handleFacebookLogin = async () => {
         userSnap = await getDoc(userRef)
       }
 
-      const role = userSnap.data()?.role || 'Customer'
-      const redirectPath = roleRoutes[role] || '/dashboard'
+      const redirectPath = resolveRedirectPath(userSnap.data())
 
-      toast.success('Logged in with Facebook! Redirecting...')
-      setTimeout(() => {
-        router.push(redirectPath)
-      }, 2000)
+      startRedirectFlow(redirectPath)
     } catch (err) {
       console.error(err)
       toast.error('Failed to login with Facebook.')
+      setProcessLoading(false)
     }
 }
+
+onBeforeUnmount(() => {
+  if (redirectTimeout) clearTimeout(redirectTimeout)
+  setProcessLoading(false)
+})
 </script>
 
 <template>
@@ -244,11 +297,12 @@ const handleFacebookLogin = async () => {
             </div>
             <div class="relative">
               <input
-                v-model="email"
+                :value="email"
                 type="email"
                 required
                 placeholder=" "
                 class="peer input h-16 px-4 pt-5"
+                @input="handleEmailInput"
               />
               <label
                 class="floating-label"
@@ -260,10 +314,11 @@ const handleFacebookLogin = async () => {
             <div class="relative">
               <input
                 :type="passwordVisible ? 'text' : 'password'"
-                v-model="password"
+                :value="password"
                 required
                 placeholder=" "
                 class="peer input h-16 px-4 pr-12 pt-5"
+                @input="handlePasswordInput"
               />
               <label
                 class="floating-label"
@@ -372,6 +427,7 @@ const handleFacebookLogin = async () => {
         </div>
       </div>
     </div>
+
   </div>
 </template>
 

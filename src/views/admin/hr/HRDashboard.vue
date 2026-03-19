@@ -1,5 +1,5 @@
 <template>
-  <div class="flex bg-slate-900 min-h-screen">
+  <div class="flex module-theme bg-slate-900 min-h-screen">
     <HRSidebar />
     
     <main class="flex-1 p-8">
@@ -27,23 +27,59 @@
         </div>
       </div>
 
-      <!-- Branch Distribution -->
+      <!-- Employee Distribution -->
       <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-8">
-        <h2 class="text-xl font-semibold text-white mb-6">Branch Distribution</h2>
+        <h2 class="text-xl font-semibold text-white mb-6">Employee Distribution</h2>
         <div class="space-y-4">
-          <div v-for="branch in branchDistribution" :key="branch.name" class="flex items-center gap-4">
+          <div v-for="role in roleDistribution" :key="role.name" class="flex items-center gap-4">
             <div class="flex-1">
               <div class="flex items-center justify-between mb-2">
-                <span class="text-white font-medium">{{ branch.name }}</span>
-                <span class="text-slate-400 text-sm">{{ branch.employees }} employees</span>
+                <span class="text-white font-medium">{{ role.name }}</span>
+                <span class="text-slate-400 text-sm">{{ role.employees }} employees</span>
               </div>
               <div class="w-full bg-slate-700 rounded-full h-2">
                 <div
                   class="bg-purple-500 h-2 rounded-full transition-all duration-500"
-                  :style="{ width: `${(branch.employees / totalEmployees) * 100}%` }"
+                  :style="{ width: `${(role.employees / totalEmployees) * 100}%` }"
                 ></div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DSS: Unassigned Shifts -->
+      <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-8">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-xl font-semibold text-white">DSS: Unassigned Shifts</h2>
+            <p class="text-slate-400 text-sm">Employees who do not have any shift assignments yet.</p>
+          </div>
+          <router-link
+            to="/hr/shift-assignment"
+            class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm"
+          >
+            Assign Shifts
+          </router-link>
+        </div>
+
+        <div v-if="unassignedLoading" class="text-slate-400 text-sm">Checking employee schedules...</div>
+        <div v-else-if="unassignedEmployees.length === 0" class="text-emerald-300 text-sm">
+          All employees have at least one assigned shift.
+        </div>
+        <div v-else class="space-y-3">
+          <div
+            v-for="employee in unassignedEmployees"
+            :key="employee.id"
+            class="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-3"
+          >
+            <div>
+              <p class="text-white text-sm font-medium">{{ employee.fullName || employee.name || 'Unnamed' }}</p>
+              <p class="text-slate-400 text-xs">{{ employee.role || 'Staff' }}</p>
+            </div>
+            <span class="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-full">
+              No shifts assigned
+            </span>
           </div>
         </div>
       </div>
@@ -73,7 +109,7 @@
 <script>
 import { ref, onMounted } from 'vue'
 import { auth } from '@/config/firebaseConfig'
-import { getFirestore, collection, getDocs, query, where, doc, getDoc, orderBy } from 'firebase/firestore'
+import { getFirestore, collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore'
 import { getApp } from 'firebase/app'
 import { useRouter } from 'vue-router'
 import HRSidebar from '@/components/sidebar/HRSidebar.vue'
@@ -89,8 +125,10 @@ export default {
     const totalBranches = ref(0)
     const totalEmployees = ref(0)
     const activeEmployees = ref(0)
-    const branchDistribution = ref([])
+    const roleDistribution = ref([])
     const recentActivity = ref([])
+    const unassignedEmployees = ref([])
+    const unassignedLoading = ref(false)
 
     const checkPasswordChange = async () => {
       const user = auth.currentUser
@@ -147,29 +185,67 @@ export default {
         where('userType', '==', 'Staff')
       )
       const staffSnapshot = await getDocs(staffQuery)
-      const staff = staffSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const staff = staffSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((user) => !user.archived)
       totalEmployees.value = staff.length
       activeEmployees.value = staff.filter(s => s.status === 'Active').length
 
-      // Step 4: Branch distribution (only HR’s branch)
-      branchDistribution.value = [{
-        name: clinicData.clinicBranch || 'Assigned Branch',
-        employees: staff.length
-      }]
+      // Step 4: Employee distribution by role (HR’s branch)
+      const roleMap = new Map()
+      staff.forEach((member) => {
+        const role = member.role || 'Staff'
+        roleMap.set(role, (roleMap.get(role) || 0) + 1)
+      })
+      roleDistribution.value = Array.from(roleMap.entries())
+        .map(([name, employees]) => ({ name, employees }))
+        .sort((a, b) => b.employees - a.employees)
+
+      // Step 4.5: DSS - Employees with no shift assignments
+      unassignedLoading.value = true
+      const unassigned = []
+      for (const employee of staff) {
+        const scheduleSnap = await getDocs(collection(db, 'users', employee.id, 'schedules'))
+        if (scheduleSnap.empty) {
+          unassigned.push(employee)
+          continue
+        }
+
+        const hasShift = scheduleSnap.docs.some((snap) => {
+          const assignments = snap.data()?.assignments || {}
+          return Object.values(assignments).some((value) => {
+            const normalized = String(value || '').trim()
+            return normalized && normalized.toLowerCase() !== 'off'
+          })
+        })
+
+        if (!hasShift) {
+          unassigned.push(employee)
+        }
+      }
+      unassignedEmployees.value = unassigned
+      unassignedLoading.value = false
 
       // Step 5: Logs only for HR’s branch
       // ⚠️ Requires composite index: branchId + time
-      const logsQuery = query(
-        collection(db, 'logs'),
-        where('branchId', '==', hrBranchId),
-        orderBy('time', 'desc')
+      const activityQuery = query(
+        collection(db, 'activities'),
+        where('actorId', '==', user.uid)
       )
-      const logsSnapshot = await getDocs(logsQuery)
-      recentActivity.value = logsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        time: doc.data().time?.toDate().toLocaleString() || 'Unknown time'
-      }))
+      const activitySnapshot = await getDocs(activityQuery)
+      recentActivity.value = activitySnapshot.docs
+        .map((snap) => ({ id: snap.id, ...snap.data() }))
+        .sort((a, b) => {
+          const aTime = a.createdAt?.seconds || 0
+          const bTime = b.createdAt?.seconds || 0
+          return bTime - aTime
+        })
+        .slice(0, 10)
+        .map((activity) => ({
+          id: activity.id,
+          action: activity.action || 'Activity recorded',
+          time: activity.createdAt?.toDate?.().toLocaleString() || 'Unknown time'
+        }))
     }
 
     onMounted(async () => {
@@ -181,8 +257,10 @@ export default {
       totalBranches,
       totalEmployees,
       activeEmployees,
-      branchDistribution,
-      recentActivity
+      roleDistribution,
+      recentActivity,
+      unassignedEmployees,
+      unassignedLoading
     }
   }
 }

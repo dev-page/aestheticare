@@ -20,18 +20,37 @@ const initAuth = () => {
 
 export function useAuth() {
   const router = useRouter()
+
+  const setProcessLoading = (active, label) => {
+    window.dispatchEvent(new CustomEvent('app-process-loading', { detail: { active, label } }))
+  }
   
   const logout = async () => {
     isLoggingOut.value = true
+    setProcessLoading(true, 'Logging out...')
     try {
+      await new Promise((resolve) => setTimeout(resolve, 600))
       await signOut(auth)
-      setTimeout(() => {
-        router.push('/')
-      }, 1000)
+      try {
+        Object.keys(localStorage).forEach((key) => {
+          if (
+            key.startsWith('permissions:user:') ||
+            key.startsWith('permissions:role:') ||
+            key.startsWith('subscription:plan') ||
+            key.startsWith('subscription:features:')
+          ) {
+            localStorage.removeItem(key)
+          }
+        })
+      } catch (_error) {
+        // ignore cache clear errors
+      }
+      await router.push('/login')
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
       isLoggingOut.value = false
+      setProcessLoading(false)
     } 
   }
 
