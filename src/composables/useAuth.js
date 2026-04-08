@@ -1,32 +1,20 @@
-import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { auth } from '@/config/firebaseConfig'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { useRouter } from 'vue-router'
-
-const user = ref(null)
-const isLoading = ref(true)
-const isLoggingOut = ref(false)
-
-let unsubscribe = null
-
-const initAuth = () => {
-  if (unsubscribe) return // Already initialized
-
-  unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-    user.value = firebaseUser
-    isLoading.value = false
-  })
-}
+import { signOut } from 'firebase/auth'
+import router from '@/router'
+import { useAuthStore } from '@/stores/auth'
 
 export function useAuth() {
-  const router = useRouter()
+  const authStore = useAuthStore()
+  const { user, isLoading, isLoggingOut } = storeToRefs(authStore)
+  const { initAuth, setLoggingOut } = authStore
 
   const setProcessLoading = (active, label) => {
     window.dispatchEvent(new CustomEvent('app-process-loading', { detail: { active, label } }))
   }
   
   const logout = async () => {
-    isLoggingOut.value = true
+    setLoggingOut(true)
     setProcessLoading(true, 'Logging out...')
     try {
       await new Promise((resolve) => setTimeout(resolve, 600))
@@ -49,7 +37,7 @@ export function useAuth() {
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      isLoggingOut.value = false
+      setLoggingOut(false)
       setProcessLoading(false)
     } 
   }

@@ -1,12 +1,14 @@
 
 <template>
   <div class="bg-gradient-to-br from-cream-100 via-gold-100 to-cream-200 text-charcoal-800 overflow-x-hidden">
-    <nav class="fixed top-0 inset-x-0 z-50 bg-gradient-to-r from-cream-50 via-gold-50 to-cream-100 backdrop-blur-xl border-b border-gold-300/40">
+    <nav class="public-glass-nav fixed top-0 inset-x-0 z-50">
       <div class="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 md:px-8 h-16">
-        <div class="flex items-center gap-3">
-          <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600"></div>
-          <span class="text-lg tracking-wide text-charcoal-900">AesthetiCare</span>
-        </div>
+        <router-link to="/" class="public-brand-cluster shrink-0">
+          <span class="public-nav-mark" aria-hidden="true"></span>
+          <span class="public-nav-brand text-lg sm:text-xl tracking-wide">
+            AesthetiCare
+          </span>
+        </router-link>
 
         <ul class="hidden lg:flex items-center gap-6 lg:gap-10 text-[11px] tracking-[0.2em] uppercase text-charcoal-600">
           <li>
@@ -53,12 +55,13 @@
           >
             Login
           </router-link>
-          <button
-            @click="showSubscriptionPopup = true"
+
+          <router-link
+            to="/register"
             class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gold-700 text-white text-xs sm:text-sm tracking-widest uppercase hover:bg-gold-800 transition"
           >
-            Free Trial
-          </button>
+            Get Started
+          </router-link>
         </div>
 
         <button
@@ -117,12 +120,13 @@
               >
                 Login
               </router-link>
-              <button
-                @click="showSubscriptionPopup = true; closeMobileMenu()"
+              <router-link
+                to="/register"
+                @click="closeMobileMenu"
                 class="px-4 py-3 rounded-full bg-gold-700 text-white text-center transition hover:bg-gold-800"
               >
-                Free Trial
-              </button>
+                Get Started
+              </router-link>
             </div>
           </div>
         </aside>
@@ -150,7 +154,7 @@
         <div class="pt-2 lg:min-h-[610px] flex flex-col lg:justify-between">
           <div class="lg:flex-1 lg:flex lg:flex-col lg:justify-center">
             <p class="text-[11px] sm:text-xs tracking-[0.22em] uppercase text-gold-700 mb-3">Glow Naturally With</p>
-            <h1 class="text-4xl sm:text-5xl md:text-[3.35rem] leading-tight mb-3 font-playfair">
+            <h1 class="hero-editorial-title text-4xl sm:text-5xl md:text-[3.35rem] leading-tight mb-3">
               <span class="text-charcoal-800">AesthetiCare</span>
               <br />
               <span class="text-gold-700">Skin Solutions</span>
@@ -203,7 +207,7 @@
       </div>
     </section>
 
-    <section class="relative h-[50vh] sm:h-[60vh] md:h-[70vh] overflow-hidden">
+    <section class="relative h-[54vh] sm:h-[62vh] md:h-[72vh] overflow-hidden">
       <video
         class="absolute inset-0 w-full h-full object-cover"
         autoplay
@@ -213,73 +217,134 @@
       >
         <source src="@/assets/home_vid.mp4" type="video/mp4" />
       </video>
-      <div class="absolute inset-0 bg-black/35"></div>
-      <div class="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
-        <h2 class="font-playfair italic font-semibold text-3xl sm:text-4xl md:text-5xl tracking-[0.16em] bg-gradient-to-r from-cream-200 via-gold-300 to-gold-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
-          SOLACE AESTHETIQUE
-        </h2>
-        <p class="mt-3 font-montserrat text-white/90 text-xs sm:text-sm md:text-base">
-          Where precision meets beauty in every personalized aesthetic journey.
-        </p>
+      <div class="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,11,9,0.38)_0%,rgba(24,16,12,0.18)_34%,rgba(21,14,11,0.18)_66%,rgba(16,11,9,0.34)_100%)]"></div>
+      <div class="absolute inset-0 bg-black/18"></div>
+      <div class="relative z-10 h-full">
+        <div class="mx-auto grid h-full max-w-7xl grid-cols-1 items-center px-4 sm:px-6 md:px-8 lg:grid-cols-[240px_minmax(0,1fr)_240px] lg:gap-8">
+          <div class="hidden lg:flex flex-col gap-4 justify-center">
+            <div class="video-feature-card video-feature-card-soft">
+              <p class="video-feature-kicker">Treatment Focus</p>
+              <h3 class="video-feature-title">Laser Precision</h3>
+              <p class="video-feature-copy">Refined workflows for advanced skin, tone, and texture sessions.</p>
+            </div>
+            <div class="video-feature-card video-feature-card-soft">
+              <p class="video-feature-kicker">Client Comfort</p>
+              <h3 class="video-feature-title">Seamless Visits</h3>
+              <p class="video-feature-copy">Guide every appointment with calm, premium, clinic-ready coordination.</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-center justify-center text-center px-4">
+            <p class="video-showcase-kicker">Advanced aesthetic care</p>
+            <h2 class="video-showcase-title">
+              SOLACE AESTHETIQUE
+            </h2>
+            <p class="video-showcase-copy">
+              Where precision meets beauty in every personalized aesthetic journey.
+            </p>
+          </div>
+
+          <div class="hidden lg:flex flex-col gap-4 justify-center">
+            <div class="video-feature-card video-feature-card-accent">
+              <p class="video-feature-kicker">Signature Result</p>
+              <h3 class="video-feature-title">Glow-First Care</h3>
+              <p class="video-feature-copy">Tailored treatment paths designed for visible outcomes and patient trust.</p>
+            </div>
+            <div class="video-stat-card">
+              <p class="video-stat-value">3k+</p>
+              <p class="video-stat-label">beauty-led workflows supported inside AesthetiCare experiences</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- SOLUTIONS -->
-    <section class="py-16 sm:py-24 md:py-32 bg-cream-100 text-charcoal-800">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 text-center">
-        <h2 class="text-2xl sm:text-3xl md:text-4xl mb-12 sm:mb-16 font-playfair italic font-semibold tracking-[0.03em] bg-gradient-to-r from-rose-500 via-gold-600 to-rose-400 bg-clip-text text-transparent drop-shadow-[0_2px_8px_rgba(149,99,68,0.25)]">Built for the Aesthetic Industry</h2>
+    <section class="solutions-section py-16 sm:py-24 md:py-32 text-charcoal-800">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <div class="solutions-header text-center">
+          <p class="solutions-kicker">Tailored platform modes</p>
+          <h2 class="solutions-title">Built for the Aesthetic Industry</h2>
+          <p class="solutions-subtitle">
+            From boutique med spas to advanced laser centers, AesthetiCare adapts to the pace, treatments, and workflows each practice depends on.
+          </p>
+        </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-          <!-- Card 1 -->
-          <div class="solution-card delay-0 rounded-[26px] border border-rose-200/45 bg-cream-50/90 backdrop-blur-sm px-5 py-6 sm:px-6 sm:py-7 shadow-[0_10px_28px_rgba(54,34,22,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(54,34,22,0.12)]">
-            <div class="mx-auto mb-4 h-10 w-10 rounded-xl bg-rose-100/75 flex items-center justify-center text-rose-700 font-semibold">1</div>
-            <div class="mx-auto mb-4 h-20 w-20 rounded-full bg-gradient-to-br from-gold-100 to-cream-200 ring-1 ring-gold-300/60 flex items-center justify-center">
+          <div class="solution-card delay-0">
+            <div class="solution-card-top">
+              <span class="solution-step">01</span>
+              <span class="solution-tag">Clinic Core</span>
+            </div>
+            <div class="solution-icon-wrap">
               <svg class="h-10 w-10 text-gold-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M5 20V7a2 2 0 012-2h10a2 2 0 012 2v13M9 20v-4h6v4M9 10h6M12 8v4M10 10h4" />
               </svg>
             </div>
-            <h3 class="text-lg mb-2 font-playfair text-charcoal-900">Aesthetic Clinics</h3>
-            <p class="font-montserrat text-charcoal-700/90 text-sm sm:text-base">Tailored workflows and features designed specifically for this practice type.</p>
+            <h3 class="solution-title">Aesthetic Clinics</h3>
+            <p class="solution-description">Tailored workflows and features designed specifically for this practice type.</p>
+            <div class="solution-footer">
+              <span class="solution-chip">Appointments</span>
+              <span class="solution-chip">Treatment flow</span>
+            </div>
           </div>
 
-          <!-- Card 2 -->
-          <div class="solution-card delay-1 rounded-[26px] border border-rose-200/45 bg-cream-50/90 backdrop-blur-sm px-5 py-6 sm:px-6 sm:py-7 shadow-[0_10px_28px_rgba(54,34,22,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(54,34,22,0.12)]">
-            <div class="mx-auto mb-4 h-10 w-10 rounded-xl bg-rose-100/75 flex items-center justify-center text-rose-700 font-semibold">2</div>
-            <div class="mx-auto mb-4 h-20 w-20 rounded-full bg-gradient-to-br from-rose-100 to-gold-100 ring-1 ring-gold-300/60 flex items-center justify-center">
+          <div class="solution-card delay-1">
+            <div class="solution-card-top">
+              <span class="solution-step">02</span>
+              <span class="solution-tag">Luxury Service</span>
+            </div>
+            <div class="solution-icon-wrap solution-icon-wrap-rose">
               <svg class="h-10 w-10 text-gold-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 4c3 4 5 6.5 5 9a5 5 0 01-10 0c0-2.5 2-5 5-9z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M17.5 7.5v3M16 9h3" />
               </svg>
             </div>
-            <h3 class="text-lg mb-2 font-playfair text-charcoal-900">Med Spas</h3>
-            <p class="font-montserrat text-charcoal-700/90 text-sm sm:text-base">Tailored workflows and features designed specifically for this practice type.</p>
+            <h3 class="solution-title">Med Spas</h3>
+            <p class="solution-description">Tailored workflows and features designed specifically for this practice type.</p>
+            <div class="solution-footer">
+              <span class="solution-chip">Packages</span>
+              <span class="solution-chip">Client retention</span>
+            </div>
           </div>
 
-          <!-- Card 3 -->
-          <div class="solution-card delay-2 rounded-[26px] border border-rose-200/45 bg-cream-50/90 backdrop-blur-sm px-5 py-6 sm:px-6 sm:py-7 shadow-[0_10px_28px_rgba(54,34,22,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(54,34,22,0.12)]">
-            <div class="mx-auto mb-4 h-10 w-10 rounded-xl bg-rose-100/75 flex items-center justify-center text-rose-700 font-semibold">3</div>
-            <div class="mx-auto mb-4 h-20 w-20 rounded-full bg-gradient-to-br from-cream-100 to-gold-100 ring-1 ring-gold-300/60 flex items-center justify-center">
+          <div class="solution-card delay-2">
+            <div class="solution-card-top">
+              <span class="solution-step">03</span>
+              <span class="solution-tag">Clinical Detail</span>
+            </div>
+            <div class="solution-icon-wrap solution-icon-wrap-cream">
               <svg class="h-10 w-10 text-gold-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 3l7 3v6c0 4.2-2.9 7.6-7 8.9C7.9 19.6 5 16.2 5 12V6l7-3z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 10.5c.8-.8 1.8-1.2 3-1.2s2.2.4 3 1.2M9.5 14h5" />
               </svg>
             </div>
-            <h3 class="text-lg mb-2 font-playfair text-charcoal-900">Cosmetic Dermatology</h3>
-            <p class="font-montserrat text-charcoal-700/90 text-sm sm:text-base">Tailored workflows and features designed specifically for this practice type.</p>
+            <h3 class="solution-title">Cosmetic Dermatology</h3>
+            <p class="solution-description">Tailored workflows and features designed specifically for this practice type.</p>
+            <div class="solution-footer">
+              <span class="solution-chip">Clinical notes</span>
+              <span class="solution-chip">Follow-ups</span>
+            </div>
           </div>
 
-          <!-- Card 4 -->
-          <div class="solution-card delay-3 rounded-[26px] border border-rose-200/45 bg-cream-50/90 backdrop-blur-sm px-5 py-6 sm:px-6 sm:py-7 shadow-[0_10px_28px_rgba(54,34,22,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(54,34,22,0.12)]">
-            <div class="mx-auto mb-4 h-10 w-10 rounded-xl bg-rose-100/75 flex items-center justify-center text-rose-700 font-semibold">4</div>
-            <div class="mx-auto mb-4 h-20 w-20 rounded-full bg-gradient-to-br from-gold-100 to-cream-200 ring-1 ring-gold-300/60 flex items-center justify-center">
+          <div class="solution-card delay-3">
+            <div class="solution-card-top">
+              <span class="solution-step">04</span>
+              <span class="solution-tag">Precision Tech</span>
+            </div>
+            <div class="solution-icon-wrap">
               <svg class="h-10 w-10 text-gold-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="6" stroke-width="1.7" />
                 <circle cx="12" cy="12" r="2.2" stroke-width="1.7" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 3v3M12 18v3M3 12h3M18 12h3" />
               </svg>
             </div>
-            <h3 class="text-lg mb-2 font-playfair text-charcoal-900">Laser & Skin Centers</h3>
-            <p class="font-montserrat text-charcoal-700/90 text-sm sm:text-base">Tailored workflows and features designed specifically for this practice type.</p>
+            <h3 class="solution-title">Laser & Skin Centers</h3>
+            <p class="solution-description">Tailored workflows and features designed specifically for this practice type.</p>
+            <div class="solution-footer">
+              <span class="solution-chip">Device tracking</span>
+              <span class="solution-chip">Outcome review</span>
+            </div>
           </div>
         </div>
       </div>
@@ -292,9 +357,15 @@
     </div>
 
     <!-- FEATURES / PLATFORM CAPABILITIES SHOWCASE -->
-    <section class="py-16 sm:py-24 md:py-32 bg-gold-50">
+    <section class="capability-section py-16 sm:py-24 md:py-32">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-        <h2 class="text-2xl sm:text-3xl md:text-4xl text-center mb-8 sm:mb-12 font-playfair italic tracking-[0.04em] bg-gradient-to-r from-gold-700 via-gold-500 to-gold-300 bg-clip-text text-transparent">Platform Capabilities</h2>
+        <div class="capability-header">
+          <p class="capability-section-kicker">Designed for modern clinic teams</p>
+          <h2 class="capability-section-title">Platform Capabilities</h2>
+          <p class="capability-section-subtitle">
+            Explore the operational systems that help aesthetic clinics streamline appointments, treatment visibility, inventory control, and growth decisions.
+          </p>
+        </div>
 
         <div
           class="capability-showcase"
@@ -302,15 +373,28 @@
           :style="{ backgroundImage: `url(${currentCapability.image})` }"
         >
           <div class="capability-showcase-overlay"></div>
+          <div class="capability-showcase-sheen" aria-hidden="true"></div>
+
+          <div class="capability-floating-badge">
+            <span>Featured Module</span>
+            <strong>{{ String(currentCapabilityIndex + 1).padStart(2, '0') }} / {{ String(capabilities.length).padStart(2, '0') }}</strong>
+          </div>
 
           <div class="capability-showcase-content" :key="`content-${currentCapabilityIndex}`">
             <p class="capability-eyebrow">{{ currentCapability.eyebrow }}</p>
             <h3 class="capability-showcase-title">{{ currentCapability.title }}</h3>
             <p class="capability-showcase-desc">{{ currentCapability.description }}</p>
+            <div class="capability-meta">
+              <span class="capability-meta-pill">{{ currentCapability.miniEyebrow }}</span>
+              <span class="capability-meta-separator"></span>
+              <span class="capability-meta-note">Elegant control for daily clinic operations</span>
+            </div>
           </div>
 
           <div class="capability-actions">
-            <button class="capability-btn-main">Explore</button>
+            <router-link to="/subscription-features" class="capability-btn-main">
+              Explore
+            </router-link>
             <button @click="prevCapability" class="capability-btn-icon" aria-label="Previous capability">&#8592;</button>
             <button @click="nextCapability" class="capability-btn-icon" aria-label="Next capability">&#8594;</button>
           </div>
@@ -356,49 +440,95 @@
       </div>
     </section>
 
-    <!-- CTA -->
-    <section class="relative min-h-[50vh] sm:min-h-[60vh] flex items-center justify-center text-white overflow-hidden">
-      <!-- Background image -->
-      <div class="absolute inset-0 bg-center bg-cover" style="background-image: url('../img/room.jpg');"></div>
-      <!-- Blur layer -->
-      <div class="absolute inset-0 backdrop-blur-sm"></div>
-      <!-- Color overlay -->
-      <div class="absolute inset-0 bg-gradient-to-br from-[#fbf3e5]/78 via-[#f3e2c9]/66 to-[#e7c8a5]/56"></div>
+    <!-- CTA + Footer -->
+    <section class="footer-cta-section">
+      <div class="footer-cta-shell">
+        <div class="footer-cta-card">
+          <div class="footer-cta-copy">
+            <p class="footer-kicker">Launch with confidence</p>
+            <h2 class="cta-title text-3xl sm:text-4xl md:text-5xl">Elevate Your Aesthetic Operations</h2>
+            <p class="footer-cta-text">
+              Join modern aesthetic centers using intelligent systems to manage bookings, treatment journeys, staff visibility, and clinic growth in one elegant platform.
+            </p>
+            <div class="footer-cta-highlights">
+              <span class="footer-highlight-chip">14-day free trial</span>
+              <span class="footer-highlight-chip">No card required</span>
+              <span class="footer-highlight-chip">Clinic-ready setup</span>
+            </div>
+          </div>
 
-      <!-- Content -->
-      <div class="relative z-10 max-w-4xl text-center px-4 sm:px-6 md:px-8">
-        <h2 class="cta-title text-3xl sm:text-4xl md:text-5xl mb-4 sm:mb-6">Elevate Your Aesthetic Operations</h2>
-        <p class="text-charcoal-700/85 mb-6 sm:mb-8 text-sm sm:text-base">
-          Join modern aesthetic centers using intelligent systems to scale with confidence.
-        </p>
-        <button @click="showSubscriptionPopup = true" class="bg-gradient-to-r from-[#9f6946] to-[#7b4e35] border border-[#dcb084]/50 text-cream-50 font-semibold px-6 sm:px-8 py-3 sm:py-4 rounded-xl hover:from-[#b07a54] hover:to-[#8d5a3f] transition text-sm sm:text-base shadow-[0_10px_24px_rgba(54,34,22,0.22)]">
-          Try 14-Day Free Trial
-        </button>
-      </div>
-
-      <div class="absolute top-0 left-0 w-48 sm:w-64 h-48 sm:h-64 bg-gold-200/20 rounded-full blur-[60px] sm:blur-[80px] animate-parallaxSlow"></div>
-      <div class="absolute bottom-0 right-0 w-56 sm:w-72 h-56 sm:h-72 bg-rose-200/20 rounded-full blur-[90px] sm:blur-[120px] animate-parallaxSlow"></div>
-      <div class="cta-social-wrap">
-        <span class="cta-quote cta-quote-left" aria-hidden="true">"</span>
-        <span class="cta-quote cta-quote-right" aria-hidden="true">"</span>
-        <div class="cta-social">
-          <a href="#" aria-label="Facebook (Coming Soon)" class="social-icon" title="Coming Soon">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073c0 6.024 4.388 11.018 10.125 11.927v-8.44H7.078v-3.487h3.047V9.414c0-3.017 1.792-4.685 4.533-4.685 1.313 0 2.687.236 2.687.236v2.96h-1.514c-1.49 0-1.954.928-1.954 1.88v2.268h3.328l-.532 3.487h-2.796V24C19.612 23.09 24 18.097 24 12.073z"/>
-            </svg>
-          </a>
-          <a href="#" aria-label="Instagram (Coming Soon)" class="social-icon" title="Coming Soon">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7.75 2h8.5A5.75 5.75 0 0122 7.75v8.5A5.75 5.75 0 0116.25 22h-8.5A5.75 5.75 0 012 16.25v-8.5A5.75 5.75 0 017.75 2zm0 1.7A4.05 4.05 0 003.7 7.75v8.5a4.05 4.05 0 004.05 4.05h8.5a4.05 4.05 0 004.05-4.05v-8.5a4.05 4.05 0 00-4.05-4.05h-8.5zM12 7.5A4.5 4.5 0 1112 16.5 4.5 4.5 0 0112 7.5zm0 1.7a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6zm4.85-2.2a1.1 1.1 0 110 2.2 1.1 1.1 0 010-2.2z"/>
-            </svg>
-          </a>
-          <a href="#" aria-label="YouTube (Coming Soon)" class="social-icon" title="Coming Soon">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M23.5 7.2a3.1 3.1 0 00-2.2-2.2C19.4 4.5 12 4.5 12 4.5s-7.4 0-9.3.5A3.1 3.1 0 00.5 7.2 32.7 32.7 0 000 12a32.7 32.7 0 00.5 4.8 3.1 3.1 0 002.2 2.2c1.9.5 9.3.5 9.3.5s7.4 0 9.3-.5a3.1 3.1 0 002.2-2.2A32.7 32.7 0 0024 12a32.7 32.7 0 00-.5-4.8zM9.6 15.1V8.9l5.5 3.1-5.5 3.1z"/>
-            </svg>
-          </a>
+          <div class="footer-cta-actions">
+            <button @click="showSubscriptionPopup = true" class="footer-primary-btn">
+              Try 14-Day Free Trial
+            </button>
+            <router-link to="/subscription-features" class="footer-secondary-btn">
+              View Plans
+            </router-link>
+          </div>
         </div>
-        <p class="cta-social-note">Social links are placeholders for now.</p>
+
+        <footer class="site-footer">
+          <div class="site-footer-grid">
+            <div class="site-footer-brand">
+              <div class="public-brand-cluster">
+                <span class="public-nav-mark" aria-hidden="true"></span>
+                <span class="public-nav-brand text-xl tracking-wide">AesthetiCare</span>
+              </div>
+              <p class="site-footer-copy">
+                A refined platform for aesthetic clinics, med spas, and skin centers that want polished workflows and smarter operations.
+              </p>
+              <div class="site-footer-social">
+                <a href="#" aria-label="Facebook (Coming Soon)" class="social-icon" title="Coming Soon">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073c0 6.024 4.388 11.018 10.125 11.927v-8.44H7.078v-3.487h3.047V9.414c0-3.017 1.792-4.685 4.533-4.685 1.313 0 2.687.236 2.687.236v2.96h-1.514c-1.49 0-1.954.928-1.954 1.88v2.268h3.328l-.532 3.487h-2.796V24C19.612 23.09 24 18.097 24 12.073z"/>
+                  </svg>
+                </a>
+                <a href="#" aria-label="Instagram (Coming Soon)" class="social-icon" title="Coming Soon">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7.75 2h8.5A5.75 5.75 0 0122 7.75v8.5A5.75 5.75 0 0116.25 22h-8.5A5.75 5.75 0 012 16.25v-8.5A5.75 5.75 0 017.75 2zm0 1.7A4.05 4.05 0 003.7 7.75v8.5a4.05 4.05 0 004.05 4.05h8.5a4.05 4.05 0 004.05-4.05v-8.5a4.05 4.05 0 00-4.05-4.05h-8.5zM12 7.5A4.5 4.5 0 1112 16.5 4.5 4.5 0 0112 7.5zm0 1.7a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6zm4.85-2.2a1.1 1.1 0 110 2.2 1.1 1.1 0 010-2.2z"/>
+                  </svg>
+                </a>
+                <a href="#" aria-label="YouTube (Coming Soon)" class="social-icon" title="Coming Soon">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23.5 7.2a3.1 3.1 0 00-2.2-2.2C19.4 4.5 12 4.5 12 4.5s-7.4 0-9.3.5A3.1 3.1 0 00.5 7.2 32.7 32.7 0 000 12a32.7 32.7 0 00.5 4.8 3.1 3.1 0 002.2 2.2c1.9.5 9.3.5 9.3.5s7.4 0 9.3-.5a3.1 3.1 0 002.2-2.2A32.7 32.7 0 0024 12a32.7 32.7 0 00-.5-4.8zM9.6 15.1V8.9l5.5 3.1-5.5 3.1z"/>
+                  </svg>
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <p class="site-footer-heading">Explore</p>
+              <div class="site-footer-links">
+                <router-link to="/" class="site-footer-link">Home</router-link>
+                <router-link to="/subscription-features" class="site-footer-link">Pricing</router-link>
+                <router-link to="/centers" class="site-footer-link">Centers</router-link>
+              </div>
+            </div>
+
+            <div>
+              <p class="site-footer-heading">Access</p>
+              <div class="site-footer-links">
+                <router-link to="/login" class="site-footer-link">Login</router-link>
+                <router-link to="/register" class="site-footer-link">Create Account</router-link>
+                <router-link to="/clinic/register" class="site-footer-link">Register Clinic</router-link>
+              </div>
+            </div>
+
+            <div>
+              <p class="site-footer-heading">Why Clinics Choose Us</p>
+              <div class="site-footer-links">
+                <span class="site-footer-note">Polished booking flow</span>
+                <span class="site-footer-note">Treatment visibility</span>
+                <span class="site-footer-note">Growth-ready operations</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="site-footer-bottom">
+            <p>© 2026 AesthetiCare. Designed for modern aesthetic practices.</p>
+            <p class="site-footer-bottom-note">Social links are placeholders for now.</p>
+          </div>
+        </footer>
       </div>
     </section>
 
@@ -416,7 +546,6 @@
 
 <script>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
 import Modal from "@/components/common/Modal.vue";
 import SubscriptionPopup from "@/components/common/SubscriptionPopup.vue";
@@ -432,7 +561,6 @@ export default {
   },
   setup() {
     const { user, isLoading, initAuth } = useAuth();
-    const router = useRouter();
     const showSubscriptionPopup = ref(false);
     const isMobileMenuOpen = ref(false);
     const currentCapabilityIndex = ref(0);
@@ -615,6 +743,14 @@ body {
   font-family: "Playfair Display", serif;
 }
 
+.hero-editorial-title {
+  font-family: "Bodoni Moda", "Playfair Display", "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 0.96;
+}
+
 /* Parallax animation for blobs */
 @keyframes parallaxSlow {
   0% {
@@ -671,15 +807,58 @@ body {
   opacity: 1 !important;
 }
 
+.capability-section {
+  position: relative;
+  background:
+    radial-gradient(circle at top center, rgba(241, 212, 170, 0.46), transparent 28%),
+    linear-gradient(180deg, #fff8ed 0%, #fdf3e2 54%, #f8ead4 100%);
+}
+
+.capability-header {
+  max-width: 760px;
+  margin: 0 auto 2.8rem;
+  text-align: center;
+}
+
+.capability-section-kicker {
+  margin: 0 0 0.8rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a56b44;
+}
+
+.capability-section-title {
+  margin: 0;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-size: clamp(2.35rem, 4vw, 4.25rem);
+  line-height: 0.98;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  background: linear-gradient(120deg, #92583a 0%, #c78558 50%, #a66747 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.capability-section-subtitle {
+  margin: 1rem auto 0;
+  max-width: 680px;
+  color: rgba(84, 58, 41, 0.82);
+  font-size: 0.98rem;
+  line-height: 1.7;
+}
+
 .capability-showcase {
   position: relative;
-  min-height: clamp(430px, 62vw, 560px);
-  border-radius: 26px;
+  min-height: clamp(460px, 62vw, 590px);
+  border-radius: 32px;
   overflow: hidden;
   background-size: cover;
   background-position: center;
-  border: 1px solid rgba(248, 229, 189, 0.3);
-  box-shadow: 0 20px 42px rgba(36, 24, 15, 0.2);
+  border: 1px solid rgba(248, 229, 189, 0.42);
+  box-shadow: 0 28px 56px rgba(78, 52, 36, 0.16);
   display: flex;
   align-items: stretch;
 }
@@ -689,14 +868,58 @@ body {
 .capability-showcase-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(95deg, rgba(36, 24, 15, 0.62) 0%, rgba(54, 34, 22, 0.45) 42%, rgba(54, 34, 22, 0.18) 68%, rgba(36, 24, 15, 0.58) 100%);
+  background:
+    linear-gradient(98deg, rgba(46, 30, 20, 0.7) 0%, rgba(77, 52, 37, 0.52) 38%, rgba(77, 52, 37, 0.18) 64%, rgba(46, 30, 20, 0.62) 100%);
+}
+.capability-showcase-sheen {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(255, 249, 239, 0.16), transparent 24%),
+    linear-gradient(120deg, transparent 48%, rgba(255, 248, 235, 0.08) 58%, transparent 68%);
+  pointer-events: none;
+}
+.capability-floating-badge {
+  position: absolute;
+  top: 1.35rem;
+  right: 1.35rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.22rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 248, 235, 0.26);
+  background: rgba(73, 48, 34, 0.38);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 24px rgba(30, 19, 12, 0.14);
+}
+.capability-floating-badge span {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(248, 229, 189, 0.72);
+}
+.capability-floating-badge strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff8eb;
 }
 .capability-showcase-content {
   position: relative;
   z-index: 2;
-  width: min(56%, 650px);
-  padding: clamp(24px, 4vw, 44px);
-  padding-bottom: clamp(90px, 8vw, 120px);
+  width: min(56%, 660px);
+  margin: clamp(1.35rem, 3vw, 2rem);
+  align-self: center;
+  border-radius: 1.9rem;
+  border: 1px solid rgba(255, 248, 235, 0.14);
+  background: linear-gradient(180deg, rgba(58, 38, 27, 0.28) 0%, rgba(58, 38, 27, 0.1) 100%);
+  backdrop-filter: blur(10px);
+  padding: clamp(1.4rem, 3.3vw, 2.4rem);
+  padding-right: clamp(1.4rem, 3.3vw, 2.8rem);
+  padding-bottom: clamp(7.4rem, 8vw, 8.9rem);
   color: #fff8eb;
   display: flex;
   flex-direction: column;
@@ -704,60 +927,106 @@ body {
   animation: capabilityContentIn 0.52s ease both;
 }
 .capability-eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.18em;
+  font-size: 0.74rem;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: rgba(248, 229, 189, 0.95);
-  margin-bottom: 12px;
+  margin-bottom: 0.9rem;
 }
 .capability-showcase-title {
-  font-family: "Playfair Display", serif;
-  font-size: clamp(2rem, 5vw, 5rem);
-  line-height: 0.95;
-  font-weight: 700;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-size: clamp(2.6rem, 5.3vw, 5.5rem);
+  line-height: 0.9;
+  font-style: italic;
+  font-weight: 600;
   text-transform: uppercase;
-  margin: 0 0 16px;
+  letter-spacing: -0.035em;
+  margin: 0 0 1rem;
+  text-wrap: balance;
+  text-shadow: 0 10px 24px rgba(26, 16, 10, 0.28);
 }
 .capability-showcase-desc {
-  max-width: 560px;
+  max-width: 34rem;
   color: rgba(255, 248, 235, 0.9);
-  font-size: clamp(0.95rem, 1.3vw, 1.1rem);
-  line-height: 1.45;
-  margin-bottom: 20px;
+  font-size: clamp(1rem, 1.3vw, 1.15rem);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+.capability-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.capability-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 229, 189, 0.34);
+  background: rgba(255, 248, 235, 0.12);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f8e5bd;
+}
+.capability-meta-separator {
+  width: 2.4rem;
+  height: 1px;
+  background: rgba(255, 248, 235, 0.34);
+}
+.capability-meta-note {
+  color: rgba(255, 248, 235, 0.78);
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
 }
 .capability-actions {
   position: absolute;
   z-index: 3;
-  left: clamp(18px, 3vw, 40px);
-  bottom: clamp(18px, 3vw, 30px);
+  left: clamp(28px, 3vw, 40px);
+  bottom: clamp(24px, 3vw, 34px);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0.75rem;
 }
 .capability-btn-main {
-  border: none;
-  background: #fff8eb;
+  border: 1px solid rgba(255, 248, 235, 0.34);
+  background: rgba(255, 248, 235, 0.94);
   color: #342419;
-  border-radius: 12px;
-  padding: 12px 28px;
-  font-weight: 600;
+  border-radius: 1rem;
+  padding: 0.92rem 1.75rem;
+  font-weight: 700;
+  min-width: 7.75rem;
+  transition: transform 0.24s ease, box-shadow 0.24s ease, background 0.24s ease;
+  box-shadow: 0 12px 30px rgba(41, 26, 17, 0.14);
+}
+.capability-btn-main:hover {
+  transform: translateY(-1px);
+  background: #ffffff;
 }
 .capability-btn-icon {
   border: 1px solid rgba(255, 248, 235, 0.6);
-  background: rgba(255, 248, 235, 0.18);
+  background: rgba(255, 248, 235, 0.12);
   color: #fff8eb;
-  width: 42px;
-  height: 42px;
+  width: 3rem;
+  height: 3rem;
   border-radius: 50%;
-  font-size: 20px;
+  font-size: 1.2rem;
   line-height: 1;
+  backdrop-filter: blur(10px);
+  transition: transform 0.22s ease, background 0.22s ease;
+}
+.capability-btn-icon:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 248, 235, 0.18);
 }
 .capability-rail-wrap {
   position: absolute;
   z-index: 2;
-  right: clamp(10px, 2vw, 24px);
-  bottom: clamp(12px, 2.2vw, 22px);
-  width: min(38%, 420px);
+  right: clamp(16px, 2vw, 30px);
+  bottom: clamp(18px, 2.4vw, 24px);
+  width: min(38%, 448px);
 }
 .capability-rail-wrap.is-switching .capability-mini {
   animation: miniCardIn 0.38s ease both;
@@ -773,39 +1042,42 @@ body {
   top: 50%;
   transform: translateY(-50%);
   z-index: 3;
-  width: 30px;
-  height: 30px;
+  width: 2.2rem;
+  height: 2.2rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 248, 235, 0.65);
-  background: rgba(36, 24, 15, 0.48);
+  background: rgba(52, 34, 24, 0.58);
   color: #fff8eb;
-  font-size: 22px;
+  font-size: 1.35rem;
   line-height: 1;
+  backdrop-filter: blur(10px);
 }
 .capability-rail-nav-left {
-  left: -38px;
+  left: -2.9rem;
 }
 .capability-rail-nav-right {
-  right: -38px;
+  right: -2.9rem;
 }
 .capability-mini {
   position: relative;
   border: 1px solid rgba(255, 248, 235, 0.35);
-  border-radius: 16px;
+  border-radius: 1.3rem;
   overflow: hidden;
   min-width: 0;
-  min-height: 156px;
+  min-height: 11.4rem;
   text-align: left;
   background: transparent;
   padding: 0;
-  opacity: 0.85;
+  opacity: 0.82;
   transform: scale(0.98);
-  transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 12px 28px rgba(29, 19, 13, 0.16);
+  transition: opacity 0.22s ease, transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
 }
 .capability-mini.is-active {
   opacity: 1;
   transform: scale(1);
   border-color: rgba(248, 229, 189, 0.85);
+  box-shadow: 0 18px 36px rgba(29, 19, 13, 0.24);
 }
 .capability-mini-img {
   width: 100%;
@@ -820,24 +1092,27 @@ body {
 .capability-mini-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(36, 24, 15, 0.05) 35%, rgba(36, 24, 15, 0.76) 100%);
+  background:
+    linear-gradient(180deg, rgba(36, 24, 15, 0.04) 32%, rgba(36, 24, 15, 0.84) 100%);
 }
 .capability-mini-text {
   position: absolute;
-  inset: auto 10px 10px 10px;
+  inset: auto 0.8rem 0.8rem 0.8rem;
   z-index: 2;
 }
 .capability-mini-eyebrow {
   color: rgba(255, 248, 235, 0.82);
-  font-size: 10px;
-  margin: 0 0 3px;
+  font-size: 0.63rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.22rem;
 }
 .capability-mini-title {
   color: #fff8eb;
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.08rem;
   line-height: 1.05;
   margin: 0;
+  text-shadow: 0 6px 16px rgba(26, 16, 10, 0.18);
 }
 
 @keyframes capabilityBackgroundPulse {
@@ -851,6 +1126,172 @@ body {
 @keyframes miniCardIn {
   0% { opacity: 0; transform: translateY(12px) scale(0.95); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.solutions-section {
+  position: relative;
+  background:
+    radial-gradient(circle at top center, rgba(241, 212, 170, 0.52), transparent 34%),
+    linear-gradient(180deg, #fff9ef 0%, #fdf3e2 52%, #fbefdc 100%);
+}
+
+.solutions-header {
+  max-width: 760px;
+  margin: 0 auto 3rem;
+}
+
+.solutions-kicker {
+  margin-bottom: 0.75rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #a56b44;
+}
+
+.solutions-title {
+  margin: 0;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-size: clamp(2.25rem, 4vw, 4rem);
+  line-height: 0.96;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  background: linear-gradient(120deg, #8a5237 0%, #c68457 52%, #a86444 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 8px 24px rgba(198, 148, 108, 0.18);
+}
+
+.solutions-subtitle {
+  margin: 1rem auto 0;
+  max-width: 640px;
+  color: rgba(84, 58, 41, 0.86);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.solution-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.75rem;
+  border: 1px solid rgba(222, 181, 141, 0.44);
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96) 0%, rgba(255, 247, 236, 0.9) 100%);
+  backdrop-filter: blur(12px);
+  padding: 1.4rem 1.35rem 1.25rem;
+  box-shadow: 0 20px 42px rgba(147, 104, 69, 0.12);
+  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.solution-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 5px;
+  background: linear-gradient(90deg, rgba(233, 194, 143, 0.18), rgba(198, 148, 108, 0.45), rgba(233, 194, 143, 0.18));
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.solution-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(198, 148, 108, 0.55);
+  box-shadow: 0 26px 46px rgba(147, 104, 69, 0.18);
+}
+
+.solution-card:hover::before {
+  opacity: 1;
+}
+
+.solution-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 1.1rem;
+}
+
+.solution-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.95rem;
+  background: rgba(249, 228, 211, 0.94);
+  color: #8c4f31;
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.solution-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #9f6946;
+}
+
+.solution-icon-wrap {
+  width: 5.5rem;
+  height: 5.5rem;
+  margin: 0 auto 1.2rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top left, #fff8eb 0%, #f1d4aa 34%, #efd3ac 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 12px 24px rgba(198, 148, 108, 0.14);
+  border: 1px solid rgba(214, 169, 123, 0.55);
+}
+
+.solution-icon-wrap-rose {
+  background: radial-gradient(circle at top left, #fff8eb 0%, #f6cfbb 35%, #f1d4aa 100%);
+}
+
+.solution-icon-wrap-cream {
+  background: radial-gradient(circle at top left, #fff8eb 0%, #fdf3e2 35%, #f1d4aa 100%);
+}
+
+.solution-title {
+  margin: 0 0 0.65rem;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.08;
+  text-align: center;
+  color: #3b281d;
+}
+
+.solution-description {
+  margin: 0;
+  min-height: 4.8rem;
+  font-size: 0.96rem;
+  line-height: 1.7;
+  text-align: center;
+  color: rgba(74, 53, 40, 0.88);
+}
+
+.solution-footer {
+  margin-top: 1.15rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.solution-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.42rem 0.72rem;
+  background: rgba(255, 248, 235, 0.9);
+  border: 1px solid rgba(214, 169, 123, 0.34);
+  color: #8d5e3f;
+  font-size: 0.74rem;
+  font-weight: 600;
 }
 
 /* Floating animation */
@@ -869,6 +1310,198 @@ body {
   display: block;
   width: 100%;
   height: 78px;
+}
+
+.footer-cta-section {
+  position: relative;
+  background:
+    radial-gradient(circle at top center, rgba(241, 212, 170, 0.42), transparent 30%),
+    linear-gradient(180deg, #f8eedf 0%, #f4e4cf 48%, #eed7bc 100%);
+  padding: clamp(3.5rem, 8vw, 5.5rem) 1rem 2rem;
+}
+
+.footer-cta-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.footer-cta-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.2rem;
+  border-radius: 2rem;
+  border: 1px solid rgba(198, 148, 108, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(255, 248, 235, 0.34), transparent 24%),
+    linear-gradient(135deg, rgba(255, 251, 244, 0.92) 0%, rgba(249, 236, 214, 0.78) 52%, rgba(232, 199, 163, 0.7) 100%);
+  padding: clamp(1.35rem, 4vw, 2.25rem);
+  box-shadow: 0 24px 54px rgba(117, 78, 53, 0.12);
+}
+
+.footer-kicker {
+  margin-bottom: 0.7rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #a56b44;
+}
+
+.footer-cta-text {
+  margin-top: 1rem;
+  max-width: 42rem;
+  color: rgba(84, 58, 41, 0.84);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.footer-cta-highlights {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.footer-highlight-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.5rem 0.78rem;
+  background: rgba(255, 248, 235, 0.86);
+  border: 1px solid rgba(198, 148, 108, 0.24);
+  color: #87593b;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.footer-cta-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.footer-primary-btn,
+.footer-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border-radius: 1rem;
+  padding: 0.95rem 1.15rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: transform 0.22s ease, background 0.22s ease, color 0.22s ease, border-color 0.22s ease;
+}
+
+.footer-primary-btn {
+  border: 1px solid rgba(126, 78, 53, 0.24);
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 50%, #6e4330 100%);
+  color: #fff8eb;
+  box-shadow: 0 16px 34px rgba(111, 63, 42, 0.18);
+}
+
+.footer-primary-btn:hover {
+  transform: translateY(-1px);
+}
+
+.footer-secondary-btn {
+  border: 1px solid rgba(198, 148, 108, 0.34);
+  background: rgba(255, 251, 244, 0.72);
+  color: #7b4e35;
+}
+
+.footer-secondary-btn:hover {
+  background: rgba(255, 248, 235, 0.95);
+}
+
+.site-footer {
+  margin-top: 1.1rem;
+  border-radius: 1.7rem;
+  border: 1px solid rgba(198, 148, 108, 0.18);
+  background: rgba(79, 52, 40, 0.96);
+  color: #f7eadf;
+  padding: clamp(1.25rem, 3vw, 1.8rem);
+  box-shadow: 0 20px 42px rgba(59, 37, 26, 0.18);
+}
+
+.site-footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 1.2rem;
+}
+
+.site-footer-brand {
+  max-width: 23rem;
+}
+
+.site-footer-brand .public-nav-brand {
+  background: linear-gradient(120deg, #fff8eb 0%, #f1d4aa 36%, #d7aa7d 70%, #fff8eb 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.site-footer-copy {
+  margin-top: 1rem;
+  color: rgba(247, 234, 223, 0.76);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.site-footer-social {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.site-footer-heading {
+  margin: 0 0 0.85rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(241, 212, 170, 0.82);
+}
+
+.site-footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.site-footer-link,
+.site-footer-note {
+  color: rgba(247, 234, 223, 0.78);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.site-footer-link {
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.site-footer-link:hover {
+  color: #fff8eb;
+  transform: translateX(2px);
+}
+
+.site-footer-bottom {
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 248, 235, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: rgba(247, 234, 223, 0.62);
+  font-size: 0.82rem;
+}
+
+.site-footer-bottom-note {
+  text-align: right;
 }
 
 /* Hero collage layout */
@@ -989,6 +1622,7 @@ body {
   background-size: 500px 610px;
   background-position: -162px -430px;
 }
+
 .product-card {
   display: flex;
   flex-direction: column;
@@ -1010,25 +1644,135 @@ body {
   color: var(--color-charcoal-700);
   letter-spacing: 0.02em;
 }
+
+.video-showcase-kicker {
+  margin-bottom: 0.9rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255, 248, 235, 0.8);
+}
+
+.video-showcase-title {
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-size: clamp(2.55rem, 4.9vw, 5.2rem);
+  line-height: 0.94;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  background: linear-gradient(120deg, #fff4dc 0%, #f1d4aa 28%, #d7aa7d 58%, #c6946c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.16);
+}
+
+.video-showcase-copy {
+  margin-top: 1rem;
+  max-width: 42rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.video-feature-card,
+.video-stat-card {
+  border-radius: 1.45rem;
+  padding: 1rem 1rem 1.05rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 248, 235, 0.14);
+  box-shadow: 0 18px 34px rgba(9, 6, 5, 0.18);
+}
+
+.video-feature-card {
+  background: rgba(27, 18, 14, 0.34);
+}
+
+.video-feature-card-soft {
+  background: linear-gradient(180deg, rgba(27, 18, 14, 0.38) 0%, rgba(27, 18, 14, 0.22) 100%);
+}
+
+.video-feature-card-accent {
+  background: linear-gradient(180deg, rgba(188, 138, 101, 0.18) 0%, rgba(74, 44, 30, 0.28) 100%);
+}
+
+.video-feature-kicker {
+  margin: 0 0 0.45rem;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(241, 212, 170, 0.82);
+}
+
+.video-feature-title {
+  margin: 0;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #fff8eb;
+  line-height: 1.05;
+}
+
+.video-feature-copy {
+  margin: 0.55rem 0 0;
+  color: rgba(255, 248, 235, 0.76);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.video-stat-card {
+  background: rgba(255, 248, 235, 0.14);
+  text-align: left;
+}
+
+.video-stat-value {
+  margin: 0;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff8eb;
+}
+
+.video-stat-label {
+  margin: 0.45rem 0 0;
+  color: rgba(255, 248, 235, 0.74);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 1023px) {
   .capability-showcase {
-    min-height: 640px;
+    min-height: 700px;
     display: block;
+    border-radius: 1.8rem;
+  }
+  .capability-header {
+    margin-bottom: 2.1rem;
   }
   .capability-showcase-content {
-    width: 100%;
-    padding: 22px 18px;
+    width: auto;
+    margin: 1rem;
+    padding: 1.15rem 1rem 6.8rem;
   }
   .capability-showcase-title {
-    font-size: clamp(1.9rem, 8vw, 3.2rem);
+    font-size: clamp(2.1rem, 9vw, 3.5rem);
   }
   .capability-showcase-desc {
     max-width: 100%;
-    margin-bottom: 86px;
+    margin-bottom: 0.85rem;
+  }
+  .capability-floating-badge {
+    top: auto;
+    right: 1rem;
+    bottom: 12.9rem;
+    padding: 0.7rem 0.85rem;
   }
   .capability-actions {
-    left: 18px;
-    bottom: 184px;
+    left: 1rem;
+    bottom: 11rem;
   }
   .capability-rail {
     width: auto;
@@ -1047,7 +1791,10 @@ body {
   }
   .capability-mini {
     min-width: 0;
-    min-height: 150px;
+    min-height: 8.9rem;
+  }
+  .capability-mini-title {
+    font-size: 0.96rem;
   }
 
   .collage-grid {
@@ -1110,6 +1857,33 @@ body {
     background-size: 340px 450px;
     background-position: -120px -320px;
   }
+
+  .video-showcase-title {
+    letter-spacing: 0.1em;
+  }
+
+  .video-showcase-copy {
+    max-width: 30rem;
+    font-size: 0.95rem;
+  }
+
+  .solutions-header {
+    margin-bottom: 2.2rem;
+  }
+
+  .solution-card {
+    padding: 1.2rem 1.05rem 1.1rem;
+  }
+
+  .solution-title {
+    font-size: 1.25rem;
+  }
+
+  .solution-description {
+    min-height: auto;
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
 }
 
 /* Mobile sidebar transitions */
@@ -1157,9 +1931,9 @@ body {
   width: 2rem;
   height: 2rem;
   border-radius: 999px;
-  border: 1px solid rgba(198, 148, 108, 0.45);
-  background: rgba(255, 255, 255, 0.68);
-  color: #8c5a3a;
+  border: 1px solid rgba(198, 148, 108, 0.3);
+  background: rgba(255, 248, 235, 0.16);
+  color: #fff1e3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1167,8 +1941,8 @@ body {
 }
 
 .social-icon:hover {
-  border-color: rgba(159, 105, 70, 0.6);
-  background: rgba(255, 247, 232, 0.95);
+  border-color: rgba(241, 212, 170, 0.42);
+  background: rgba(255, 248, 235, 0.22);
   transform: translateY(-1px);
 }
 
@@ -1197,12 +1971,41 @@ body {
 }
 
 @media (max-width: 768px) {
+  .footer-cta-section {
+    padding-bottom: 1.4rem;
+  }
+
+  .footer-cta-text {
+    font-size: 0.94rem;
+    line-height: 1.6;
+  }
+
+  .site-footer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .site-footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .site-footer-bottom-note {
+    text-align: left;
+  }
+
   .cta-social-wrap {
     left: 14px;
     bottom: 12px;
   }
   .cta-social-note {
     font-size: 0.72rem;
+  }
+}
+
+@media (min-width: 960px) {
+  .footer-cta-card {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: center;
   }
 }
 

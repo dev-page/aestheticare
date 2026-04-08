@@ -89,14 +89,6 @@
               <p class="text-xs text-slate-400 mb-1">Clinic Location</p>
               <p class="text-white">{{ selectedRecord.clinicLocation || '-' }}</p>
             </div>
-            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-              <p class="text-xs text-slate-400 mb-1">Selected Plan</p>
-              <p class="text-white">{{ selectedRecord.planLabel }}</p>
-            </div>
-            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
-              <p class="text-xs text-slate-400 mb-1">Payment Status</p>
-              <p class="text-white">{{ selectedRecord.paymentStatus || '-' }}</p>
-            </div>
           </div>
 
           <section class="mb-6">
@@ -104,7 +96,6 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <article v-for="docItem in selectedRecord.documents" :key="docItem.key" class="bg-slate-800 border border-slate-700 rounded-xl p-4">
                 <p class="text-sm text-slate-200 mb-3">{{ docItem.label }}</p>
-
                 <div v-if="docItem.url">
                   <img
                     v-if="docItem.isImage"
@@ -185,16 +176,19 @@ const normalizeStatusLabel = (clinicStatus, userStatus) => {
   return String(clinicStatus || userStatus || 'Pending Approval')
 }
 
-const mapDocs = (submittedDocuments = {}) => {
+const mapDocs = (submittedDocuments = {}, draftDocuments = {}) => {
+  const docs = { ...(draftDocuments || {}), ...(submittedDocuments || {}) }
   const definitions = [
-    { key: 'businessPermit', label: 'Business Permit' },
+    { key: 'businessPermit', label: 'Business Permit/Registration' },
+    { key: 'governmentIdRepresentativeFront', label: 'Government-Issued ID of Representative (Front)' },
+    { key: 'governmentIdRepresentativeBack', label: 'Government-Issued ID of Representative (Back)' },
     { key: 'dohAccreditation', label: 'DOH Accreditation' },
     { key: 'fdaApproval', label: 'FDA Approval' },
-    { key: 'prcLicenseMedicalDirector', label: 'PRC License (Medical Director)' },
+    { key: 'prcIdMedicalDirector', label: 'PRC ID of Medical Director' },
   ]
 
   return definitions.map((item) => {
-    const file = submittedDocuments?.[item.key] || {}
+    const file = docs?.[item.key] || {}
     const url = String(file?.url || '').trim()
     const type = String(file?.type || '').toLowerCase()
     return {
@@ -345,7 +339,7 @@ export default {
               planKey: String(resolvedPlan || '').trim().toLowerCase(),
               planLabel: normalizePlanLabel(resolvedPlan),
               paymentStatus: resolvedPayment,
-              documents: mapDocs(clinic.submittedDocuments || {}),
+              documents: mapDocs(clinic.submittedDocuments || {}, clinic.draftDocuments || {}),
             }
           })
         )
@@ -443,10 +437,17 @@ export default {
 
       processing.value = true
       try {
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
+        if (!token) {
+          throw new Error('Missing authorization token')
+        }
         const reviewerId = auth.currentUser?.uid || null
         const response = await fetchFromBackend('/admin/reject-clinic-registration', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: {
+            'content-type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             uid: selectedRecord.value.id,
             rejectionReason: remark,

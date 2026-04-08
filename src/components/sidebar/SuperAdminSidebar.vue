@@ -23,8 +23,8 @@ export default {
         label: 'Account Management',
         icon: 'users',
         children: [
-          { label: 'User Accounts', icon: 'profile', to: '/superadmin/accounts/users' },
-          { label: 'Permissions', icon: 'lock', to: '/superadmin/permissions' }
+          { label: 'Admin List', icon: 'shield-account', to: '/superadmin/admin-list' },
+          { label: 'User Accounts', icon: 'profile', to: '/superadmin/accounts/users' }
         ]
       },
       {
@@ -33,6 +33,7 @@ export default {
         icon: 'box',
         children: [
           { label: 'Verified Clinics', icon: 'shield', to: '/superadmin/clinics/verified' },
+          { label: 'Suspended Centers', icon: 'reportIssue', to: '/superadmin/clinics/suspended' },
           { label: 'Clinic Verification', icon: 'clipboard', to: '/superadmin/clinics/verification' },
           { label: 'Archived Clinics', icon: 'archive', to: '/superadmin/clinics/archived' }
         ]
@@ -50,9 +51,9 @@ export default {
       { label: 'Activity Logs', icon: 'activity', to: '/superadmin/activity-logs' },
       {
         key: 'support',
-        label: 'Support & Ticketing',
+        label: 'Support & Reports',
         icon: 'inbox',
-        children: [{ label: 'User Tickets', icon: 'file', to: '/superadmin/tickets' }]
+        children: [{ label: 'User Issues', icon: 'reportIssue', to: '/superadmin/tickets' }]
       }
     ]
 

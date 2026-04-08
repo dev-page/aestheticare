@@ -20,7 +20,7 @@
         </div>
 
         <div class="bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-700">
-          <h3 class="text-slate-400 text-xs sm:text-sm mb-1">Monthly Revenue</h3>
+          <h3 class="text-slate-400 text-xs sm:text-sm mb-1">Total Revenue</h3>
           <p class="text-2xl sm:text-3xl font-bold text-white">P{{ monthlyRevenue.toLocaleString('en-PH') }}</p>
         </div>
 
@@ -91,6 +91,14 @@ export default {
       return timestamp.toDate().toLocaleString()
     }
 
+    const chunkArray = (items, size = 10) => {
+      const chunks = []
+      for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size))
+      }
+      return chunks
+    }
+
     const loadOwnerData = async (user) => {
       const branchQuery = query(collection(db, 'clinics'), where('ownerId', '==', user.uid))
       const branchSnapshot = await getDocs(branchQuery)
@@ -101,12 +109,21 @@ export default {
       monthlyRevenue.value = branchData.reduce((sum, b) => sum + Number(b.revenue || 0), 0)
       newInquiries.value = branchData.reduce((sum, b) => sum + Number(b.inquiries || 0), 0)
 
-      const branchIds = new Set(branchData.map((b) => b.id))
-      const usersSnapshot = await getDocs(collection(db, 'users'))
-      totalEmployees.value = usersSnapshot.docs
-        .map((snap) => snap.data())
-        .filter((u) => String(u.userType || '').toLowerCase() === 'staff' && branchIds.has(u.branchId))
-        .length
+      const branchIds = branchData.map((b) => b.id).filter(Boolean)
+      let totalStaff = 0
+      if (branchIds.length) {
+        const chunks = chunkArray(branchIds)
+        for (const chunk of chunks) {
+          const staffQuery = query(
+            collection(db, 'users'),
+            where('branchId', 'in', chunk),
+            where('userType', '==', 'Staff')
+          )
+          const usersSnapshot = await getDocs(staffQuery)
+          totalStaff += usersSnapshot.docs.filter((snap) => !snap.data()?.archived).length
+        }
+      }
+      totalEmployees.value = totalStaff
 
       const activityQuery = query(collection(db, 'activities'), where('ownerId', '==', user.uid))
       const activitySnapshot = await getDocs(activityQuery)

@@ -1,9 +1,17 @@
 <template>
   <nav class="fixed top-0 inset-x-0 z-50 bg-gradient-to-r from-gold-50 via-cream-100 to-gold-200 border-b border-gold-400/30">
     <div class="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 md:px-8 h-16">
-      <div class="flex items-center gap-3">
-        <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-gold-500 to-gold-700"></div>
-        <span class="text-lg tracking-wide text-charcoal-900">AesthetiCare</span>
+      <div class="flex items-center gap-2">
+        <img
+          src="@/assets/logo_no_bg.png"
+          alt="AesthetiCare logo"
+          class="h-10 w-10 object-contain"
+        />
+        <img
+          src="@/assets/brand_name.png"
+          alt="AesthetiCare"
+          class="h-6 sm:h-7 md:h-8 object-contain"
+        />
       </div>
       <div class="flex items-center gap-4">
         <router-link to="/" class="text-sm text-charcoal-700 hover:text-gold-700">Homepage</router-link>

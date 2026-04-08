@@ -14,8 +14,10 @@ dotenv.config()
 
 const app = express()
 const PORT = Number(process.env.PORT || 3000)
+const isDevelopment = String(process.env.NODE_ENV || 'development').toLowerCase() !== 'production'
 const OTP_PATH = '/send-otp'
 const ATTENDANCE_PIN_PATH = '/send-attendance-pin'
+const STAFF_WELCOME_PATH = '/send-staff-welcome'
 const RESET_PASSWORD_PATH = '/auth/reset-password'
 const CHECK_USER_PATH = '/auth/check-user'
 const __filename = fileURLToPath(import.meta.url)
@@ -109,6 +111,15 @@ const getGoogleCalendarClient = () => {
   return google.calendar({ version: 'v3', auth: oauth2Client })
 }
 
+const sendSendGridMessage = async (message) => {
+  const [response] = await sgMail.send(message)
+  const messageId = response?.headers?.['x-message-id'] || response?.headers?.['X-Message-Id'] || null
+  return {
+    statusCode: response?.statusCode || null,
+    messageId,
+  }
+}
+
 const requireAuth = async (req, res, next) => {
   if (!adminReady) {
     return res.status(500).json({
@@ -123,6 +134,30 @@ const requireAuth = async (req, res, next) => {
       success: false,
       error: 'Missing authorization token',
     })
+  }
+  try {
+    const decoded = await admin.auth().verifyIdToken(tokenMatch[1])
+    req.user = decoded
+    return next()
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid authorization token',
+    })
+  }
+}
+
+const optionalAuth = async (req, res, next) => {
+  if (!adminReady) {
+    return res.status(500).json({
+      success: false,
+      error: adminInitError || 'firebase-admin is not ready',
+    })
+  }
+  const authHeader = String(req.headers?.authorization || '').trim()
+  const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i)
+  if (!tokenMatch) {
+    return next()
   }
   try {
     const decoded = await admin.auth().verifyIdToken(tokenMatch[1])
@@ -153,6 +188,208 @@ const requireRole = (roles = []) => async (req, res, next) => {
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Failed to verify role' })
   }
+}
+
+const normalizeRoleKey = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  const compact = raw.toLowerCase().replace(/[\s_-]+/g, '')
+  if (compact === 'clinicadmin' || compact === 'clinicadministrator') return 'Owner'
+  if (compact === 'superadmin' || compact === 'systemadmin' || compact === 'sysadmin') return 'Superadmin'
+  if (compact === 'hr') return 'HR'
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
+
+const loadUserContext = async (uid) => {
+  const firestore = admin.firestore()
+  const userSnap = await firestore.collection('users').doc(uid).get()
+  const userData = userSnap.exists ? userSnap.data() || {} : {}
+  const roleKey = normalizeRoleKey(userData.role || userData.userType || '')
+  let rolePermissions = []
+  if (roleKey) {
+    const roleSnap = await firestore.collection('rolePermissions').doc(roleKey).get()
+    const roleData = roleSnap.exists ? roleSnap.data() || {} : {}
+    rolePermissions = Array.isArray(roleData.permissions) ? roleData.permissions : []
+  }
+  const userPermissions = Array.isArray(userData.permissions) ? userData.permissions : []
+  return {
+    uid,
+    roleKey,
+    userData,
+    permissions: new Set([...userPermissions, ...rolePermissions]),
+  }
+}
+
+const requirePermission = (permission) => async (req, res, next) => {
+  const uid = req.user?.uid
+  if (!uid) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' })
+  }
+  try {
+    if (!req.userContext || req.userContext.uid !== uid) {
+      req.userContext = await loadUserContext(uid)
+    }
+    const allowed = req.userContext.permissions.has(permission)
+    if (!allowed) {
+      return res.status(403).json({ success: false, error: 'Forbidden' })
+    }
+    return next()
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Failed to verify permission' })
+  }
+}
+
+const BOOKING_RESERVATIONS_COLLECTION = 'bookingReservations'
+const BOOKING_RESERVATION_TTL_MINUTES = Math.max(5, Number(process.env.BOOKING_RESERVATION_TTL_MINUTES || 15))
+const BOOKING_BLOCKING_STATUSES = new Set([
+  'scheduled',
+  'approved',
+  'paid',
+  'completed',
+  'in progress',
+  'ongoing',
+  'held',
+])
+
+const parseClockToMinutes = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+
+  const hhmm = raw.match(/^(\d{1,2}):(\d{2})$/)
+  if (hhmm) {
+    const hour = Number(hhmm[1])
+    const minute = Number(hhmm[2])
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return null
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null
+    return hour * 60 + minute
+  }
+
+  const ampm = raw.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/)
+  if (!ampm) return null
+
+  let hour = Number(ampm[1])
+  const minute = Number(ampm[2])
+  const marker = ampm[3].toUpperCase()
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null
+  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return null
+  if (marker === 'PM' && hour !== 12) hour += 12
+  if (marker === 'AM' && hour === 12) hour = 0
+  return hour * 60 + minute
+}
+
+const normalizeBookingStatus = (value) => String(value || '').trim().toLowerCase()
+
+const getMinutesFromData = (value, fallback = 60) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const getBookingRange = (data = {}) => {
+  const start = parseClockToMinutes(data.time)
+  if (start === null) return null
+  const end = parseClockToMinutes(data.endTime)
+  const durationMinutes = getMinutesFromData(
+    data.totalServiceDurationMinutes ||
+    data.consultationForServiceDurationMinutes ||
+    data.durationMinutes ||
+    data.bookingDurationMinutes,
+    60
+  )
+  let normalizedEnd = end !== null && end > start ? end : start + durationMinutes
+  if (normalizedEnd <= start) {
+    normalizedEnd = start + durationMinutes
+  }
+  return { start, end: normalizedEnd }
+}
+
+const rangesOverlap = (leftStart, leftEnd, rightStart, rightEnd) =>
+  leftStart < rightEnd && leftEnd > rightStart
+
+const toMillis = (value) => {
+  if (!value) return 0
+  if (typeof value.toMillis === 'function') return value.toMillis()
+  if (typeof value.toDate === 'function') return value.toDate().getTime()
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'number') return value
+  const parsed = Date.parse(String(value))
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+const buildBookingAppointmentPayload = ({
+  reservation,
+  paymongo,
+  paymentMethodType,
+  paymentMethod,
+}) => {
+  const flowType = String(reservation.flowType || 'booking').trim().toLowerCase()
+  const selectedServices = Array.isArray(reservation.selectedServices) ? reservation.selectedServices : []
+  const serviceNames = selectedServices.map((service) => String(service?.title || service?.name || '').trim()).filter(Boolean)
+  const serviceIds = Array.isArray(reservation.selectedServiceIds) ? reservation.selectedServiceIds.filter(Boolean) : []
+  const serviceDurations = Array.isArray(reservation.serviceDurations) ? reservation.serviceDurations.map((value) => Number(value || 0)).filter((value) => value > 0) : []
+  const totalServiceDurationMinutes = Number(reservation.totalServiceDurationMinutes || serviceDurations.reduce((sum, value) => sum + value, 0) || 0)
+  const totalAmount = Number(reservation.amount || reservation.consultationFee || 0)
+  const commissionAmount = Number(reservation.commissionAmount || 0)
+  const netAmount = Number(reservation.netAmount || 0)
+  const basePayload = {
+    customerId: reservation.customerId || '',
+    customerName: reservation.customerName || reservation.customerEmail || 'Customer',
+    clientName: reservation.customerName || reservation.customerEmail || 'Customer',
+    practitionerId: reservation.practitionerId || '',
+    assignedPractitionerId: reservation.practitionerId || '',
+    practitionerName: reservation.practitionerName || '',
+    assignedPractitionerName: reservation.practitionerName || '',
+    service: serviceNames.join(', '),
+    services: serviceNames,
+    serviceIds,
+    serviceDetails: selectedServices,
+    serviceDurations,
+    totalServiceDurationMinutes,
+    date: reservation.date || '',
+    time: reservation.time || '',
+    endTime: reservation.endTime || '',
+    notes: reservation.notes || '',
+    status: 'Scheduled',
+    paymentStatus: 'Paid',
+    paymentMethod: paymentMethod || paymentMethodType || reservation.paymentMethod || 'GCash',
+    paymentCoverage: 'full',
+    amount: totalAmount,
+    amountPaid: totalAmount,
+    totalAmount,
+    commissionPercent: Number(reservation.commissionPercent || 10),
+    commissionAmount,
+    merchantNetAmount: netAmount,
+    requiresConsultationFirst: Boolean(reservation.requiresConsultationFirst),
+    followUpAllowed: Boolean(reservation.followUpAllowed),
+    followUpWindowDays: reservation.followUpWindowDays != null ? Number(reservation.followUpWindowDays) : null,
+    branchId: reservation.branchId || '',
+    centerId: reservation.centerId || reservation.branchId || '',
+    paymongoCheckoutSessionId: reservation.checkoutSessionId || null,
+    paymongoStatus: paymongo?.status || null,
+    paymongoPaidAt: paymongo?.paid_at || null,
+    paymongoPaymentId: paymongo?.paymentId || null,
+    paymongoPaymentMethodType: paymentMethodType || null,
+    referenceNumber: reservation.referenceNumber || '',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    reservationId: reservation.id,
+  }
+
+  return flowType === 'consultation'
+    ? {
+        ...basePayload,
+        type: 'Consultation',
+        service: 'Online Consultation',
+        services: ['Online Consultation'],
+        consultationMode: 'online',
+        consultationFee: totalAmount,
+        consultationForServices: serviceNames,
+        consultationForServiceIds: serviceIds,
+        consultationForServiceDetails: selectedServices,
+        consultationForServiceDurationMinutes: totalServiceDurationMinutes,
+        followUpAllowed: false,
+        followUpWindowDays: null,
+      }
+    : basePayload
 }
 
 const zipJsonBuffer = async (jsonBuffer, fileBaseName) => {
@@ -318,7 +555,7 @@ app.get('/health', (_req, res) => {
   })
 })
 
-app.post('/google-meet/create-consultation-link', async (req, res) => {
+app.post('/google-meet/create-consultation-link', requireAuth, requirePermission('consultations:create'), async (req, res) => {
   if (!isGoogleMeetConfigured()) {
     return res.status(503).json({
       success: false,
@@ -484,41 +721,66 @@ app.post('/admin/reject-clinic-registration', requireAuth, requireRole(['superad
 })
 
 app.post(OTP_PATH, async (req, res) => {
-  const { recipient, otp } = req.body ?? {}
-
-  if (!recipient || !otp) {
-    return res.status(400).json({
-      success: false,
-      error: 'recipient and otp are required',
-    })
-  }
-
-  if (!sendGridApiKey || !senderEmail) {
-    return res.status(500).json({
-      success: false,
-      error: 'SENDGRID_API_KEY or SENDGRID_SENDER is missing',
-    })
-  }
-
-  const message = {
-    to: recipient,
-    from: senderEmail,
-    subject: 'Your OTP Code',
-    text: `Your one-time password is: ${otp}`,
-    html: `<strong>Your OTP code is: ${otp}</strong>`,
-  }
-
   try {
-    await sgMail.send(message)
-    return res.json({ success: true })
-  } catch (error) {
-    const providerMessage =
-      error?.response?.body?.errors?.[0]?.message ||
-      error?.message ||
-      'Unknown SendGrid error'
+    const { recipient, otp } = req.body ?? {}
+    const normalizedRecipient = String(recipient || '').trim()
+    const normalizedOtp = String(otp || '').trim()
 
-    console.error('SendGrid error:', providerMessage)
-    return res.status(500).json({ success: false, error: providerMessage })
+    if (!normalizedRecipient || !normalizedOtp) {
+      return res.status(400).json({
+        success: false,
+        error: 'recipient and otp are required',
+      })
+    }
+
+    if (!sendGridApiKey || !senderEmail) {
+      if (isDevelopment) {
+        console.warn(`[DEV OTP BYPASS] Missing SendGrid config. OTP for ${normalizedRecipient}: ${normalizedOtp}`)
+        return res.json({ success: true, devMode: true })
+      }
+      return res.status(500).json({
+        success: false,
+        error: 'SENDGRID_API_KEY or SENDGRID_SENDER is missing',
+      })
+    }
+
+    const message = {
+      to: normalizedRecipient,
+      from: senderEmail,
+      subject: 'Your OTP Code',
+      text: `Your one-time password is: ${normalizedOtp}`,
+      html: `<strong>Your OTP code is: ${normalizedOtp}</strong>`,
+    }
+
+    try {
+      await sgMail.send(message)
+      return res.json({ success: true })
+    } catch (error) {
+      const providerMessage =
+        error?.response?.body?.errors?.[0]?.message ||
+        error?.response?.body?.errors?.[0]?.field ||
+        error?.message ||
+        'Unknown SendGrid error'
+
+      console.error('SendGrid error:', providerMessage)
+      if (isDevelopment) {
+        console.warn(`[DEV OTP BYPASS] SendGrid failed. OTP for ${normalizedRecipient}: ${normalizedOtp}`)
+        return res.json({ success: true, devMode: true, warning: providerMessage })
+      }
+      return res.status(500).json({ success: false, error: providerMessage })
+    }
+  } catch (error) {
+    const unexpectedMessage = error?.message || 'Unexpected OTP route error'
+    console.error('OTP route error:', unexpectedMessage)
+    if (isDevelopment) {
+      const safeRecipient = String(req.body?.recipient || '').trim()
+      const safeOtp = String(req.body?.otp || '').trim()
+      if (safeRecipient && safeOtp) {
+        console.warn(`[DEV OTP BYPASS] Route-level failure. OTP for ${safeRecipient}: ${safeOtp}`)
+        return res.json({ success: true, devMode: true, warning: unexpectedMessage })
+      }
+    }
+    return res.status(500).json({ success: false, error: unexpectedMessage })
   }
 })
 
@@ -597,6 +859,222 @@ app.post(CHECK_USER_PATH, async (req, res) => {
   }
 })
 
+app.post('/auth/check-registration-status', async (req, res) => {
+  const { email } = req.body ?? {}
+
+  if (!adminReady) {
+    return res.status(500).json({
+      success: false,
+      error: adminInitError || 'firebase-admin is not ready',
+    })
+  }
+
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  if (!normalizedEmail) {
+    return res.status(400).json({
+      success: false,
+      error: 'email is required',
+    })
+  }
+
+  try {
+    const userRecord = await admin.auth().getUserByEmail(normalizedEmail)
+    const uid = userRecord.uid
+    const firestore = admin.firestore()
+    const [userSnap, clinicSnap] = await Promise.all([
+      firestore.collection('users').doc(uid).get(),
+      firestore.collection('clinics').doc(uid).get(),
+    ])
+
+    const userData = userSnap.data() || {}
+    const clinicData = clinicSnap.data() || {}
+    const userStatus = String(userData.status || '').toLowerCase()
+    const clinicStatus = String(clinicData.approvalStatus || '').toLowerCase()
+    const businessType =
+      String(userData.businessType || clinicData.businessType || '').trim()
+
+    const hasSubmittedDocs =
+      Boolean(clinicData.documentsSubmittedAt) ||
+      (clinicData.submittedDocuments && Object.keys(clinicData.submittedDocuments || {}).length > 0)
+
+    const pendingApprovalSignals =
+      userStatus.includes('pending approval') ||
+      clinicStatus.includes('pending approval') ||
+      clinicStatus.includes('waiting') ||
+      clinicStatus.includes('for approval') ||
+      clinicStatus.includes('submitted') ||
+      hasSubmittedDocs
+
+    let resumeStep = 1
+    if (userStatus === 'active') {
+      resumeStep = 'active'
+    } else if (pendingApprovalSignals) {
+      resumeStep = 4
+    } else if (userStatus.includes('pending document') || clinicStatus.includes('pending document')) {
+      resumeStep = 3
+    } else if (userStatus.includes('pending otp') || clinicStatus.includes('pending otp')) {
+      resumeStep = 2
+    }
+
+    return res.json({
+      success: true,
+      exists: true,
+      uid,
+      resumeStep,
+      userStatus,
+      clinicStatus,
+      hasSubmittedDocs,
+      businessType,
+    })
+  } catch (error) {
+    const code = error?.code || ''
+    if (code === 'auth/user-not-found') {
+      return res.json({ success: true, exists: false })
+    }
+    return res.status(400).json({
+      success: false,
+      error: error?.message || 'Failed to check registration status.',
+      code,
+    })
+  }
+})
+
+app.post('/auth/verify-registration-otp', async (req, res) => {
+  const { uid, email } = req.body ?? {}
+
+  if (!adminReady) {
+    return res.status(500).json({
+      success: false,
+      error: adminInitError || 'firebase-admin is not ready',
+    })
+  }
+
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  const normalizedUid = String(uid || '').trim()
+  if (!normalizedEmail || !normalizedUid) {
+    return res.status(400).json({
+      success: false,
+      error: 'uid and email are required',
+    })
+  }
+
+  try {
+    const userRecord = await admin.auth().getUser(normalizedUid)
+    const recordEmail = String(userRecord?.email || '').trim().toLowerCase()
+    if (recordEmail && recordEmail !== normalizedEmail) {
+      return res.status(403).json({
+        success: false,
+        error: 'Email does not match user record',
+      })
+    }
+
+    const firestore = admin.firestore()
+    await Promise.all([
+      firestore.collection('users').doc(normalizedUid).update({
+        status: 'Pending Document Submission',
+        emailVerified: true,
+        emailVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }),
+      firestore.collection('clinics').doc(normalizedUid).update({
+        approvalStatus: 'Pending Document Submission',
+      }),
+    ])
+
+    return res.json({ success: true })
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: error?.message || 'Failed to verify OTP.',
+      code: error?.code || '',
+    })
+  }
+})
+
+app.post('/auth/registration-profile', async (req, res) => {
+  const { email } = req.body ?? {}
+
+  if (!adminReady) {
+    return res.status(500).json({
+      success: false,
+      error: adminInitError || 'firebase-admin is not ready',
+    })
+  }
+
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  if (!normalizedEmail) {
+    return res.status(400).json({
+      success: false,
+      error: 'email is required',
+    })
+  }
+
+  try {
+    const userRecord = await admin.auth().getUserByEmail(normalizedEmail)
+    const uid = userRecord.uid
+    const firestore = admin.firestore()
+    const [userSnap, clinicSnap] = await Promise.all([
+      firestore.collection('users').doc(uid).get(),
+      firestore.collection('clinics').doc(uid).get(),
+    ])
+
+    const userData = userSnap.exists ? userSnap.data() || {} : {}
+    const clinicData = clinicSnap.exists ? clinicSnap.data() || {} : {}
+
+    const safeDate = (value) => {
+      if (!value) return null
+      if (typeof value?.toDate === 'function') {
+        const d = value.toDate()
+        return Number.isNaN(d.getTime()) ? null : d.toISOString()
+      }
+      if (value instanceof Date) return value.toISOString()
+      if (typeof value === 'string' || typeof value === 'number') {
+        const d = new Date(value)
+        return Number.isNaN(d.getTime()) ? null : d.toISOString()
+      }
+      return null
+    }
+
+    return res.json({
+      success: true,
+      exists: true,
+      uid,
+      profile: {
+        firstName: userData.firstName || '',
+        lastName: userData.lastName || '',
+        birthDate: safeDate(userData.birthDate),
+        email: userData.email || normalizedEmail,
+        contactNumber: userData.contactNumber || '',
+        businessType: userData.businessType || clinicData.businessType || '',
+        authorizedRepPosition: userData.authorizedRepPosition || clinicData.authorizedRepPosition || '',
+        companyName: userData.companyName || clinicData.companyName || '',
+        companyType: userData.companyType || clinicData.companyType || '',
+        clinicName: clinicData.clinicName || '',
+        clinicLocation: clinicData.clinicLocation || '',
+        clinicLocationLat: clinicData.clinicLocationLat || '',
+        clinicLocationLng: clinicData.clinicLocationLng || '',
+        clinicLocationAddress: clinicData.clinicLocationAddress || '',
+        subscriptionPlan: clinicData.subscriptionPlan || userData.subscriptionPlan || '',
+        paymentStatus: clinicData.paymentStatus || userData.paymentStatus || '',
+        paymentId: clinicData.paymentId || userData.paymentId || '',
+        submittedDocuments: clinicData.submittedDocuments || {},
+        draftDocuments: clinicData.draftDocuments || {},
+        status: userData.status || '',
+        approvalStatus: clinicData.approvalStatus || '',
+      },
+    })
+  } catch (error) {
+    const code = error?.code || ''
+    if (code === 'auth/user-not-found') {
+      return res.json({ success: true, exists: false })
+    }
+    return res.status(400).json({
+      success: false,
+      error: error?.message || 'Failed to load registration profile.',
+      code,
+    })
+  }
+})
+
 app.post('/admin/unpublish-expired-clinics', requireAuth, requireRole(['superadmin']), async (req, res) => {
 
   const ownerId = String(req.body?.ownerId || '').trim()
@@ -654,7 +1132,7 @@ app.post('/admin/unpublish-expired-clinics', requireAuth, requireRole(['superadm
   }
 })
 
-app.post('/owner/backup', requireAuth, async (req, res) => {
+app.post('/owner/backup', requireAuth, requirePermission('backups:create'), async (req, res) => {
 
   const ownerId = String(req.body?.ownerId || '').trim()
   if (!ownerId) {
@@ -682,7 +1160,7 @@ app.post('/owner/backup', requireAuth, async (req, res) => {
   }
 })
 
-app.post('/owner/backup/zip', requireAuth, async (req, res) => {
+app.post('/owner/backup/zip', requireAuth, requirePermission('backups:view'), async (req, res) => {
 
   const ownerId = String(req.body?.ownerId || '').trim()
   const storagePath = String(req.body?.storagePath || '').trim()
@@ -785,7 +1263,7 @@ if (backupScheduleEnabled && adminReady) {
   runScheduledBackups().catch(() => {})
 }
 
-app.post(ATTENDANCE_PIN_PATH, async (req, res) => {
+app.post(ATTENDANCE_PIN_PATH, requireAuth, requirePermission('staff:create'), async (req, res) => {
   const { recipient, attendancePin, fullName } = req.body ?? {}
 
   if (!recipient || !attendancePin) {
@@ -808,14 +1286,19 @@ app.post(ATTENDANCE_PIN_PATH, async (req, res) => {
   const message = {
     to: recipient,
     from: senderEmail,
-    subject: 'Your Attendance PIN',
-    text: `Hi ${safeName}, your attendance PIN is: ${safePin}`,
+    subject: 'Your Attendance PIN (Do Not Share)',
+    text:
+      `Hi ${safeName},\n\n` +
+      `Your attendance PIN is: ${safePin}\n\n` +
+      `Do not share this PIN with anyone. You will use it for attendance as verification that you are the person who says you are.\n\n` +
+      `If you did not expect this email, please contact your administrator.`,
     html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#2a1408;">
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#2a1408;">
         <p>Hi ${safeName},</p>
         <p>Your attendance PIN is:</p>
         <p style="font-size:22px;font-weight:700;letter-spacing:2px;">${safePin}</p>
-        <p>Keep this PIN private and use it when recording attendance.</p>
+        <p><strong>Do not share this PIN with anyone.</strong> You will use it for attendance as verification that you are the person who says you are.</p>
+        <p>If you did not expect this email, please contact your administrator.</p>
       </div>
     `,
   }
@@ -836,6 +1319,74 @@ app.post(ATTENDANCE_PIN_PATH, async (req, res) => {
       'Unknown SendGrid error'
 
     console.error('SendGrid error:', providerMessage)
+    return res.status(500).json({ success: false, error: providerMessage })
+  }
+})
+
+app.post(STAFF_WELCOME_PATH, requireAuth, requirePermission('staff:create'), async (req, res) => {
+  const { recipient, fullName, defaultPassword } = req.body ?? {}
+
+  const normalizedRecipient = String(recipient || '').trim().toLowerCase()
+  const safeName = String(fullName || 'Staff').trim() || 'Staff'
+  const safePassword = String(defaultPassword || '').trim()
+
+  if (!normalizedRecipient || !safePassword) {
+    return res.status(400).json({
+      success: false,
+      error: 'recipient and defaultPassword are required',
+    })
+  }
+
+  if (!sendGridApiKey || !senderEmail) {
+    if (isDevelopment) {
+      console.warn(`[DEV STAFF EMAIL BYPASS] Welcome email not sent to ${normalizedRecipient}. Default password: ${safePassword}`)
+      return res.json({ success: true, devMode: true })
+    }
+    return res.status(500).json({
+      success: false,
+      error: 'SENDGRID_API_KEY or SENDGRID_SENDER is missing',
+    })
+  }
+
+  const loginUrl = `${String(frontendBaseUrl || '').replace(/\/$/, '')}/login`
+  const message = {
+    to: normalizedRecipient,
+    from: senderEmail,
+    subject: 'Your Staff Account Has Been Created',
+    text:
+      `Hi ${safeName},\n\n` +
+      `A staff account has been created for you.\n\n` +
+      `Email: ${normalizedRecipient}\n` +
+      `Default password: ${safePassword}\n\n` +
+      `Please sign in and change your password as soon as possible.\n` +
+      `Login page: ${loginUrl}\n\n` +
+      `If you did not expect this email, please contact your clinic administrator.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#2a1408;">
+        <p>Hi ${safeName},</p>
+        <p>A staff account has been created for you.</p>
+        <p><strong>Email:</strong> ${normalizedRecipient}<br /><strong>Default password:</strong> ${safePassword}</p>
+        <p>Please sign in and change your password as soon as possible.</p>
+        <p><a href="${loginUrl}">Go to Login</a></p>
+        <p>If you did not expect this email, please contact your clinic administrator.</p>
+      </div>
+    `,
+  }
+
+  try {
+    const delivery = await sendSendGridMessage(message)
+    return res.json({ success: true, ...delivery })
+  } catch (error) {
+    const providerMessage =
+      error?.response?.body?.errors?.[0]?.message ||
+      error?.message ||
+      'Unknown SendGrid error'
+
+    console.error('SendGrid error:', providerMessage)
+    if (isDevelopment) {
+      console.warn(`[DEV STAFF EMAIL BYPASS] SendGrid failed for ${normalizedRecipient}. Default password: ${safePassword}`)
+      return res.json({ success: true, devMode: true, warning: providerMessage })
+    }
     return res.status(500).json({ success: false, error: providerMessage })
   }
 })
@@ -909,7 +1460,317 @@ app.post('/send-payment-receipt', async (req, res) => {
   }
 })
 
-app.post('/paymongo/create-checkout-session', async (req, res) => {
+app.post('/appointments/reservations', requireAuth, async (req, res) => {
+  if (!adminReady) {
+    return res.status(500).json({
+      success: false,
+      error: adminInitError || 'firebase-admin is not ready',
+    })
+  }
+
+  const body = req.body || {}
+  const branchId = String(body.branchId || '').trim()
+  const centerId = String(body.centerId || branchId || '').trim()
+  const customerId = String(body.customerId || '').trim()
+  const customerName = String(body.customerName || '').trim()
+  const customerEmail = String(body.customerEmail || '').trim()
+  const practitionerId = String(body.practitionerId || '').trim()
+  const practitionerName = String(body.practitionerName || '').trim()
+  const date = String(body.date || '').trim()
+  const time = String(body.time || '').trim()
+  const endTime = String(body.endTime || '').trim()
+  const notes = String(body.notes || '').trim()
+  const flowType = String(body.flowType || 'booking').trim().toLowerCase()
+  const selectedServices = Array.isArray(body.selectedServices) ? body.selectedServices : []
+  const selectedServiceIds = Array.isArray(body.selectedServiceIds) ? body.selectedServiceIds.map((value) => String(value || '').trim()).filter(Boolean) : []
+  const selectedServiceNames = Array.isArray(body.selectedServiceNames) ? body.selectedServiceNames.map((value) => String(value || '').trim()).filter(Boolean) : []
+  const serviceDurations = Array.isArray(body.serviceDurations) ? body.serviceDurations.map((value) => Number(value || 0)).filter((value) => value > 0) : []
+  const totalServiceDurationMinutes = Math.max(30, Number(body.totalServiceDurationMinutes || serviceDurations.reduce((sum, value) => sum + value, 0) || 0))
+  const consultationFee = Number(body.consultationFee || 0)
+  const amount = Number(body.amount || 0)
+  const paymentMethod = String(body.paymentMethod || '').trim()
+  const paymentCoverage = String(body.paymentCoverage || 'full').trim()
+  const commissionPercent = Number(body.commissionPercent || 10)
+  const commissionAmount = Number(body.commissionAmount || 0)
+  const netAmount = Number(body.netAmount || 0)
+  const requiresConsultationFirst = Boolean(body.requiresConsultationFirst)
+  const followUpAllowed = Boolean(body.followUpAllowed)
+  const followUpWindowDays = body.followUpWindowDays != null ? Number(body.followUpWindowDays) : null
+
+  if (!customerId || !req.user?.uid || customerId !== req.user.uid) {
+    return res.status(403).json({ success: false, error: 'Forbidden' })
+  }
+  if (!branchId || !practitionerId || !date || !time) {
+    return res.status(400).json({ success: false, error: 'Missing booking details' })
+  }
+
+  const start = parseClockToMinutes(time)
+  if (start === null) {
+    return res.status(400).json({ success: false, error: 'Invalid booking time' })
+  }
+  const end = parseClockToMinutes(endTime)
+  const normalizedEnd = end !== null && end > start ? end : start + totalServiceDurationMinutes
+
+  const firestore = admin.firestore()
+  const reservationsCol = firestore.collection(BOOKING_RESERVATIONS_COLLECTION)
+  const reservationRef = reservationsCol.doc()
+  const nowMs = Date.now()
+  const expiresAt = admin.firestore.Timestamp.fromMillis(nowMs + BOOKING_RESERVATION_TTL_MINUTES * 60 * 1000)
+  let responseData = null
+
+  try {
+    await firestore.runTransaction(async (transaction) => {
+      const appointmentsSnap = await transaction.get(
+        firestore.collection('appointments')
+          .where('branchId', '==', branchId)
+          .where('date', '==', date)
+          .where('assignedPractitionerId', '==', practitionerId)
+      )
+      const reservationsSnap = await transaction.get(
+        reservationsCol
+          .where('branchId', '==', branchId)
+          .where('date', '==', date)
+          .where('practitionerId', '==', practitionerId)
+          .where('status', '==', 'held')
+      )
+
+      const existingBlocks = []
+
+      appointmentsSnap.docs.forEach((snap) => {
+        const data = snap.data() || {}
+        const status = normalizeBookingStatus(data.status)
+        if (!BOOKING_BLOCKING_STATUSES.has(status)) return
+        const range = getBookingRange(data)
+        if (range) existingBlocks.push(range)
+      })
+
+      for (const snap of reservationsSnap.docs) {
+        const data = snap.data() || {}
+        const expiry = toMillis(data.expiresAt)
+        const status = normalizeBookingStatus(data.status)
+        if (status !== 'held' || expiry <= nowMs) continue
+        const range = getBookingRange(data)
+        if (!range) continue
+
+        if (
+          String(data.customerId || '').trim() === customerId &&
+          rangesOverlap(start, normalizedEnd, range.start, range.end)
+        ) {
+          responseData = {
+            id: snap.id,
+            expiresAt: expiry ? new Date(expiry).toISOString() : expiresAt.toDate().toISOString(),
+            reused: true,
+          }
+          return
+        }
+
+        existingBlocks.push(range)
+      }
+
+      const conflictingBlock = existingBlocks.find((range) => rangesOverlap(start, normalizedEnd, range.start, range.end))
+      if (conflictingBlock) {
+        throw new Error('That schedule was just taken. Please choose another available time.')
+      }
+
+      transaction.set(reservationRef, {
+        branchId,
+        centerId,
+        customerId,
+        customerName,
+        customerEmail,
+        practitionerId,
+        practitionerName,
+        flowType,
+        date,
+        time,
+        endTime: endTime || '',
+        durationMinutes: totalServiceDurationMinutes,
+        selectedServices,
+        selectedServiceIds,
+        selectedServiceNames,
+        serviceDurations,
+        totalServiceDurationMinutes,
+        consultationFee,
+        amount,
+        paymentMethod,
+        paymentCoverage,
+        commissionPercent,
+        commissionAmount,
+        netAmount,
+        requiresConsultationFirst,
+        followUpAllowed,
+        followUpWindowDays,
+        notes,
+        status: 'held',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt,
+      })
+
+      responseData = {
+        id: reservationRef.id,
+        expiresAt: expiresAt.toDate().toISOString(),
+        reused: false,
+      }
+    })
+
+    return res.json({ success: true, data: responseData })
+  } catch (error) {
+    const message = String(error?.message || '').trim() || 'Failed to reserve the selected time.'
+    return res.status(400).json({ success: false, error: message })
+  }
+})
+
+app.delete('/appointments/reservations/:id', requireAuth, async (req, res) => {
+  if (!adminReady) {
+    return res.status(500).json({
+      success: false,
+      error: adminInitError || 'firebase-admin is not ready',
+    })
+  }
+
+  const reservationId = String(req.params.id || '').trim()
+  if (!reservationId) {
+    return res.status(400).json({ success: false, error: 'reservation id is required' })
+  }
+
+  try {
+    const firestore = admin.firestore()
+    const reservationRef = firestore.collection(BOOKING_RESERVATIONS_COLLECTION).doc(reservationId)
+    await firestore.runTransaction(async (transaction) => {
+      const snap = await transaction.get(reservationRef)
+      if (!snap.exists) return
+      const data = snap.data() || {}
+      if (String(data.customerId || '').trim() !== String(req.user?.uid || '').trim()) {
+        throw new Error('Forbidden')
+      }
+      if (normalizeBookingStatus(data.status) === 'consumed') return
+      transaction.update(reservationRef, {
+        status: 'cancelled',
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    })
+    return res.json({ success: true })
+  } catch (error) {
+    if (String(error?.message || '') === 'Forbidden') {
+      return res.status(403).json({ success: false, error: 'Forbidden' })
+    }
+    return res.status(500).json({ success: false, error: error?.message || 'Failed to release reservation' })
+  }
+})
+
+app.post('/appointments/finalize-booking', requireAuth, async (req, res) => {
+  if (!adminReady) {
+    return res.status(500).json({
+      success: false,
+      error: adminInitError || 'firebase-admin is not ready',
+    })
+  }
+
+  const body = req.body || {}
+  const reservationId = String(body.reservationId || '').trim()
+  const paymongoCheckoutSessionId = String(body.paymongoCheckoutSessionId || '').trim() || null
+  const paymongoStatus = String(body.paymongoStatus || '').trim() || null
+  const paymongoPaidAt = body.paymongoPaidAt || null
+  const paymongoPaymentId = String(body.paymongoPaymentId || '').trim() || null
+  const paymongoPaymentMethodType = String(body.paymongoPaymentMethodType || '').trim() || null
+  const paymentMethod = String(body.paymentMethod || '').trim() || null
+
+  if (!reservationId) {
+    return res.status(400).json({ success: false, error: 'reservation id is required' })
+  }
+
+  const firestore = admin.firestore()
+  const reservationRef = firestore.collection(BOOKING_RESERVATIONS_COLLECTION).doc(reservationId)
+  let appointmentId = ''
+
+  try {
+    await firestore.runTransaction(async (transaction) => {
+      const snap = await transaction.get(reservationRef)
+      if (!snap.exists) {
+        throw new Error('Reservation not found.')
+      }
+
+      const reservation = snap.data() || {}
+      if (String(reservation.customerId || '').trim() !== String(req.user?.uid || '').trim()) {
+        throw new Error('Forbidden')
+      }
+      if (normalizeBookingStatus(reservation.status) === 'consumed') {
+        appointmentId = String(reservation.appointmentId || '').trim()
+        return
+      }
+      if (normalizeBookingStatus(reservation.status) !== 'held') {
+        throw new Error('This reservation is no longer active.')
+      }
+      if (toMillis(reservation.expiresAt) <= Date.now()) {
+        throw new Error('This reservation has expired. Please book again.')
+      }
+
+      const range = getBookingRange(reservation)
+      if (!range) {
+        throw new Error('Invalid reservation time.')
+      }
+
+      const appointmentsSnap = await transaction.get(
+        firestore.collection('appointments')
+          .where('branchId', '==', String(reservation.branchId || '').trim())
+          .where('date', '==', String(reservation.date || '').trim())
+          .where('assignedPractitionerId', '==', String(reservation.practitionerId || '').trim())
+      )
+
+      appointmentsSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data() || {}
+        const status = normalizeBookingStatus(data.status)
+        if (!BOOKING_BLOCKING_STATUSES.has(status)) return
+        const existingRange = getBookingRange(data)
+        if (existingRange && rangesOverlap(range.start, range.end, existingRange.start, existingRange.end)) {
+          throw new Error('That schedule was just taken. Please choose another available time.')
+        }
+      })
+
+      const finalAppointmentRef = firestore.collection('appointments').doc()
+      const appointmentPayload = buildBookingAppointmentPayload({
+        reservation: {
+          ...reservation,
+          id: reservationId,
+          checkoutSessionId: paymongoCheckoutSessionId,
+          paymentMethod: paymentMethod || reservation.paymentMethod || 'GCash',
+        },
+        paymongo: {
+          status: paymongoStatus,
+          paid_at: paymongoPaidAt,
+          paymentId: paymongoPaymentId,
+        },
+        paymentMethodType: paymongoPaymentMethodType,
+        paymentMethod,
+      })
+
+      transaction.set(finalAppointmentRef, appointmentPayload)
+      transaction.update(reservationRef, {
+        status: 'consumed',
+        appointmentId: finalAppointmentRef.id,
+        paymongoCheckoutSessionId,
+        paymongoStatus,
+        paymongoPaidAt,
+        paymongoPaymentId,
+        paymongoPaymentMethodType,
+        consumedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+      appointmentId = finalAppointmentRef.id
+    })
+
+    return res.json({ success: true, data: { appointmentId } })
+  } catch (error) {
+    if (String(error?.message || '') === 'Forbidden') {
+      return res.status(403).json({ success: false, error: 'Forbidden' })
+    }
+    return res.status(400).json({ success: false, error: error?.message || 'Failed to finalize booking' })
+  }
+})
+
+app.post('/paymongo/create-checkout-session', optionalAuth, async (req, res) => {
   if (!assertPayMongoConfigured(res)) return
 
   const {
@@ -924,6 +1785,109 @@ app.post('/paymongo/create-checkout-session', async (req, res) => {
     successUrl,
     cancelUrl,
   } = req.body ?? {}
+
+  const moduleKey = String(metadata?.module || '').trim().toLowerCase()
+  const isSubscriptionCheckout = moduleKey === 'subscription'
+  const isCustomerOrderCheckout = moduleKey === 'customer_order'
+  const isCustomerBookingCheckout =
+    moduleKey === 'customer_appointment' ||
+    moduleKey === 'customer_consultation'
+  const reservationId = String(metadata?.reservationId || '').trim()
+  const totalServiceDurationMinutes = Math.max(
+    30,
+    Number(metadata?.totalServiceDurationMinutes || metadata?.durationMinutes || 0)
+  )
+
+  if (!isSubscriptionCheckout) {
+    if (!req.user?.uid) {
+      return res.status(401).json({
+        success: false,
+        error: 'Missing authorization token',
+      })
+    }
+    if (isCustomerOrderCheckout || isCustomerBookingCheckout) {
+      const metadataCustomerId = String(metadata?.customerId || '').trim()
+      if (!metadataCustomerId || metadataCustomerId !== req.user.uid) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+        })
+      }
+      if (isCustomerBookingCheckout) {
+        const firestore = admin.firestore()
+        if (reservationId) {
+          const reservationSnap = await firestore.collection(BOOKING_RESERVATIONS_COLLECTION).doc(reservationId).get()
+          if (!reservationSnap.exists) {
+            return res.status(404).json({
+              success: false,
+              error: 'Reservation not found',
+            })
+          }
+          const reservationData = reservationSnap.data() || {}
+          if (String(reservationData.customerId || '').trim() !== req.user.uid) {
+            return res.status(403).json({
+              success: false,
+              error: 'Forbidden',
+            })
+          }
+          if (normalizeBookingStatus(reservationData.status) !== 'held' || toMillis(reservationData.expiresAt) <= Date.now()) {
+            return res.status(409).json({
+              success: false,
+              error: 'Reservation is no longer active',
+            })
+          }
+        } else {
+          const branchId = String(metadata?.branchId || '').trim()
+          const practitionerId = String(metadata?.practitionerId || '').trim()
+          const appointmentDate = String(metadata?.appointmentDate || '').trim()
+          const appointmentTime = String(metadata?.appointmentTime || '').trim()
+          const appointmentStart = parseClockToMinutes(appointmentTime)
+          if (!branchId || !practitionerId || !appointmentDate || appointmentStart === null) {
+            return res.status(400).json({
+              success: false,
+              error: 'branchId, practitionerId, appointmentDate, and appointmentTime are required for customer bookings',
+            })
+          }
+          const existingAppointments = await firestore.collection('appointments')
+            .where('branchId', '==', branchId)
+            .where('date', '==', appointmentDate)
+            .where('assignedPractitionerId', '==', practitionerId)
+            .get()
+          const appointmentEnd = appointmentStart + totalServiceDurationMinutes
+          const conflicting = existingAppointments.docs.some((docSnap) => {
+            const data = docSnap.data() || {}
+            const status = normalizeBookingStatus(data.status)
+            if (!BOOKING_BLOCKING_STATUSES.has(status)) return false
+            const range = getBookingRange(data)
+            return range && rangesOverlap(appointmentStart, appointmentEnd, range.start, range.end)
+          })
+          if (conflicting) {
+            return res.status(409).json({
+              success: false,
+              error: 'That schedule was just taken. Please choose another available time.',
+            })
+          }
+        }
+      }
+    } else {
+      try {
+        if (!req.userContext || req.userContext.uid !== req.user.uid) {
+          req.userContext = await loadUserContext(req.user.uid)
+        }
+        if (!req.userContext.permissions.has('payments:create')) {
+          return res.status(403).json({
+            success: false,
+            error: 'Forbidden',
+          })
+        }
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to verify permission',
+        })
+      }
+    }
+  }
 
   const normalizedAmount = Number(amount || 0)
   if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
@@ -1020,7 +1984,7 @@ app.post('/paymongo/create-checkout-session', async (req, res) => {
   }
 })
 
-app.get('/paymongo/checkout-session/:id', async (req, res) => {
+app.get('/paymongo/checkout-session/:id', optionalAuth, async (req, res) => {
   if (!assertPayMongoConfigured(res)) return
 
   const checkoutSessionId = String(req.params.id || '').trim()
@@ -1048,6 +2012,114 @@ app.get('/paymongo/checkout-session/:id', async (req, res) => {
 
     const attributes = data?.data?.attributes || {}
     const isPaid = Boolean(attributes?.paid_at) || (Array.isArray(attributes?.payments) && attributes.payments.length > 0)
+    const metadata = attributes?.metadata || {}
+    const moduleKey = String(metadata?.module || '').trim().toLowerCase()
+    const isCustomerOrderCheckout = moduleKey === 'customer_order'
+    const isCustomerBookingCheckout =
+      moduleKey === 'customer_appointment' ||
+      moduleKey === 'customer_consultation'
+
+    if (isCustomerOrderCheckout || isCustomerBookingCheckout) {
+      if (!req.user?.uid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Missing authorization token',
+        })
+      }
+      const metadataCustomerId = String(metadata?.customerId || '').trim()
+      if (!metadataCustomerId || metadataCustomerId !== req.user.uid) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+        })
+      }
+    } else if (moduleKey !== 'subscription') {
+      if (!req.user?.uid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Missing authorization token',
+        })
+      }
+      try {
+        if (!req.userContext || req.userContext.uid !== req.user.uid) {
+          req.userContext = await loadUserContext(req.user.uid)
+        }
+        if (!req.userContext.permissions.has('payments:view')) {
+          return res.status(403).json({
+            success: false,
+            error: 'Forbidden',
+          })
+        }
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to verify permission',
+        })
+      }
+    }
+
+    if (isPaid && String(metadata?.module || '').trim().toLowerCase() === 'subscription') {
+      try {
+        const payerEmail = String(metadata?.payerEmail || metadata?.email || '').trim().toLowerCase()
+        const planId = String(metadata?.planId || '').trim().toLowerCase()
+        if (payerEmail && planId) {
+          const firestore = admin.firestore()
+          const usersSnap = await firestore.collection('users').where('email', '==', payerEmail).get()
+          if (!usersSnap.empty) {
+            const userDoc = usersSnap.docs[0]
+            const uid = userDoc.id
+            const paidAtMs = attributes?.paid_at ? Date.parse(attributes.paid_at) : Date.now()
+            const planDays = planId === 'free-trial' ? 14 : 30
+            const startedAt = new Date(Number.isNaN(paidAtMs) ? Date.now() : paidAtMs)
+            const expiresAt = new Date(startedAt.getTime() + planDays * 24 * 60 * 60 * 1000)
+
+            await firestore.collection('users').doc(uid).set(
+              {
+                subscriptionPlan: planId,
+                paymentStatus: 'paid',
+                paymentId: String(data?.data?.id || '') || null,
+                subscriptionStartedAt: startedAt,
+                subscriptionExpiresAt: expiresAt,
+                subscriptionUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge: true }
+            )
+
+            const clinicsByOwnerSnap = await firestore.collection('clinics').where('ownerId', '==', uid).get()
+            for (const clinicDoc of clinicsByOwnerSnap.docs) {
+              await firestore.collection('clinics').doc(clinicDoc.id).set(
+                {
+                  subscriptionPlan: planId,
+                  paymentStatus: 'paid',
+                  paymentId: String(data?.data?.id || '') || null,
+                  subscriptionStartedAt: startedAt,
+                  subscriptionExpiresAt: expiresAt,
+                  subscriptionUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              )
+            }
+
+            const clinicDocByUid = await firestore.collection('clinics').doc(uid).get()
+            if (clinicDocByUid.exists) {
+              await firestore.collection('clinics').doc(uid).set(
+                {
+                  subscriptionPlan: planId,
+                  paymentStatus: 'paid',
+                  paymentId: String(data?.data?.id || '') || null,
+                  subscriptionStartedAt: startedAt,
+                  subscriptionExpiresAt: expiresAt,
+                  subscriptionUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              )
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to backfill subscription after PayMongo payment:', error?.message || error)
+      }
+    }
 
     return res.json({
       success: true,
@@ -1064,6 +2136,177 @@ app.get('/paymongo/checkout-session/:id', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error?.message || 'Unexpected PayMongo error',
+    })
+  }
+})
+
+app.post('/customer/orders/:id/cancel', requireAuth, async (req, res) => {
+  if (!assertPayMongoConfigured(res)) return
+
+  const orderId = String(req.params.id || '').trim()
+  const reasonType = String(req.body?.reasonType || '').trim()
+  const reasonDetails = String(req.body?.reasonDetails || '').trim()
+  if (!orderId) {
+    return res.status(400).json({
+      success: false,
+      error: 'order id is required',
+    })
+  }
+  if (!reasonType) {
+    return res.status(400).json({
+      success: false,
+      error: 'reasonType is required',
+    })
+  }
+  if (reasonType === 'Other' && !reasonDetails) {
+    return res.status(400).json({
+      success: false,
+      error: 'reasonDetails is required when reasonType is Other',
+    })
+  }
+
+  try {
+    const firestore = admin.firestore()
+    const orderRef = firestore.collection('customerOrders').doc(orderId)
+    const orderSnap = await orderRef.get()
+
+    if (!orderSnap.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found',
+      })
+    }
+
+    const orderData = orderSnap.data() || {}
+    if (String(orderData.customerId || '').trim() !== String(req.user?.uid || '').trim()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+      })
+    }
+
+    const status = String(orderData.status || '').trim().toLowerCase()
+    if (['cancelled', 'completed', 'refunded'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'This order can no longer be cancelled.',
+      })
+    }
+
+    const createdAt = orderData.createdAt?.toDate?.() || new Date(orderData.createdAt || 0)
+    if (!(createdAt instanceof Date) || Number.isNaN(createdAt.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Order creation date is invalid.',
+      })
+    }
+
+    const diffHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60)
+    if (diffHours > 24) {
+      return res.status(400).json({
+        success: false,
+        error: 'Orders can only be cancelled within 24 hours.',
+      })
+    }
+
+    const totalAmount = Number(orderData.total || 0)
+    const paymentId = String(orderData.paymongoPaymentId || '').trim()
+    const isPayMongoPaid =
+      String(orderData.source || '').trim().toLowerCase() === 'paymongo_checkout' &&
+      String(orderData.paymentStatus || '').trim().toLowerCase() === 'paid' &&
+      Boolean(paymentId)
+
+    let refundId = null
+    let refundStatus = null
+
+    if (isPayMongoPaid) {
+      const refundResponse = await fetch('https://api.paymongo.com/v1/refunds', {
+        method: 'POST',
+        headers: buildPayMongoHeaders(),
+        body: JSON.stringify({
+          data: {
+            attributes: {
+              amount: Math.round(totalAmount * 100),
+              payment_id: paymentId,
+              reason: 'requested_by_customer',
+            },
+          },
+        }),
+      })
+
+      const refundData = await refundResponse.json()
+      if (!refundResponse.ok) {
+        return res.status(refundResponse.status).json({
+          success: false,
+          error: refundData?.errors?.[0]?.detail || 'Failed to refund payment via PayMongo',
+          provider: refundData,
+        })
+      }
+
+      refundId = refundData?.data?.id || null
+      refundStatus = refundData?.data?.attributes?.status || 'pending'
+    }
+
+    const updatePayload = {
+      status: 'Cancelled',
+      cancelReasonType: reasonType,
+      cancelReasonDetails: reasonType === 'Other' ? reasonDetails : '',
+      cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }
+
+    if (isPayMongoPaid) {
+      updatePayload.paymentStatus = 'Refunded'
+      updatePayload.refundType = 'PayMongo'
+      updatePayload.refundReason = 'Order cancelled within 24 hours by customer'
+      updatePayload.refundAmount = totalAmount
+      updatePayload.paymongoRefundId = refundId
+      updatePayload.paymongoRefundStatus = refundStatus
+      updatePayload.refundedAt = admin.firestore.FieldValue.serverTimestamp()
+    }
+
+    await orderRef.update(updatePayload)
+
+    if (isPayMongoPaid) {
+      const branchId =
+        String(orderData.branchId || '').trim() ||
+        String(orderData.items?.[0]?.branchId || '').trim() ||
+        ''
+
+      await firestore.collection('transactions').add({
+        branchId,
+        amount: -Math.abs(totalAmount),
+        method: orderData.paymentMethod || 'PayMongo',
+        status: 'Refunded',
+        type: 'customer_order_refund',
+        orderId,
+        clientName: orderData.customerName || orderData.delivery?.fullName || 'Customer',
+        service: 'Customer Order Cancellation Refund',
+        paymongoPaymentId: paymentId,
+        paymongoRefundId: refundId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        orderId,
+        status: 'Cancelled',
+        cancelReasonType: reasonType,
+        cancelReasonDetails: reasonType === 'Other' ? reasonDetails : '',
+        paymentStatus: isPayMongoPaid ? 'Refunded' : String(orderData.paymentStatus || ''),
+        refundType: isPayMongoPaid ? 'PayMongo' : null,
+        refundAmount: isPayMongoPaid ? totalAmount : 0,
+        paymongoRefundId: refundId,
+        paymongoRefundStatus: refundStatus,
+      },
+    })
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Failed to cancel order',
     })
   }
 })

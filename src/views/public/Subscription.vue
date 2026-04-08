@@ -1,7 +1,23 @@
 <template>
-  <div class="subscription-popup w-full">
+  <div class="subscription-page w-full">
+    <nav class="pricing-nav">
+      <div class="pricing-nav-inner">
+        <div class="pricing-breadcrumb">
+          <router-link to="/" class="breadcrumb-link">Home</router-link>
+          <span class="breadcrumb-sep">></span>
+          <span class="breadcrumb-current">Pricing</span>
+        </div>
+      </div>
+    </nav>
+    <div class="subscription-popup w-full">
     <div class="popup-top">
-      <div>
+      <div v-if="isLoading" class="popup-top-skeleton">
+        <div class="skeleton-line skeleton-eyebrow"></div>
+        <div class="skeleton-line skeleton-heading"></div>
+        <div class="skeleton-line skeleton-subtitle"></div>
+        <div class="skeleton-line skeleton-subtitle short"></div>
+      </div>
+      <div v-else>
         <p class="popup-eyebrow">AesthetiCare Plans</p>
         <h2 class="popup-title">Choose Your Plan</h2>
         <p class="popup-subtitle">
@@ -12,86 +28,81 @@
 
     <p v-if="error" class="popup-subtitle" style="color:#b91c1c;">{{ error }}</p>
 
-    <div class="plan-grid">
-      <button
+    <div v-if="isLoading" class="plan-grid plan-grid-skeleton">
+      <div v-for="index in 3" :key="`pricing-skeleton-${index}`" class="plan-card skeleton-card">
+        <div class="skeleton-line skeleton-title"></div>
+        <div class="skeleton-line skeleton-price"></div>
+        <div class="skeleton-line skeleton-desc"></div>
+        <div class="skeleton-line skeleton-desc short"></div>
+        <div class="skeleton-list">
+          <div class="skeleton-line skeleton-item"></div>
+          <div class="skeleton-line skeleton-item"></div>
+          <div class="skeleton-line skeleton-item short"></div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="plan-grid">
+      <div
         v-for="plan in plans"
         :key="plan.id"
-        type="button"
-        class="plan-card group"
-        :class="{
-          'plan-card-active': selectedPlan === plan.id,
-          'plan-card-free': plan.id === 'free-trial',
-          'plan-card-basic': plan.id === 'basic',
-          'plan-card-premium': plan.recommended
-        }"
-        @click="selectedPlan = plan.id"
+        class="plan-option"
       >
-        <span v-if="plan.id !== 'free-trial'" class="card-shine"></span>
-        <span v-if="plan.recommended" class="plan-badge">Recommended</span>
-        <p class="plan-name">{{ plan.name }}</p>
-        <p class="plan-price">
-          {{ plan.price }}
-          <span class="plan-cycle">{{ plan.cycle }}</span>
-        </p>
-        <p class="plan-desc">{{ plan.description }}</p>
-        <ul class="plan-features">
-          <li v-for="item in plan.features" :key="item">{{ item }}</li>
-        </ul>
-      </button>
+        <button
+          type="button"
+          class="plan-card group"
+          :class="{
+            'plan-card-active': selectedPlan === plan.id,
+            'plan-card-basic': plan.id === 'basic',
+            'plan-card-premium': plan.recommended
+          }"
+          @click="selectedPlan = plan.id"
+        >
+          <span class="card-shine"></span>
+          <span v-if="plan.recommended" class="plan-badge">Recommended</span>
+          <p class="plan-name">{{ plan.name }}</p>
+          <p class="plan-price">
+            {{ plan.price }}
+            <span class="plan-cycle">{{ plan.cycle }}</span>
+          </p>
+          <p class="plan-desc">{{ plan.description }}</p>
+          <ul class="plan-features">
+            <li v-for="item in plan.features" :key="item">{{ item }}</li>
+          </ul>
+        </button>
+        <span v-if="selectedPlan === plan.id" class="plan-selection-line" aria-hidden="true"></span>
+      </div>
     </div>
 
-    <div class="popup-actions">
-      <button type="button" class="btn-secondary" @click="maybeLater">Maybe Later</button>
-      <button type="button" class="btn-outline" @click="toggleResume">
-        Continue Registration
-      </button>
-      <button type="button" class="btn-primary" @click="continueWithPlan">
-        {{ ctaLabel }}
-      </button>
+    <div class="popup-actions" :class="{ 'popup-actions-skeleton': isLoading }">
+      <template v-if="isLoading">
+        <div class="skeleton-button"></div>
+      </template>
+      <template v-else>
+        <button type="button" class="btn-primary" @click="continueWithPlan">
+          {{ ctaLabel }}
+        </button>
+      </template>
     </div>
-
-    <div v-if="showResume" class="resume-card">
-      <label class="resume-label">Use the email you paid with</label>
-      <input v-model="resumeEmail" type="email" placeholder="you@email.com" class="resume-input" />
-      <p v-if="resumeError" class="resume-error">{{ resumeError }}</p>
-      <button type="button" class="btn-primary" :disabled="resumeLoading" @click="resumeRegistration">
-        {{ resumeLoading ? 'Checking...' : 'Continue to Registration' }}
-      </button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { useRouter } from "vue-router";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/config/firebaseConfig";
 
-const emit = defineEmits(["close"]);
 const router = useRouter();
-const route = useRoute();
 
 const plans = ref([]);
 const error = ref("");
+const isLoading = ref(true);
 
-const selectedPlan = ref(String(route.query.plan || "free-trial").trim().toLowerCase() || "free-trial");
-const showResume = ref(false);
-const resumeEmail = ref("");
-const resumeError = ref("");
-const resumeLoading = ref(false);
+const selectedPlan = ref("basic");
 
 const defaultPlans = () => [
-  {
-    id: "free-trial",
-    name: "Free Trial",
-    price: "PHP 0",
-    cycle: "",
-    description: "Try all core features for 14 days. No card required.",
-    features: ["14-day full access", "All clinic essentials", "Cancel anytime"],
-    trialDays: 14,
-    isActive: true,
-    recommended: false,
-  },
   {
     id: "basic",
     name: "Basic",
@@ -121,7 +132,7 @@ const formatCurrency = (amount) => {
   const safeValue = Number.isFinite(value) ? value : 0;
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
-    currency: "PHP",
+    currency: "PHP", currencyDisplay: "code",
     maximumFractionDigits: 0,
   }).format(safeValue);
 };
@@ -158,6 +169,7 @@ const mergePlans = (dbPlansMap) => {
 
 const loadPlans = async () => {
   error.value = "";
+  isLoading.value = true;
   try {
     const snapshot = await getDocs(collection(db, "subscriptionPlans"));
     const dbPlans = new Map(snapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()]));
@@ -166,132 +178,134 @@ const loadPlans = async () => {
     plans.value = activePlans.length ? activePlans : merged;
 
     if (!plans.value.some((plan) => plan.id === selectedPlan.value)) {
-      selectedPlan.value = plans.value[0]?.id || "free-trial";
+      selectedPlan.value = plans.value[0]?.id || "basic";
     }
   } catch (err) {
     console.error("Failed to load public subscription plans:", err);
     error.value = "Unable to load latest plans right now.";
     plans.value = defaultPlans();
+  } finally {
+    isLoading.value = false;
   }
 };
 
 const selectedPlanData = computed(() => plans.value.find((plan) => plan.id === selectedPlan.value) || null);
 
 const ctaLabel = computed(() => {
-  const current = selectedPlanData.value;
-  if (!current) return "Continue";
-  if (current.id === "free-trial") {
-    const days = Number(current.trialDays || 14);
-    return `Proceed to ${days}-day Free Trial`;
-  }
-  return "Continue with Selected Plan";
+  return selectedPlanData.value ? "Continue with Selected Plan" : "Continue";
 });
 
 const continueWithPlan = () => {
-  if (selectedPlan.value === "free-trial") {
-    router.push({ name: "register-clinic" });
-    return;
-  }
-  router.push({ path: "/subscription/checkout", query: { plan: selectedPlan.value, from: route.query.from } });
-};
-
-const maybeLater = () => {
-  emit("close");
-  const fallback = route.query.from === "owner" ? "/owner/account/subscription" : "/";
-  router.back();
-  setTimeout(() => {
-    if (router.currentRoute.value.path === route.path) {
-      router.replace({ path: fallback });
-    }
-  }, 0);
-};
-
-const toggleResume = () => {
-  showResume.value = !showResume.value;
-  resumeError.value = "";
-};
-
-const resumeRegistration = async () => {
-  const normalizedEmail = String(resumeEmail.value || "").trim().toLowerCase();
-  resumeError.value = "";
-
-  if (!normalizedEmail) {
-    resumeError.value = "Email is required.";
-    return;
-  }
-
-  resumeLoading.value = true;
-  try {
-    const userSnap = await getDocs(query(
-      collection(db, "users"),
-      where("email", "==", normalizedEmail)
-    ));
-    if (!userSnap.empty) {
-      resumeError.value = "Account already registered.";
-      return;
-    }
-
-    const paymentsSnap = await getDocs(query(
-      collection(db, "planPayments"),
-      where("payerEmail", "==", normalizedEmail),
-      where("status", "==", "Paid")
-    ));
-
-    if (paymentsSnap.empty) {
-      resumeError.value = "No paid subscription found for that email.";
-      return;
-    }
-
-    let latestPayment = null;
-    paymentsSnap.forEach((docSnap) => {
-      const data = docSnap.data() || {};
-      const createdAt = data.createdAt?.seconds || 0;
-      if (!latestPayment || createdAt > latestPayment.createdAt) {
-        latestPayment = {
-          id: docSnap.id,
-          planId: String(data.planId || data.planName || "").trim().toLowerCase(),
-          firstName: data.payerFirstName || "",
-          lastName: data.payerLastName || "",
-        };
-      }
-    });
-
-    if (!latestPayment?.planId) {
-      resumeError.value = "Payment record missing plan data.";
-      return;
-    }
-
-    router.push({
-      name: "register-clinic",
-      query: {
-        plan: latestPayment.planId,
-        paymentId: latestPayment.id,
-        paymentStatus: "paid",
-        firstName: latestPayment.firstName,
-        lastName: latestPayment.lastName,
-        email: normalizedEmail,
-      },
-    });
-  } catch (err) {
-    console.error("Failed to resume registration:", err);
-    resumeError.value = "Unable to resume right now. Please try again.";
-  } finally {
-    resumeLoading.value = false;
-  }
+  router.push({ name: "login" });
 };
 
 onMounted(loadPlans);
 </script>
 
 <style scoped>
+.subscription-page {
+  width: 100%;
+}
+
+.pricing-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(90deg, rgba(255, 251, 244, 0.96), rgba(251, 238, 213, 0.94));
+  border-bottom: 1px solid rgba(214, 169, 123, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.pricing-nav-inner {
+  width: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1rem 0.75rem;
+}
+
+.pricing-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #9f7a5a;
+}
+
 .subscription-popup {
-  padding: 0.75rem;
+  padding: 1rem 1.25rem 1.5rem;
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+.breadcrumb-link {
+  color: #7b4e35;
+  transition: color 0.2s ease;
+  position: relative;
+}
+
+.breadcrumb-link:hover {
+  color: #9f6946;
+}
+
+.breadcrumb-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 0%;
+  height: 2px;
+  background: #9f6946;
+  transition: width 0.2s ease;
+}
+
+.breadcrumb-link:hover::after {
+  width: 100%;
+}
+
+.breadcrumb-sep {
+  opacity: 0.5;
+}
+
+.breadcrumb-current {
+  color: #6a4a34;
 }
 
 .popup-top {
   display: block;
-  margin-bottom: 1.15rem;
+  margin-bottom: 1.4rem;
 }
+
+.popup-top-skeleton {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.skeleton-eyebrow {
+  height: 10px;
+  width: 140px;
+}
+
+.skeleton-heading {
+  height: 26px;
+  width: min(70%, 320px);
+  border-radius: 0.6rem;
+}
+
+.skeleton-subtitle {
+  height: 12px;
+  width: min(85%, 520px);
+  border-radius: 0.5rem;
+}
+
+.skeleton-subtitle.short {
+  width: min(65%, 420px);
+}
+
 
 .popup-eyebrow {
   font-size: 0.7rem;
@@ -315,15 +329,110 @@ onMounted(loadPlans);
   margin-top: 0.35rem;
   color: #5f4b3a;
   font-size: 0.92rem;
-  max-width: 660px;
+  max-width: 760px;
 }
 
 .plan-grid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 0.85rem;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
+  gap: 1.35rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.85rem;
+  justify-content: center;
+}
+
+.plan-option {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.plan-grid-skeleton {
+  pointer-events: none;
+}
+
+.skeleton-card {
+  border: 1px solid rgba(198, 148, 108, 0.22);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(248, 234, 206, 0.55));
+}
+
+.skeleton-line {
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(224, 197, 168, 0.52) 0%,
+    rgba(244, 228, 206, 0.9) 45%,
+    rgba(224, 197, 168, 0.52) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shine 1.4s ease-in-out infinite;
+}
+
+.skeleton-title {
+  height: 14px;
+  width: 40%;
+}
+
+.skeleton-price {
+  margin-top: 0.6rem;
+  height: 26px;
+  width: 55%;
+}
+
+.skeleton-desc {
+  margin-top: 0.6rem;
+  height: 12px;
+  width: 80%;
+  border-radius: 0.5rem;
+}
+
+.skeleton-desc.short {
+  width: 65%;
+}
+
+.skeleton-list {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.skeleton-item {
+  height: 10px;
+  width: 75%;
+  border-radius: 0.4rem;
+}
+
+.skeleton-item.short {
+  width: 55%;
+}
+
+.popup-actions-skeleton {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.skeleton-button {
+  height: 42px;
+  width: 100%;
+  border-radius: 0.8rem;
+  background: linear-gradient(
+    90deg,
+    rgba(224, 197, 168, 0.52) 0%,
+    rgba(244, 228, 206, 0.9) 45%,
+    rgba(224, 197, 168, 0.52) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shine 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shine {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
 }
 
 .plan-card {
@@ -333,7 +442,8 @@ onMounted(loadPlans);
   border-radius: 1rem;
   border: 1px solid rgba(198, 148, 108, 0.34);
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.8), rgba(248, 234, 206, 0.56));
-  padding: 1.2rem 1rem;
+  min-height: 330px;
+  padding: 1.45rem 1.25rem 1.5rem;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -344,18 +454,11 @@ onMounted(loadPlans);
 }
 
 .plan-card-active {
-  border-color: rgba(159, 105, 70, 0.72);
-  box-shadow: 0 12px 24px rgba(111, 63, 42, 0.18);
-}
-
-.plan-card-free {
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.88), rgba(246, 238, 223, 0.78));
-}
-
-.plan-card-free:hover {
-  transform: none;
-  border-color: rgba(198, 148, 108, 0.34);
-  box-shadow: none;
+  border-color: rgba(123, 78, 53, 0.9);
+  box-shadow: 0 18px 34px rgba(111, 63, 42, 0.22);
+  transform: translateY(-4px);
+  outline: 2px solid rgba(255, 244, 224, 0.7);
+  outline-offset: -2px;
 }
 
 .plan-card-basic {
@@ -408,6 +511,16 @@ onMounted(loadPlans);
   padding: 0.2rem 0.5rem;
 }
 
+.plan-selection-line {
+  display: block;
+  width: calc(100% - 2rem);
+  margin: 0 auto;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 247, 234, 0.18), rgba(255, 247, 234, 0.92), rgba(255, 247, 234, 0.18));
+  box-shadow: 0 0 0 1px rgba(255, 241, 220, 0.2), 0 6px 16px rgba(54, 34, 22, 0.16);
+}
+
 .plan-name {
   font-size: 1rem;
   font-weight: 700;
@@ -450,79 +563,19 @@ onMounted(loadPlans);
 }
 
 .popup-actions {
-  margin-top: 1rem;
+  margin-top: 1.35rem;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  align-items: center;
 }
 
-.btn-outline {
-  width: 100%;
-  border-radius: 0.8rem;
-  padding: 0.72rem 0.95rem;
-  font-weight: 600;
-  border: 1px solid rgba(198, 148, 108, 0.6);
-  color: #7b4e35;
-  background: transparent;
-  transition: all 0.2s ease;
-}
-
-.btn-outline:hover {
-  background: rgba(255, 248, 235, 0.6);
-}
-
-.resume-card {
-  border-radius: 0.9rem;
-  border: 1px solid rgba(198, 148, 108, 0.35);
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0.9rem;
-  display: grid;
-  gap: 0.6rem;
-}
-
-.resume-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #7b4e35;
-}
-
-.resume-input {
-  height: 44px;
-  border-radius: 0.65rem;
-  border: 1px solid rgba(198, 148, 108, 0.5);
-  padding: 0 0.75rem;
-  font-size: 0.9rem;
-  color: #4a2c1e;
-  background: #fff;
-  outline: none;
-}
-
-.resume-input:focus {
-  border-color: rgba(159, 105, 70, 0.8);
-}
-
-.resume-error {
-  color: #b91c1c;
-  font-size: 0.75rem;
-}
-
-.btn-secondary,
 .btn-primary {
   width: 100%;
   border-radius: 0.8rem;
   padding: 0.72rem 0.95rem;
   font-weight: 600;
   transition: all 0.2s ease;
-}
-
-.btn-secondary {
-  border: 1px solid rgba(198, 148, 108, 0.45);
-  color: #7b4e35;
-  background: rgba(255, 255, 255, 0.6);
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 248, 235, 0.95);
 }
 
 .btn-primary {
@@ -536,29 +589,24 @@ onMounted(loadPlans);
   transform: translateY(-1px);
 }
 
-.resume-card {
-  margin-top: 1rem;
-}
-
 @media (min-width: 768px) {
+  .pricing-nav-inner {
+    padding-top: 1.1rem;
+    padding-bottom: 1.1rem;
+    padding-left: 0.95rem;
+  }
   .subscription-popup {
-    padding: 0.95rem;
+    padding: 1.35rem 1.5rem 1.8rem;
   }
   .plan-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(420px, 1fr));
   }
   .popup-actions {
-    flex-direction: row;
-    justify-content: flex-end;
-  }
-  .btn-secondary {
-    width: 170px;
-  }
-  .btn-outline {
-    width: 220px;
+    justify-content: center;
   }
   .btn-primary {
-    width: 290px;
+    width: min(360px, 100%);
   }
 }
 </style>
+

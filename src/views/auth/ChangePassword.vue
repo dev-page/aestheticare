@@ -22,6 +22,7 @@ const currentPasswordVisible = ref(false)
 
 const roleRoutes = {
   Owner: '/owner/dashboard',
+  'Clinic Admin': '/owner/dashboard',
   Manager: '/manager/dashboard',
   Receptionist: '/receptionist/dashboard',
   Practitioner: '/practitioner/dashboard',
@@ -37,7 +38,22 @@ const normalizeRoleKey = (value) => {
   if (!rawRole) return 'Customer'
   if (rawRole === 'hr') return 'HR'
   if (rawRole === 'crm') return 'CRM'
+  if (rawRole === 'clinic admin' || rawRole === 'clinicadmin' || rawRole === 'clinic administrator') return 'Clinic Admin'
   return `${rawRole.charAt(0).toUpperCase()}${rawRole.slice(1)}`
+}
+
+const resolveRedirectPath = async (userData) => {
+  const role = normalizeRoleKey(userData?.role || userData?.customRoleName || userData?.userType)
+  if (roleRoutes[role]) {
+    return roleRoutes[role]
+  }
+
+  const userType = String(userData?.userType || '').trim().toLowerCase()
+  if (userType === 'staff') {
+    return '/employee/dashboard'
+  }
+
+  return '/customer/home'
 }
 
 const togglePassword = () => (passwordVisible.value = !passwordVisible.value)
@@ -107,8 +123,7 @@ const handleChangePassword = async () => {
     await updateDoc(userRef, { mustChangePassword: false })
 
     const updatedUserSnap = await getDoc(userRef)
-    const role = normalizeRoleKey(updatedUserSnap.exists() ? updatedUserSnap.data().role : '')
-    const redirectPath = roleRoutes[role] || '/customer/home'
+    const redirectPath = await resolveRedirectPath(updatedUserSnap.exists() ? updatedUserSnap.data() : {})
 
     toast.success('Password changed successfully.')
     router.push(redirectPath)

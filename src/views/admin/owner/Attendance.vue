@@ -1,8 +1,11 @@
 <script>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { collection, getDocs, getFirestore } from 'firebase/firestore'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { collection, doc, getDoc, getDocs, getFirestore, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { getApp } from 'firebase/app'
+import QRCode from 'qrcode'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
+import { auth } from '@/config/firebaseConfig'
+import { classifyAttendanceRecord } from '@/utils/attendanceStatus'
 
 export default {
   name: 'AttendanceReports',
@@ -13,6 +16,11 @@ export default {
     const attendanceRecords = ref([])
     const staffUsers = ref([])
     const branchMap = ref({})
+    const branches = ref([])
+    const selectedQrBranchId = ref('')
+    const qrCodeUrl = ref('')
+    const qrLoading = ref(false)
+    const qrTokenRecord = ref(null)
     const nowRef = ref(new Date())
 
     const branchFilter = ref('')
@@ -24,30 +32,6 @@ export default {
       const mm = String(dateObj.getMonth() + 1).padStart(2, '0')
       const dd = String(dateObj.getDate()).padStart(2, '0')
       return `${yyyy}-${mm}-${dd}`
-    }
-
-    const parseClockToMinutes = (timeValue) => {
-      if (!timeValue) return null
-      const input = String(timeValue).trim().toUpperCase()
-      if (!input) return null
-
-      const hasMeridiem = input.includes('AM') || input.includes('PM')
-      const clean = input.replace(/\s+/g, '')
-      const meridiem = clean.endsWith('AM') ? 'AM' : clean.endsWith('PM') ? 'PM' : ''
-      const timePart = meridiem ? clean.slice(0, -2) : clean
-      const parts = timePart.split(':')
-
-      if (parts.length < 2) return null
-      let hours = Number(parts[0])
-      const minutes = Number(parts[1])
-      if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
-
-      if (hasMeridiem) {
-        if (hours === 12) hours = 0
-        if (meridiem === 'PM') hours += 12
-      }
-
-      return hours * 60 + minutes
     }
 
     const liveTime = computed(() =>
@@ -69,27 +53,155 @@ export default {
 
     const todayKey = computed(() => toDateKey(nowRef.value))
 
-    const loadAttendance = async () => {
-      const [attendanceSnap, clinicsSnap, usersSnap] = await Promise.all([
-        getDocs(collection(db, 'attendance')),
-        getDocs(collection(db, 'clinics')),
-        getDocs(collection(db, 'users'))
-      ])
+    const chunkArray = (items, size = 10) => {
+      const chunks = []
+      for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size))
+      }
+      return chunks
+    }
 
+    const generateToken = (length = 24) => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+      let token = ''
+      for (let index = 0; index < length; index += 1) {
+        token += chars[Math.floor(Math.random() * chars.length)]
+      }
+      return token
+    }
+
+    const getSelectedBranchLabel = () => {
+      const match = branches.value.find((branch) => branch.id === selectedQrBranchId.value)
+      if (!match) return 'Clinic Branch'
+      return `${match.branch}${match.location ? ` - ${match.location}` : ''}`
+    }
+
+    const renderQrCode = async (payload) => {
+      qrCodeUrl.value = await QRCode.toDataURL(payload, {
+        width: 320,
+        margin: 2,
+        color: {
+          dark: '#0f172a',
+          light: '#f8fafc'
+        }
+      })
+    }
+
+    const ensureDailyAttendanceQr = async (forceRegenerate = false) => {
+      const user = auth.currentUser
+      if (!user || !selectedQrBranchId.value) {
+        qrCodeUrl.value = ''
+        qrTokenRecord.value = null
+        return
+      }
+
+      qrLoading.value = true
+      try {
+        const dateKey = todayKey.value
+        const docId = `${selectedQrBranchId.value}_${dateKey}`
+        const qrRef = doc(db, 'attendanceDailyQRCodes', docId)
+        const qrSnap = await getDoc(qrRef)
+
+        let record = null
+        if (qrSnap.exists() && !forceRegenerate) {
+          record = qrSnap.data() || {}
+        } else {
+          const token = generateToken()
+          const branchLabel = getSelectedBranchLabel()
+          const qrPayloadObject = {
+            type: 'attendance-qr',
+            ownerId: user.uid,
+            branchId: selectedQrBranchId.value,
+            branchLabel,
+            date: dateKey,
+            token
+          }
+          const qrPayload = JSON.stringify(qrPayloadObject)
+
+          record = {
+            ...qrPayloadObject,
+            qrPayload
+          }
+
+          await setDoc(qrRef, {
+            ...record,
+            createdAt: qrSnap.exists() && !forceRegenerate ? (qrSnap.data()?.createdAt || serverTimestamp()) : serverTimestamp(),
+            updatedAt: serverTimestamp()
+          })
+        }
+
+        qrTokenRecord.value = record
+        await renderQrCode(record.qrPayload)
+      } catch (error) {
+        console.error('Failed to generate attendance QR:', error)
+        qrCodeUrl.value = ''
+        qrTokenRecord.value = null
+      } finally {
+        qrLoading.value = false
+      }
+    }
+
+    const regenerateDailyAttendanceQr = async () => {
+      await ensureDailyAttendanceQr(true)
+    }
+
+    const loadAttendance = async () => {
+      const user = auth.currentUser
+      if (!user) {
+        attendanceRecords.value = []
+        staffUsers.value = []
+        branchMap.value = {}
+        branches.value = []
+        return
+      }
+
+      const clinicsSnap = await getDocs(query(collection(db, 'clinics'), where('ownerId', '==', user.uid)))
+      const clinics = clinicsSnap.docs.map((clinicDoc) => ({ id: clinicDoc.id, ...clinicDoc.data() }))
+      branches.value = clinics.map((clinic) => ({
+        id: clinic.id,
+        branch: clinic.clinicBranch || 'Branch',
+        location: clinic.clinicLocation || ''
+      }))
+      if (!selectedQrBranchId.value && branches.value.length) {
+        selectedQrBranchId.value = branches.value[0].id
+      }
       const clinicLookup = {}
-      clinicsSnap.docs.forEach((clinicDoc) => {
-        const clinic = clinicDoc.data() || {}
-        clinicLookup[clinicDoc.id] = `${clinic.clinicBranch || 'Branch'}${clinic.clinicLocation ? ` - ${clinic.clinicLocation}` : ''}`
+      clinics.forEach((clinic) => {
+        clinicLookup[clinic.id] = `${clinic.clinicBranch || 'Branch'}${clinic.clinicLocation ? ` - ${clinic.clinicLocation}` : ''}`
       })
       branchMap.value = clinicLookup
 
-      attendanceRecords.value = attendanceSnap.docs
-        .map((recordDoc) => ({ id: recordDoc.id, ...recordDoc.data() }))
+      const branchIds = clinics.map((clinic) => clinic.id).filter(Boolean)
+      if (branchIds.length === 0) {
+        attendanceRecords.value = []
+        staffUsers.value = []
+        return
+      }
+
+      const attendanceChunks = chunkArray(branchIds)
+      let attendanceData = []
+      for (const chunk of attendanceChunks) {
+        const attendanceQuery = query(collection(db, 'attendance'), where('branchId', 'in', chunk))
+        const attendanceSnap = await getDocs(attendanceQuery)
+        attendanceData = attendanceData.concat(attendanceSnap.docs.map((recordDoc) => ({ id: recordDoc.id, ...recordDoc.data() })))
+      }
+
+      attendanceRecords.value = attendanceData
         .sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0))
 
-      staffUsers.value = usersSnap.docs
-        .map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }))
-        .filter((user) => user.userType === 'Staff' && !user.archived && user.status === 'Active')
+      let staffData = []
+      for (const chunk of attendanceChunks) {
+        const staffQuery = query(
+          collection(db, 'users'),
+          where('branchId', 'in', chunk),
+          where('userType', '==', 'Staff')
+        )
+        const usersSnap = await getDocs(staffQuery)
+        staffData = staffData.concat(usersSnap.docs.map((userDoc) => ({ id: userDoc.id, ...userDoc.data() })))
+      }
+
+      staffUsers.value = staffData
+        .filter((user) => !user.archived && user.status === 'Active')
     }
 
     const activeStaffIds = computed(() => new Set(staffUsers.value.map((staff) => staff.id)))
@@ -142,41 +254,12 @@ export default {
 
           const timeIn = dayRecord?.timeIn || '-'
           const timeOut = dayRecord?.timeOut || '-'
-          const shiftStart = staff.shiftStart || ''
-          const shiftEnd = staff.shiftEnd || ''
-          const hasShiftAssignment = Boolean(String(shiftStart).trim() && String(shiftEnd).trim())
-
-          let attendanceStatus = 'N/A'
-          if (hasShiftAssignment) {
-            attendanceStatus = 'Absent'
-            if (dayRecord?.timeIn) {
-              const inMinutes = parseClockToMinutes(dayRecord.timeIn)
-              const shiftStartMinutes = parseClockToMinutes(shiftStart)
-              if (shiftStartMinutes !== null && inMinutes !== null && inMinutes > shiftStartMinutes) {
-                attendanceStatus = 'Late'
-              } else {
-                attendanceStatus = 'Present'
-              }
-            }
-          }
-
-          let workHoursStatus = 'N/A'
-          if (hasShiftAssignment) {
-            workHoursStatus = '-'
-            if (dayRecord?.timeIn && !dayRecord?.timeOut) {
-              workHoursStatus = 'No Clock Out'
-            } else if (dayRecord?.timeIn && dayRecord?.timeOut) {
-              const outMinutes = parseClockToMinutes(dayRecord.timeOut)
-              const shiftEndMinutes = parseClockToMinutes(shiftEnd)
-              if (shiftEndMinutes !== null && outMinutes !== null) {
-                if (outMinutes > shiftEndMinutes) workHoursStatus = 'Overtime'
-                else if (outMinutes < shiftEndMinutes) workHoursStatus = 'Undertime'
-                else workHoursStatus = 'On Time'
-              } else {
-                workHoursStatus = 'Completed'
-              }
-            }
-          }
+          const attendanceMeta = classifyAttendanceRecord({
+            timeIn: dayRecord?.timeIn || '',
+            timeOut: dayRecord?.timeOut || '',
+            shiftStart: dayRecord?.shiftStart || staff.shiftStart || '',
+            shiftEnd: dayRecord?.shiftEnd || staff.shiftEnd || '',
+          })
 
           return {
             id: `${staff.id}-${selectedKey}`,
@@ -185,8 +268,11 @@ export default {
             date: selectedKey,
             timeIn,
             timeOut,
-            attendanceStatus,
-            workHoursStatus
+            attendanceStatus: dayRecord?.attendanceStatus || attendanceMeta.attendanceStatus,
+            workHoursStatus: dayRecord?.workHoursStatus || attendanceMeta.workHoursStatus,
+            lateMinutes: Number(dayRecord?.lateMinutes ?? attendanceMeta.lateMinutes ?? 0),
+            overtimeMinutes: Number(dayRecord?.overtimeMinutes ?? attendanceMeta.overtimeMinutes ?? 0),
+            undertimeMinutes: Number(dayRecord?.undertimeMinutes ?? attendanceMeta.undertimeMinutes ?? 0),
           }
         })
         .sort((a, b) => a.name.localeCompare(b.name))
@@ -207,10 +293,15 @@ export default {
     onMounted(async () => {
       selectedDay.value = toDateKey(new Date())
       await loadAttendance()
+      await ensureDailyAttendanceQr()
 
       clockInterval = setInterval(() => {
         nowRef.value = new Date()
       }, 1000)
+    })
+
+    watch(selectedQrBranchId, async () => {
+      await ensureDailyAttendanceQr()
     })
 
     onUnmounted(() => {
@@ -219,9 +310,16 @@ export default {
 
     return {
       branchFilter,
+      branches,
       selectedDay,
+      selectedQrBranchId,
       liveTime,
       liveDate,
+      qrCodeUrl,
+      qrLoading,
+      qrTokenRecord,
+      ensureDailyAttendanceQr,
+      regenerateDailyAttendanceQr,
       todayDailyRecords,
       statusRows,
       todaySummary
@@ -256,6 +354,69 @@ export default {
           class="px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:ring-2 focus:ring-blue-500"
         />
       </div>
+
+      <section class="bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-700 mb-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="max-w-2xl">
+            <h2 class="text-lg font-semibold text-white">Daily Attendance QR</h2>
+            <p class="mt-1 text-sm text-slate-400">
+              Generate a branch attendance QR that changes every day. Employees can scan the current day’s QR for attendance validation.
+            </p>
+
+            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label class="block flex-1">
+                <span class="mb-1 block text-sm text-slate-300">Branch</span>
+                <select
+                  v-model="selectedQrBranchId"
+                  class="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-white focus:ring-2 focus:ring-blue-500"
+                >
+                  <option disabled value="">Select Branch</option>
+                  <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                    {{ branch.branch }}{{ branch.location ? ` - ${branch.location}` : '' }}
+                  </option>
+                </select>
+              </label>
+
+              <button
+                type="button"
+                class="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-600 bg-slate-700 text-white transition hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="qrLoading || !selectedQrBranchId"
+                @click="regenerateDailyAttendanceQr"
+                title="Generate a new QR"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M5.64 18.36A9 9 0 104.58 9M18.36 5.64A9 9 0 0019.42 15" />
+                </svg>
+              </button>
+            </div>
+
+            <div v-if="qrTokenRecord" class="mt-4 grid gap-3 sm:grid-cols-2">
+              <div class="rounded-lg border border-slate-700 bg-slate-900/70 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500">Date</p>
+                <p class="mt-1 text-sm font-medium text-white">{{ qrTokenRecord.date }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-700 bg-slate-900/70 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500">Token</p>
+                <p class="mt-1 break-all text-sm font-medium text-cyan-300">{{ qrTokenRecord.token }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex w-full max-w-sm justify-center lg:justify-end">
+            <div class="rounded-[1.5rem] border border-slate-700 bg-slate-900 p-4 shadow-xl">
+              <div v-if="qrCodeUrl" class="space-y-3">
+                <img :src="qrCodeUrl" alt="Daily attendance QR" class="h-72 w-72 rounded-2xl bg-white object-contain p-3" />
+                <p class="text-center text-xs uppercase tracking-[0.18em] text-slate-400">
+                  Valid for {{ qrTokenRecord?.date || 'today' }}
+                </p>
+              </div>
+              <div v-else class="flex h-72 w-72 items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-950 p-6 text-center text-sm text-slate-400">
+                Select a branch to generate the daily attendance QR.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="bg-slate-800 p-4 rounded-lg text-center">

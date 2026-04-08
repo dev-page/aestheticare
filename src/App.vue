@@ -8,6 +8,10 @@
         :is-expired="isExpired"
         :sidebar-collapsed="sidebarCollapsed"
         :panel-key="sidebarPanelKey"
+        :badge-label="customerTopbarLabel"
+        :badge-tone="customerTopbarTone"
+        :badge-variant="customerTopbarVariant"
+        :show-badge-status="showTopbarStatus"
       />
       <router-view :key="$route.fullPath" />
     </div>
@@ -80,18 +84,17 @@
     v-if="showConnectionModal"
     class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4"
   >
-    <div class="w-full max-w-md rounded-2xl border border-amber-500/40 bg-[#1b0f08] p-6 shadow-2xl">
-      <div class="flex items-start gap-4">
-        <div class="mt-1 h-10 w-10 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xl">
-          !
-        </div>
-        <div class="flex-1">
-          <h2 class="text-white text-lg font-semibold">Connection issue detected</h2>
-          <p class="text-amber-200/90 text-sm mt-2">
-            {{ connectionMessage }}
-          </p>
-          <p class="text-amber-200/70 text-xs mt-3">
-            Please check your internet connection. This message will disappear once the connection is stable.
+    <div class="w-full max-w-md rounded-3xl border border-amber-500/50 bg-[#1b0f08] p-8 shadow-2xl">
+      <div class="flex flex-col items-center text-center gap-6">
+        <img
+          :src="disconnectIllustration"
+          alt="Connection issue"
+          class="w-64 h-64 object-contain"
+        />
+        <div>
+          <h2 class="text-white text-3xl font-semibold tracking-wide">Oops...</h2>
+          <p class="text-amber-200/90 text-base mt-3 leading-relaxed">
+            Network connection is slow or unstable. This message will disappear once the network is restored.
           </p>
         </div>
       </div>
@@ -105,6 +108,7 @@ import { useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useSubscription } from '@/composables/useSubscription'
 import EmployeeTopbar from '@/components/common/EmployeeTopbar.vue'
+import disconnectIllustration from '@/assets/disconnect.png'
 
 // Initialize auth state globally
 const { isLoading, user, initAuth } = useAuth()
@@ -115,24 +119,61 @@ const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
 const isPoorConnection = ref(false)
 const sidebarCollapsed = ref(false)
 
+const showConnectionModal = ref(false)
+const connectionIssueSince = ref(null)
+let connectionShowTimer = null
+let connectionHideTimer = null
+
 const updateConnectionStatus = () => {
   isOnline.value = typeof navigator !== 'undefined' ? navigator.onLine : true
 
   const connection = typeof navigator !== 'undefined' ? navigator.connection || navigator.mozConnection || navigator.webkitConnection : null
   if (!connection) {
     isPoorConnection.value = false
-    return
+  } else {
+    const effectiveType = String(connection.effectiveType || '').toLowerCase()
+    const downlink = Number(connection.downlink || 0)
+    const rtt = Number(connection.rtt || 0)
+
+    const slowType = effectiveType === 'slow-2g' || effectiveType === '2g'
+    const slowDownlink = downlink > 0 && downlink < 0.8
+    const highRtt = rtt > 3000
+
+    isPoorConnection.value = slowType || slowDownlink || highRtt
   }
 
-  const effectiveType = String(connection.effectiveType || '').toLowerCase()
-  const downlink = Number(connection.downlink || 0)
-  const rtt = Number(connection.rtt || 0)
+  const hasIssue = !isOnline.value || isPoorConnection.value
 
-  const slowType = effectiveType === 'slow-2g' || effectiveType === '2g'
-  const slowDownlink = downlink > 0 && downlink < 0.8
-  const highRtt = rtt > 3000
-
-  isPoorConnection.value = slowType || slowDownlink || highRtt
+  if (hasIssue) {
+    if (!connectionIssueSince.value) {
+      connectionIssueSince.value = Date.now()
+    }
+    if (connectionHideTimer) {
+      clearTimeout(connectionHideTimer)
+      connectionHideTimer = null
+    }
+    if (!connectionShowTimer) {
+      connectionShowTimer = setTimeout(() => {
+        showConnectionModal.value = true
+        connectionShowTimer = null
+      }, 1500)
+    }
+  } else {
+    connectionIssueSince.value = null
+    if (connectionShowTimer) {
+      clearTimeout(connectionShowTimer)
+      connectionShowTimer = null
+    }
+    if (showConnectionModal.value) {
+      if (connectionHideTimer) {
+        clearTimeout(connectionHideTimer)
+      }
+      connectionHideTimer = setTimeout(() => {
+        showConnectionModal.value = false
+        connectionHideTimer = null
+      }, 800)
+    }
+  }
 }
 
 const connectionMessage = computed(() => {
@@ -141,9 +182,9 @@ const connectionMessage = computed(() => {
   return ''
 })
 
-const showConnectionModal = computed(() => !isOnline.value || isPoorConnection.value)
 const sidebarPanelKey = computed(() => {
   const path = String(route.path || '').toLowerCase()
+  if (path.startsWith('/employee')) return 'employee'
   if (path.startsWith('/manager')) return 'manager'
   if (path.startsWith('/hr')) return 'hr'
   if (path.startsWith('/finance')) return 'finance'
@@ -152,12 +193,14 @@ const sidebarPanelKey = computed(() => {
   if (path.startsWith('/cashier')) return 'cashier'
   if (path.startsWith('/supply')) return 'supply'
   if (path.startsWith('/owner')) return 'owner'
+  if (path.startsWith('/customer')) return 'customer'
   return ''
 })
 
 const showEmployeeTopbar = computed(() => {
   const path = String(route.path || '').toLowerCase()
   return (
+    path.startsWith('/employee') ||
     path.startsWith('/manager') ||
     path.startsWith('/hr') ||
     path.startsWith('/finance') ||
@@ -165,15 +208,37 @@ const showEmployeeTopbar = computed(() => {
     path.startsWith('/practitioner') ||
     path.startsWith('/cashier') ||
     path.startsWith('/supply') ||
-    path.startsWith('/owner')
+    path.startsWith('/owner') ||
+    path.startsWith('/customer')
   )
 })
 
 const topbarTitle = computed(() => {
   const path = String(route.path || '').toLowerCase()
   if (path.startsWith('/owner')) return ''
+  if (path.startsWith('/customer')) return ''
+  if (path.startsWith('/employee')) return 'Employee Panel'
   return 'Employee Panel'
 })
+
+const isCustomerPanel = computed(() => String(route.path || '').toLowerCase().startsWith('/customer'))
+
+const customerTopbarLabel = computed(() => {
+  if (!isCustomerPanel.value) return ''
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    }).format(new Date())
+  } catch (_error) {
+    return ''
+  }
+})
+
+const customerTopbarTone = computed(() => (isCustomerPanel.value ? 'neutral' : ''))
+const customerTopbarVariant = computed(() => (isCustomerPanel.value ? 'date' : 'plan'))
+const showTopbarStatus = computed(() => !isCustomerPanel.value && isExpired.value)
 const isPublicSkeleton = computed(() => {
   const path = String(route.path || '').toLowerCase()
   if (path === '/') return true
@@ -257,6 +322,14 @@ onUnmounted(() => {
   if (connection && connectionHandler) {
     connection.removeEventListener('change', connectionHandler)
   }
+  if (connectionShowTimer) {
+    clearTimeout(connectionShowTimer)
+    connectionShowTimer = null
+  }
+  if (connectionHideTimer) {
+    clearTimeout(connectionHideTimer)
+    connectionHideTimer = null
+  }
   if (sidebarHandler) {
     window.removeEventListener('sidebar-collapsed-change', sidebarHandler)
   }
@@ -312,7 +385,7 @@ const planLabel = computed(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #0f0a07;
+  background: #1f120b;
   transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
@@ -326,17 +399,16 @@ const planLabel = computed(() => {
 }
 
 .loader {
-  width: 80px;
+  width: 120px;
   aspect-ratio: 1;
-  border: 10px solid #0000;
+  border: 14px solid #0000;
   box-sizing: border-box;
   background:
-    radial-gradient(farthest-side, #fff 98%, #0000) 0 0/20px 20px,
-    radial-gradient(farthest-side, #fff 98%, #0000) 100% 0/20px 20px,
-    radial-gradient(farthest-side, #fff 98%, #0000) 100% 100%/20px 20px,
-    radial-gradient(farthest-side, #fff 98%, #0000) 0 100%/20px 20px,
-    linear-gradient(#fff 0 0) 50%/40px 40px,
-    #000;
+    radial-gradient(farthest-side, #fff 98%, #0000) 0 0/30px 30px,
+    radial-gradient(farthest-side, #fff 98%, #0000) 100% 0/30px 30px,
+    radial-gradient(farthest-side, #fff 98%, #0000) 100% 100%/30px 30px,
+    radial-gradient(farthest-side, #fff 98%, #0000) 0 100%/30px 30px,
+    linear-gradient(#fff 0 0) 50%/60px 60px;
   background-repeat: no-repeat;
   filter: blur(4px) contrast(10);
   animation: l12 0.8s infinite;
@@ -344,7 +416,7 @@ const planLabel = computed(() => {
 
 .loader-label {
   margin-top: 1.25rem;
-  color: #f5e7de;
+  color: #f3e7e0;
   font-size: 0.85rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;

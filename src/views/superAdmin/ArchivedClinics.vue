@@ -84,6 +84,7 @@ import { computed, onMounted, ref } from 'vue'
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import { db } from '@/config/firebaseConfig'
 import SuperAdminSidebar from '@/components/sidebar/SuperAdminSidebar.vue'
+import { hasExpiredSuspension, restoreExpiredSuspension } from '@/utils/centerSuspension'
 
 const normalizePlanLabel = (value) => {
   const raw = String(value || '').trim().toLowerCase()
@@ -136,13 +137,25 @@ export default {
 
         const enriched = await Promise.all(
           baseClinics.map(async (clinic) => {
+            if (hasExpiredSuspension(clinic)) {
+              await restoreExpiredSuspension(db, clinic.id, clinic)
+              clinic.status = 'Active'
+              clinic.moderationStatus = 'Resolved'
+              clinic.isPublished = true
+              clinic.suspendedAt = null
+              clinic.suspensionEndsAt = null
+              clinic.suspensionReason = ''
+              clinic.suspensionSource = ''
+            }
+
             let ownerName = ''
             let ownerEmail = ''
             let ownerStatus = ''
             let ownerArchived = false
 
             try {
-              const userSnap = await getDoc(doc(db, 'users', clinic.id))
+              const ownerLookupId = clinic.ownerId || clinic.id
+              const userSnap = await getDoc(doc(db, 'users', ownerLookupId))
               if (userSnap.exists()) {
                 const userData = userSnap.data() || {}
                 ownerName =

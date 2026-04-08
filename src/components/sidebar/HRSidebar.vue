@@ -18,7 +18,16 @@ export default {
   setup() {
     const items = [
       { label: 'Dashboard', icon: 'home', to: '/hr/dashboard', feature: 'hr' },
-      { label: 'Attendance', icon: 'calendar', to: '/hr/attendance', feature: 'attendance', permission: 'attendance:view' },
+      {
+        key: 'attendance',
+        label: 'Attendance',
+        icon: 'calendar',
+        feature: 'attendance',
+        children: [
+          { label: 'Scan Attendance QR', icon: 'qr', to: '/attendance/scan', permission: 'attendance:create' },
+          { label: 'Attendance Record', icon: 'calendar', to: '/hr/attendance', permission: 'attendance:view' }
+        ]
+      },
       {
         key: 'employees',
         label: 'Employees',
@@ -34,11 +43,19 @@ export default {
         key: 'shifts',
         label: 'Shifts',
         icon: 'calendar',
+        feature: 'hr_shifts',
+        children: [
+          { label: 'Add Shift', icon: 'plus', to: '/hr/add-shift', permission: 'hr:create' }
+        ]
+      },
+      {
+        key: 'leave',
+        label: 'Leave',
+        icon: 'file',
         feature: 'hr',
         children: [
-          { label: 'Shift List', icon: 'clipboard', to: '/hr/shift-list', permission: 'hr:view' },
-          { label: 'Add Shift', icon: 'plus', to: '/hr/add-shift', permission: 'hr:create' },
-          { label: 'Shift Assignment', icon: 'settings', to: '/hr/shift-assignment', permission: 'hr:update' }
+          { label: 'Leave Request', icon: 'file', to: '/hr/leave-request', feature: 'hr' },
+          { label: 'Leave Management', icon: 'clipboard', to: '/hr/leave-management', feature: 'hr', permission: 'leave:review' }
         ]
       },
       {
@@ -48,11 +65,12 @@ export default {
         feature: 'payroll',
         children: [
           { label: 'Base Pay', icon: 'money', to: '/hr/base-pay', permission: 'payroll:update' },
-          { label: 'Payroll Settings', icon: 'money', to: '/hr/payroll', permission: 'payroll:update' },
-          { label: 'Payslip Generation', icon: 'file', to: '/hr/payslip-generation', permission: 'payroll:create' }
+          { label: 'Payroll & Payslip', icon: 'money', to: '/hr/payroll', permission: 'payroll:update' }
         ]
       },
-      { label: 'Reports and Analytics', icon: 'chart', to: '/hr/sales', feature: 'hr', permission: 'reports:view' }
+      { label: 'Reports and Analytics', icon: 'chart', to: '/hr/sales', feature: 'hr', permission: 'reports:view' },
+      { label: 'Notifications', icon: 'bell', to: '/notifications' },
+      { label: 'Report Issue', icon: 'reportIssue', to: '/support/report' }
     ]
 
     return { items }

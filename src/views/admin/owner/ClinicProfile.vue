@@ -25,6 +25,16 @@
           </div>
 
           <div>
+            <label class="block text-slate-400 text-sm mb-1">Business Type</label>
+            <input
+              :value="businessTypeLabel"
+              type="text"
+              readonly
+              class="w-full rounded-lg p-3 bg-slate-700/60 border border-slate-600 text-slate-200 focus:outline-none"
+            />
+          </div>
+
+          <div>
             <label class="block text-slate-400 text-sm mb-1">Owner Email</label>
             <input
               v-model="clinic.email"
@@ -119,6 +129,13 @@ export default {
       return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) > 0.0001 && Math.abs(lng) > 0.0001;
     });
 
+    const businessTypeLabel = computed(() => {
+      const raw = String(clinic.value.businessType || '').trim().toLowerCase();
+      if (!raw) return 'Not set';
+      if (raw === 'sole_proprietor') return 'Sole Proprietor';
+      if (raw === 'company') return 'Company';
+      return clinic.value.businessType;
+    });
 
     const loadOwnerInfo = async (user) => {
       if (!user) return;
@@ -305,7 +322,7 @@ export default {
 
     onMounted(loadClinicProfile);
 
-    return { clinic, saveClinicProfile, locationMapEl, hasLocationCoords };
+    return { clinic, saveClinicProfile, locationMapEl, hasLocationCoords, businessTypeLabel };
   },
 };
 </script>

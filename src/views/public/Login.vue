@@ -1,14 +1,16 @@
 
 <script setup>
 import { onBeforeUnmount, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { auth, db } from '@/config/firebaseConfig'
-import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, browserLocalPersistence, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth'
+import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, browserLocalPersistence, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, signOut } from 'firebase/auth'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { toast } from 'vue3-toastify'
 import { useAuth } from '@/composables/useAuth'
+import { getSuspendedCenterAccess } from '@/utils/centerAccess'
 
 const router = useRouter()
+const route = useRoute()
 const { user, isLoading } = useAuth()
 
 const email = ref('')
@@ -16,6 +18,7 @@ const password = ref('')
 const isRememberMe = ref(false)
 const isSubmitting = ref(false)
 const passwordVisible = ref(false)
+const contentVisible = ref(true)
 let redirectTimeout = null
 const REDIRECT_DELAY = 1700
 
@@ -24,6 +27,7 @@ const EMAIL_REGEX = /^[A-Za-z0-9._]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 const roleRoutes = {
   Superadmin: "/superadmin/dashboard",
   Owner: "/owner/dashboard",
+  "Clinic Admin": "/owner/dashboard",
   Manager: "/manager/dashboard",
   Receptionist: "/receptionist/dashboard",
   Practitioner: "/practitioner/dashboard",
@@ -43,19 +47,29 @@ const normalizeRoleKey = (value) => {
   if (!compact) return 'Customer'
   if (compact === 'hr') return 'HR'
   if (compact === 'crm') return 'CRM'
+  if (compact === 'clinicadmin' || compact === 'clinicadministrator') return 'Clinic Admin'
   if (compact === 'superadmin' || compact === 'systemadmin' || compact === 'sysadmin') {
     return 'Superadmin'
   }
   return `${compact.charAt(0).toUpperCase()}${compact.slice(1)}`
 }
 
-const resolveRedirectPath = (userData) => {
+const resolveRedirectPath = async (userData) => {
   const userType = String(userData?.userType || '').trim().toLowerCase()
   if (userType === 'staff' && userData?.mustChangePassword === true) {
-    return '/change-password'
+    return '/employee/change-password'
   }
-  const role = normalizeRoleKey(userData?.role)
-  return roleRoutes[role] || '/customer/home'
+
+  const role = normalizeRoleKey(userData?.role || userData?.customRoleName || userData?.userType)
+  if (roleRoutes[role]) {
+    return roleRoutes[role]
+  }
+
+  if (userType === 'staff') {
+    return '/employee/dashboard'
+  }
+
+  return '/customer/home'
 }
 
 const togglePassword = () => { passwordVisible.value = !passwordVisible.value }
@@ -85,6 +99,17 @@ const startRedirectFlow = (redirectPath) => {
     await router.push(redirectPath)
     setProcessLoading(false)
   }, REDIRECT_DELAY)
+}
+
+const ensureCenterAccessAllowed = async (firebaseUser, userData) => {
+  const suspendedCenter = await getSuspendedCenterAccess(firebaseUser.uid, userData)
+  if (!suspendedCenter) return true
+
+  await signOut(auth)
+  clearFormFields()
+  toast.error('Account suspended.')
+  setProcessLoading(false)
+  return false
 }
 
 const handleLogin = async () => {
@@ -127,7 +152,11 @@ const handleLogin = async () => {
           return
         }
 
-        const redirectPath = resolveRedirectPath(userData)
+        if (!(await ensureCenterAccessAllowed(userCredentials.user, userData))) {
+          return
+        }
+
+        const redirectPath = await resolveRedirectPath(userData)
 
         clearFormFields()
         startRedirectFlow(redirectPath)
@@ -171,7 +200,10 @@ const handleGoogleLogin = async () => {
         userSnap = await getDoc(userRef)
       }
 
-      const redirectPath = resolveRedirectPath(userSnap.data())
+      const redirectPath = await resolveRedirectPath(userSnap.data())
+      if (!(await ensureCenterAccessAllowed(userCredentials.user, userSnap.data()))) {
+        return
+      }
 
       startRedirectFlow(redirectPath)
     } catch (err) {
@@ -201,7 +233,10 @@ const handleFacebookLogin = async () => {
         userSnap = await getDoc(userRef)
       }
 
-      const redirectPath = resolveRedirectPath(userSnap.data())
+      const redirectPath = await resolveRedirectPath(userSnap.data())
+      if (!(await ensureCenterAccessAllowed(userCredentials.user, userSnap.data()))) {
+        return
+      }
 
       startRedirectFlow(redirectPath)
     } catch (err) {
@@ -214,6 +249,21 @@ const handleFacebookLogin = async () => {
 onBeforeUnmount(() => {
   if (redirectTimeout) clearTimeout(redirectTimeout)
   setProcessLoading(false)
+})
+
+if (route.query.suspended) {
+  toast.error('Account suspended.')
+}
+
+let leaveInProgress = false
+onBeforeRouteLeave((to, from, next) => {
+  if (leaveInProgress) {
+    next()
+    return
+  }
+  leaveInProgress = true
+  contentVisible.value = false
+  setTimeout(() => next(), 120)
 })
 </script>
 
@@ -252,14 +302,16 @@ onBeforeUnmount(() => {
 
 
     <div class="relative z-10 flex items-center justify-center px-4 pt-24 pb-12 text-sm">
+      <transition name="step-slide" appear>
       <div
+        v-if="contentVisible"
         class="relative w-full max-w-6xl grid grid-cols-1 lg:grid-cols-[40%_60%]
                rounded-3xl overflow-hidden
                bg-white/68 backdrop-blur-xl
                border border-gold-200/60
                shadow-2xl shadow-gold-900/15"
       >
-        <div class="login-visual relative hidden lg:flex items-center justify-center overflow-hidden">
+        <div class="login-visual login-content-block relative hidden lg:flex items-center justify-center overflow-hidden">
           <div class="visual-orb orb-1"></div>
           <div class="visual-orb orb-2"></div>
           <div class="visual-orb orb-3"></div>
@@ -286,7 +338,7 @@ onBeforeUnmount(() => {
           <div class="side-bubble bubble-6"></div>
         </div>
 
-        <div class="login-form-panel relative z-10 flex items-center justify-center px-4 pt-10 pb-10 sm:px-8">
+        <div class="login-form-panel login-content-block relative z-10 flex items-center justify-center px-4 pt-10 pb-10 sm:px-8">
           <span class="form-side-bubble f-bubble-1 hidden lg:block" aria-hidden="true"></span>
           <span class="form-side-bubble f-bubble-2 hidden lg:block" aria-hidden="true"></span>
           <span class="form-side-bubble f-bubble-3 hidden lg:block" aria-hidden="true"></span>
@@ -426,6 +478,7 @@ onBeforeUnmount(() => {
           </form>
         </div>
       </div>
+      </transition>
     </div>
 
   </div>
@@ -787,6 +840,40 @@ onBeforeUnmount(() => {
 .input:focus {
   border-color: #c9a24d;
   box-shadow: 0 0 0 3px rgba(201, 162, 77, 0.25);
+}
+
+.step-slide-enter-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.step-slide-leave-active {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.step-slide-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.step-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.login-content-block {
+  opacity: 0;
+  animation: loginContentIn 0.32s ease 0.08s forwards;
+}
+
+@keyframes loginContentIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 </style>

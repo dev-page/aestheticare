@@ -3,6 +3,8 @@
     <SuperAdminSidebar />
 
     <main class="flex-1 p-8">
+      <DashboardSkeleton v-if="loading" />
+      <div v-else>
       <div class="mb-8 flex items-start justify-between gap-4">
         <div>
           <h1 class="text-3xl font-bold text-white mb-2">System Administrator Dashboard</h1>
@@ -49,7 +51,7 @@
 
       <section class="bg-slate-800 rounded-xl border border-slate-700 p-6">
         <h2 class="text-xl text-white font-semibold mb-4">Subscription Overview</h2>
-        <p class="text-slate-400 text-sm mb-6">Number of users who availed Free Trial, Basic, and Premium plans.</p>
+        <p class="text-slate-400 text-sm mb-6">Number of clinics and users currently under the Free Plan, Basic, and Premium plans.</p>
 
         <div class="space-y-4">
           <div v-for="entry in subscriptionChart" :key="entry.key">
@@ -63,6 +65,7 @@
           </div>
         </div>
       </section>
+      </div>
     </main>
   </div>
 </template>
@@ -72,6 +75,7 @@ import { computed, onMounted, ref } from 'vue'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/config/firebaseConfig'
 import SuperAdminSidebar from '@/components/sidebar/SuperAdminSidebar.vue'
+import DashboardSkeleton from '@/components/common/DashboardSkeleton.vue'
 
 const toNumber = (value) => {
   const parsed = Number(value)
@@ -110,7 +114,7 @@ const extractPlanFromRecord = (record = {}) => {
 
 export default {
   name: 'SuperAdminDashboard',
-  components: { SuperAdminSidebar },
+  components: { SuperAdminSidebar, DashboardSkeleton },
   setup() {
     const loading = ref(false)
     const error = ref('')
@@ -128,7 +132,7 @@ export default {
     const formatCurrency = (amount) => {
       return new Intl.NumberFormat('en-PH', {
         style: 'currency',
-        currency: 'PHP',
+        currency: 'PHP', currencyDisplay: 'code',
         minimumFractionDigits: 2,
       }).format(toNumber(amount))
     }
@@ -138,7 +142,7 @@ export default {
       return [
         {
           key: 'free',
-          label: 'Free Trial',
+          label: 'Free Plan',
           value: freeTrialCount.value,
           width: (freeTrialCount.value / highest) * 100,
           colorClass: 'bg-blue-500'
@@ -165,7 +169,7 @@ export default {
       let total = 0
 
       for (const name of paymentCollections) {
-        const snapshot = await getDocs(collection(db, name))
+        const snapshot = await safeGetDocs(name)
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() || {}
           total += toNumber(data.amount ?? data.total ?? data.value ?? data.paidAmount)
@@ -176,7 +180,7 @@ export default {
     }
 
     const loadPlanPaymentCounts = async () => {
-      const snapshot = await getDocs(collection(db, 'planPayments'))
+      const snapshot = await safeGetDocs('planPayments')
       let basic = 0
       let premium = 0
 
@@ -190,14 +194,28 @@ export default {
       return { basic, premium }
     }
 
+    const safeGetDocs = async (collectionName) => {
+      try {
+        return await getDocs(collection(db, collectionName))
+      } catch (err) {
+        const code = String(err?.code || '').toLowerCase()
+        const message = err?.message || 'Unknown error'
+        console.error(`Failed to read ${collectionName}:`, err)
+        if (code.includes('permission-denied')) {
+          throw new Error(`Permission denied reading ${collectionName}.`)
+        }
+        throw new Error(`Failed to read ${collectionName}: ${message}`)
+      }
+    }
+
     const loadDashboard = async () => {
       loading.value = true
       error.value = ''
 
       try {
         const [clinicsSnap, usersSnap, paymentCounts] = await Promise.all([
-          getDocs(collection(db, 'clinics')),
-          getDocs(collection(db, 'users')),
+          safeGetDocs('clinics'),
+          safeGetDocs('users'),
           loadPlanPaymentCounts(),
         ])
 
@@ -237,7 +255,7 @@ export default {
         platformRevenue.value = await loadPaymentRevenue()
       } catch (err) {
         console.error('Error loading superadmin dashboard:', err)
-        error.value = 'Failed to load dashboard data. Please try again.'
+        error.value = err?.message || 'Failed to load dashboard data. Please try again.'
       } finally {
         loading.value = false
       }
@@ -260,3 +278,4 @@ export default {
   }
 }
 </script>
+

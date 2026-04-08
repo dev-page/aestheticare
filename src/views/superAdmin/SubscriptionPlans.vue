@@ -78,7 +78,7 @@
               ></textarea>
             </div>
 
-            <div v-if="plan.id === 'free-trial'">
+            <div v-if="plan.id === 'free'">
               <label class="block text-xs text-slate-400 mb-1">Trial Duration (days)</label>
               <input
                 v-model.number="plan.trialDays"
@@ -146,15 +146,15 @@ import SuperAdminSidebar from '@/components/sidebar/SuperAdminSidebar.vue'
 
 const defaultPlans = () => [
   {
-    id: 'free-trial',
-    label: 'Free Trial',
-    name: 'Free Trial',
+    id: 'free',
+    label: 'Free Plan',
+    name: 'Free Plan',
     price: 0,
-    billingCycle: 'trial',
-    description: 'For new clinics trying the platform.',
-    trialDays: 14,
+    billingCycle: 'month',
+    description: 'Core tools for one-branch clinics with no expiration.',
+    trialDays: 0,
     isActive: true,
-    features: ['Core modules', 'Limited users', 'Email support'],
+    features: ['One branch', 'Core operations', 'Upgrade anytime'],
   },
   {
     id: 'basic',
@@ -242,10 +242,10 @@ export default {
           key: plan.id,
           name: String(plan.name || '').trim() || plan.label,
           price: toNumber(plan.price),
-          currency: 'PHP',
+          currency: 'PHP', currencyDisplay: 'code',
           billingCycle: String(plan.billingCycle || '').trim() || 'month',
           description: String(plan.description || '').trim(),
-          trialDays: plan.id === 'free-trial' ? Math.max(0, Math.floor(toNumber(plan.trialDays))) : 0,
+          trialDays: plan.id === 'free' ? 0 : Math.max(0, Math.floor(toNumber(plan.trialDays))),
           isActive: Boolean(plan.isActive),
           features: cleanFeatures,
           updatedAt: serverTimestamp(),
@@ -284,3 +284,4 @@ export default {
   },
 }
 </script>
+

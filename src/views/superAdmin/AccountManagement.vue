@@ -87,6 +87,7 @@ const normalizeRoleKey = (value) => {
   if (!compact) return ''
   if (compact === 'superadmin' || compact === 'systemadmin' || compact === 'sysadmin') return 'Superadmin'
   if (compact === 'hr') return 'HR'
+  if (compact === 'clinicadmin' || compact === 'clinicadministrator') return 'Clinic Admin'
   return `${compact.charAt(0).toUpperCase()}${compact.slice(1)}`
 }
 

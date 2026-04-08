@@ -66,7 +66,7 @@ export default {
     const formatCurrency = (amount) => {
       return new Intl.NumberFormat('en-PH', {
         style: 'currency',
-        currency: 'PHP',
+        currency: 'PHP', currencyDisplay: 'code',
         minimumFractionDigits: 2,
       }).format(toNumber(amount))
     }
@@ -119,3 +119,4 @@ export default {
   }
 }
 </script>
+

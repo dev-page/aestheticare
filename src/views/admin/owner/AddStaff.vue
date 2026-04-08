@@ -7,18 +7,22 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage
 import { toast } from 'vue3-toastify'
 import Swal from 'sweetalert2'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
-import { generateAttendancePin } from '@/utils/attendancePin'
-import { sendAttendancePinEmail } from '@/utils/attendancePinMailer'
+import OwnerPageSkeleton from '@/components/common/OwnerPageSkeleton.vue'
 import { useSubscription } from '@/composables/useSubscription'
 import { storage } from '@/config/firebaseConfig'
 
+const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const DEFAULT_STAFF_PASSWORD = 'password123'
+
 export default {
   name: 'AddStaff',
-  components: { OwnerSidebar },
+  components: { OwnerSidebar, OwnerPageSkeleton },
   setup() {
     const db = getFirestore(getApp())
     const auth = getAuth(getApp())
+    const loading = ref(true)
     const branches = ref([])
+    const customRoles = ref([])
     const { initSubscription, activePlan } = useSubscription()
 
     const currentStaff = ref({
@@ -27,6 +31,7 @@ export default {
       email: '',
       phoneNumber: '',
       role: '',
+      customRoleId: '',
       employmentType: '',
       userType: 'Staff',
       clinicBranch: '',   // will hold branchId
@@ -35,18 +40,16 @@ export default {
     })
     const practitionerIdFile = ref(null)
 
-    const isBasicPlan = computed(() => String(activePlan.value || '').trim().toLowerCase() === 'basic')
-    const roleOptions = computed(() => (
-      isBasicPlan.value
-        ? ['Receptionist', 'Practitioner', 'Manager']
-        : ['Manager', 'Receptionist', 'Practitioner', 'Finance']
-    ))
+    const normalizedPlan = computed(() => String(activePlan.value || '').trim().toLowerCase())
+    const isBasicPlan = computed(() => normalizedPlan.value === 'basic')
 
     // Load branches from Firestore
     const loadBranches = async () => {
+      loading.value = true
       const user = auth.currentUser
       if (!user) {
         branches.value = []
+        loading.value = false
         return
       }
 
@@ -65,12 +68,45 @@ export default {
         currentStaff.value.clinicBranch = branches.value[0].id
         updateLocation()
       }
+      loading.value = false
+    }
+
+    const loadCustomRoles = async () => {
+      const user = auth.currentUser
+      if (!user) {
+        customRoles.value = []
+        return
+      }
+
+      const rolesQuery = query(
+        collection(db, 'clinicRoles'),
+        where('ownerId', '==', user.uid)
+      )
+      const snapshot = await getDocs(rolesQuery)
+      customRoles.value = snapshot.docs
+        .map((roleDoc) => {
+          const data = roleDoc.data() || {}
+          const permissions = Array.isArray(data.permissions)
+            ? data.permissions.map((value) => String(value || '').trim()).filter(Boolean)
+            : []
+
+          return {
+            id: roleDoc.id,
+            name: String(data.name || '').trim(),
+            color: String(data.color || '').trim(),
+            permissions,
+          }
+        })
+        .filter((role) => role.name && role.permissions.length > 0)
+        .sort((left, right) => left.name.localeCompare(right.name))
     }
 
     onMounted(async () => {
+      loading.value = true
       await initSubscription()
-      onAuthStateChanged(auth, () => {
-        loadBranches()
+      onAuthStateChanged(auth, async () => {
+        await loadBranches()
+        await loadCustomRoles()
       })
     })
 
@@ -80,7 +116,8 @@ export default {
         lastName: '',
         email: '',
         phoneNumber: '',
-        role: roleOptions.value[0] || '',
+        role: '',
+        customRoleId: '',
         employmentType: '',
         userType: 'Staff',
         clinicBranch: '',
@@ -100,10 +137,9 @@ export default {
       currentStaff.value.clinicLocation = selected ? selected.location : ""
     }
 
-    watch(roleOptions, (next) => {
-      if (!currentStaff.value.role || !next.includes(currentStaff.value.role)) {
-        currentStaff.value.role = next[0] || ''
-      }
+    watch(() => currentStaff.value.customRoleId, (nextCustomRoleId) => {
+      const selectedRole = customRoles.value.find((role) => role.id === nextCustomRoleId)
+      currentStaff.value.role = selectedRole?.name || ''
     }, { immediate: true })
 
     const sanitizeName = (value) => value.replace(/[^A-Za-z\s]/g, '')
@@ -188,6 +224,10 @@ export default {
 
     const hasErrors = computed(() => Object.values(fieldErrors.value).some(Boolean))
     const isPractitionerRole = computed(() => String(currentStaff.value.role || '').toLowerCase() === 'practitioner')
+    const selectedCustomRoleName = computed(() => {
+      const match = customRoles.value.find((role) => role.id === currentStaff.value.customRoleId)
+      return match?.name || ''
+    })
 
     const handlePractitionerFile = (event) => {
       const file = event?.target?.files?.[0] || null
@@ -209,6 +249,35 @@ export default {
         return
       }
       practitionerIdFile.value = file
+    }
+
+    const sendStaffWelcomeEmail = async ({ email, fullName }) => {
+      const user = auth.currentUser
+      if (!user) {
+        throw new Error('User not authenticated.')
+      }
+
+      const token = await user.getIdToken()
+      const response = await fetch(`${OTP_API_BASE}/send-staff-welcome`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          recipient: email,
+          fullName,
+          defaultPassword: DEFAULT_STAFF_PASSWORD,
+        }),
+      })
+
+      const contentType = String(response.headers.get('content-type') || '')
+      const data = contentType.includes('application/json') ? await response.json() : null
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Failed to send welcome email.')
+      }
+
+      return data
     }
 
     const saveStaff = async () => {
@@ -233,7 +302,6 @@ export default {
           return
         }
 
-        const defaultPassword = 'password123'
         let userCredential
         let creatorApp = null
         let creatorAuth = null
@@ -243,7 +311,7 @@ export default {
           const appName = `staff-creator-${Date.now()}-${Math.random().toString(36).slice(2)}`
           creatorApp = initializeApp(getApp().options, appName)
           creatorAuth = getAuth(creatorApp)
-          userCredential = await createUserWithEmailAndPassword(creatorAuth, currentStaff.value.email, defaultPassword)
+          userCredential = await createUserWithEmailAndPassword(creatorAuth, currentStaff.value.email, DEFAULT_STAFF_PASSWORD)
         } catch (error) {
           if (error.code === 'auth/email-already-in-use') {
             toast.error("This email is already registered.")
@@ -258,7 +326,6 @@ export default {
         const uid = userCredential.user.uid
 
         try {
-          const attendancePin = generateAttendancePin()
           let practitionerLicenseUrl = ''
           let practitionerLicenseName = ''
 
@@ -280,12 +347,13 @@ export default {
             email: currentStaff.value.email,
             phoneNumber: `+63${currentStaff.value.phoneNumber}`,
             role: currentStaff.value.role,
+            customRoleId: currentStaff.value.customRoleId || null,
+            customRoleName: selectedCustomRoleName.value || null,
             employmentType: currentStaff.value.employmentType,
             userType: 'Staff',
             branchId: currentStaff.value.clinicBranch,   // ✅ store branchId reference
             clinicLocation: currentStaff.value.clinicLocation,
             status: currentStaff.value.status ?? "Active",
-            attendancePin,
             practitionerLicenseUrl: practitionerLicenseUrl || null,
             practitionerLicenseName: practitionerLicenseName || null,
             practitionerLicenseUploadedBy: practitionerLicenseUrl ? (auth.currentUser?.uid || null) : null,
@@ -293,19 +361,17 @@ export default {
             createdAt: new Date()
           })
 
-          const emailResult = await sendAttendancePinEmail({
-            recipient: currentStaff.value.email,
-            fullName: `${currentStaff.value.firstName} ${currentStaff.value.lastName}`,
-            attendancePin
-          })
-
-          if (emailResult.success && emailResult.sent) {
-          toast.success('Employee added successfully. Attendance PIN email sent.')
-          } else if (emailResult.success && emailResult.skipped) {
-          toast.success(`Employee added successfully. Attendance PIN generated: ${attendancePin}`)
-          } else {
-          toast.warning(`Employee created, but PIN email failed: ${emailResult.error}`)
+          try {
+            await sendStaffWelcomeEmail({
+              email: currentStaff.value.email,
+              fullName: `${currentStaff.value.firstName} ${currentStaff.value.lastName}`,
+            })
+          } catch (emailError) {
+            console.error('Failed to send staff welcome email:', emailError)
+            toast.warn('Employee added, but the welcome email could not be sent.')
           }
+
+          toast.success('Employee added successfully.')
           resetForm()
         } catch (firestoreError) {
           // Step 3: Rollback Auth if Firestore fails
@@ -337,6 +403,7 @@ export default {
     })
 
     return {
+      loading,
       currentStaff,
       saveStaff,
       resetForm,
@@ -353,8 +420,8 @@ export default {
       practitionerIdFile,
       isPractitionerRole,
       isFormEmpty,
-      roleOptions,
-      isBasicPlan
+      isBasicPlan,
+      customRoles
     }
   }
 }
@@ -365,6 +432,8 @@ export default {
     <OwnerSidebar />
 
     <main class="flex-1 p-6 md:p-10 text-white">
+      <OwnerPageSkeleton v-if="loading" />
+      <div v-else>
       <h1 class="text-2xl font-bold mb-6">Add Employee</h1>
 
       <div class="bg-slate-800 rounded-xl shadow-lg p-6 md:p-8 border border-slate-700 max-w-2xl mx-auto">
@@ -435,14 +504,15 @@ export default {
           </div>
 
           <div>
-            <label class="block text-slate-400 mb-1">Role</label>
+            <label class="block text-slate-400 mb-1">Roles</label>
             <select
-              v-model="currentStaff.role"
+              v-model="currentStaff.customRoleId"
               class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:ring-2 focus:ring-blue-500"
             >
-              <option disabled value="">Select role</option>
-              <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+              <option value="">Select role</option>
+              <option v-for="role in customRoles" :key="role.id" :value="role.id">{{ role.name }}</option>
             </select>
+            <p class="mt-1 text-xs text-slate-400">Assign one of the clinic admin's saved roles.</p>
           </div>
 
           <div>
@@ -529,6 +599,7 @@ export default {
             </button>
           </div>
         </form>
+      </div>
       </div>
     </main>
   </div>

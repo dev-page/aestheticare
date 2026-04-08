@@ -128,7 +128,7 @@ import { db } from '@/config/firebaseConfig'
 import SuperAdminSidebar from '@/components/sidebar/SuperAdminSidebar.vue'
 
 const planCatalog = [
-  { key: 'free-trial', label: 'Free Trial' },
+  { key: 'free', label: 'Free Plan' },
   { key: 'basic', label: 'Basic' },
   { key: 'premium', label: 'Premium' },
 ]

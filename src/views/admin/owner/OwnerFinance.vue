@@ -2,8 +2,9 @@
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue';
 import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import Chart from 'chart.js/auto';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
+import { auth } from '@/config/firebaseConfig'
 
 export default {
   name: 'OwnerFinance',
@@ -69,22 +70,52 @@ export default {
     let payrollChartInstance = null;
     let financeChartInstance = null;
 
+    const chunkArray = (items, size = 10) => {
+      const chunks = []
+      for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size))
+      }
+      return chunks
+    }
+
     const loadFinanceData = async () => {
-      const clinicSnapshot = await getDocs(collection(db, "clinics"));
+      const user = auth.currentUser
+      if (!user) {
+        branches.value = []
+        reports.value = []
+        totalPayroll.value = 0
+        revenue.value = 0
+        lastMonthPayroll.value = 0
+        lastMonthRevenue.value = 0
+        return
+      }
+
+      const clinicSnapshot = await getDocs(query(collection(db, "clinics"), where("ownerId", "==", user.uid)));
       const clinicData = clinicSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       branches.value = clinicData;
 
-      const staffSnapshot = await getDocs(collection(db, "users"));
-      const staffData = staffSnapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter((u) => u.userType === 'Staff' && !u.archived);
+      const branchIds = clinicData.map((clinic) => clinic.id).filter(Boolean)
+      let staffData = []
+      if (branchIds.length) {
+        const chunks = chunkArray(branchIds)
+        for (const chunk of chunks) {
+          const staffQuery = query(
+            collection(db, "users"),
+            where("branchId", "in", chunk),
+            where("userType", "==", "Staff")
+          )
+          const staffSnapshot = await getDocs(staffQuery)
+          staffData = staffData.concat(staffSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+        }
+        staffData = staffData.filter((u) => !u.archived)
+      }
 
       reports.value = staffData.map(s => {
-        const clinic = clinicData.value.find(c => c.clinicBranch === s.clinicBranch && c.clinicLocation === s.clinicLocation);
+        const clinic = clinicData.find(c => c.id === s.branchId)
         return {
-          branch: s.clinicBranch,
-          location: clinic ? c.clinicLocation : '-',
-          employee: s.name || `${s.firstName} ${s.lastName}`,
+          branch: clinic?.clinicBranch || s.clinicBranch || '-',
+          location: clinic?.clinicLocation || s.clinicLocation || '-',
+          employee: s.fullName || s.name || `${s.firstName} ${s.lastName}`.trim(),
           proposedSalary: s.proposedSalary || 0,
           status: s.status || 'Pending'
         }
@@ -93,7 +124,7 @@ export default {
       totalPayroll.value = reports.value.reduce((sum, r) => sum + (r.proposedSalary || 0), 0);
       revenue.value = clinicData.reduce((sum, b) => sum + (b.revenue || 0), 0);
 
-      const historySnapshot = await getDocs(collection(db, "financeHistory"));
+      const historySnapshot = await getDocs(query(collection(db, "financeHistory"), where("ownerId", "==", user.uid)));
       const historyData = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       historyData.sort((a, b) => new Date(b.month) - new Date(a.month)); // Sort by most recent

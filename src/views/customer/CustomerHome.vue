@@ -1,9 +1,9 @@
 <template>
   <div class="flex customer-theme min-h-screen bg-cream-100">
-    <CustomerSidebar class="hidden md:block w-64 flex-shrink-0" />
+    <CustomerSidebar class="flex-shrink-0" />
 
-    <main class="flex-1 px-6 md:px-10 py-10">
-      <div class="bg-[#7c4a30] border border-[#8f5f46] rounded-2xl shadow-sm p-6 mb-10 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+    <main class="flex-1 px-0 md:px-0 py-0">
+      <div class="sticky top-14 z-30 w-full bg-[#7c4a30] border-b border-[#8f5f46] shadow-sm pl-6 md:pl-10 pr-6 md:pr-10 py-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end rounded-bl-2xl rounded-br-2xl">
         <div class="md:col-span-2 relative">
           <input
             v-model="search"
@@ -31,49 +31,8 @@
         </div>
       </div>
 
-      <div v-if="loading" class="text-charcoal-500 text-center py-16">Loading centers...</div>
-      <div v-else-if="errorMessage" class="text-red-500 text-center py-16">{{ errorMessage }}</div>
-      <div v-else-if="filteredCenters.length" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-        <div
-          v-for="center in filteredCenters"
-          :key="center.id"
-          class="bg-white border border-gold-200 rounded-2xl shadow-sm hover:shadow-xl transition duration-300"
-        >
-          <div class="h-44 bg-gradient-to-br from-gold-100 to-cream-200 rounded-t-2xl overflow-hidden">
-            <img v-if="center.bannerPicture" :src="center.bannerPicture" alt="Center banner" class="h-full w-full object-cover" />
-          </div>
-
-          <div class="p-6 flex flex-col justify-between h-64">
-            <div>
-              <h3 class="text-lg font-semibold text-charcoal-800">{{ center.name }}</h3>
-              <p class="text-sm text-charcoal-500 mt-1">{{ center.location || 'Location not set' }}</p>
-
-              <div class="flex flex-wrap gap-2 mt-4">
-                <span v-for="tag in center.services.slice(0, 4)" :key="tag" class="text-xs px-3 py-1 bg-gold-100 text-gold-700 rounded-full">
-                  {{ tag }}
-                </span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between mt-6">
-              <span class="text-sm text-charcoal-600">
-                {{ center.rating > 0 ? `Rating ${center.rating.toFixed(1)}` : 'New center' }}
-              </span>
-
-              <button
-                @click="openCenter(center.id)"
-                class="px-4 py-2 bg-gold-700 text-white rounded-lg hover:bg-gold-800 transition"
-              >
-                View Center
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div v-else class="text-center py-24 text-charcoal-400">No centers found.</div>
-
-      <section class="mt-12 bg-white border border-gold-200 rounded-2xl p-6 shadow-sm">
+      <div class="px-6 md:px-10 py-8">
+      <section class="mt-0 mb-10 bg-white border border-gold-200 rounded-2xl p-6 md:p-8 shadow-sm">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h2 class="text-xl font-semibold text-charcoal-800">Nearby You</h2>
@@ -123,6 +82,50 @@
 
         <p v-else class="mt-6 text-sm text-charcoal-500">No nearby centers yet. Enable location to see results.</p>
       </section>
+
+      <div v-if="loading" class="text-charcoal-500 text-center py-16">Loading centers...</div>
+      <div v-else-if="errorMessage" class="text-red-500 text-center py-16">{{ errorMessage }}</div>
+      <div v-else-if="filteredCenters.length" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
+        <div
+          v-for="center in filteredCenters"
+          :key="center.id"
+          class="bg-white border border-gold-200 rounded-2xl shadow-sm hover:shadow-xl transition duration-300"
+        >
+          <div class="h-44 bg-gradient-to-br from-gold-100 to-cream-200 rounded-t-2xl overflow-hidden">
+            <img v-if="center.bannerPicture" :src="center.bannerPicture" alt="Center banner" class="h-full w-full object-cover" />
+          </div>
+
+          <div class="p-6 flex flex-col justify-between h-64">
+            <div>
+              <h3 class="text-lg font-semibold text-charcoal-800">{{ center.name }}</h3>
+              <p class="text-sm text-charcoal-500 mt-1">{{ center.location || 'Location not set' }}</p>
+
+              <div class="flex flex-wrap gap-2 mt-4">
+                <span v-for="tag in center.services.slice(0, 4)" :key="tag" class="text-xs px-3 py-1 bg-gold-100 text-gold-700 rounded-full">
+                  {{ tag }}
+                </span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between mt-6">
+              <span class="text-sm text-charcoal-600">
+                {{ center.rating > 0 ? `Rating ${center.rating.toFixed(1)}` : 'New center' }}
+              </span>
+
+              <button
+                @click="openCenter(center.id)"
+                class="px-4 py-2 bg-gold-700 text-white rounded-lg hover:bg-gold-800 transition"
+              >
+                View Center
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="text-center py-24 text-charcoal-400">No centers found.</div>
+      </div>
+
     </main>
   </div>
 </template>

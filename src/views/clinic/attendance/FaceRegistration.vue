@@ -123,8 +123,6 @@ import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
 import { toast } from 'vue3-toastify'
 import { auth, db, storage } from '@/config/firebaseConfig'
-import { generateAttendancePin } from '@/utils/attendancePin'
-import { sendAttendancePinEmail } from '@/utils/attendancePinMailer'
 
 export default {
   name: 'FaceRegistration',
@@ -142,7 +140,6 @@ export default {
 
     const currentUserId = ref('')
     const employeeName = ref('Loading...')
-    const employeeEmail = ref('')
     const alreadyRegistered = ref(false)
 
     const videoRef = ref(null)
@@ -451,13 +448,11 @@ export default {
       try {
         const uploadedSamples = await uploadSamples()
         const meanDescriptor = computeMeanDescriptor(uploadedSamples)
-        const attendancePin = generateAttendancePin(6)
 
         const userRef = doc(db, 'users', currentUserId.value)
         await setDoc(
           userRef,
           {
-            attendancePin,
             faceRegistration: {
               registered: true,
               registeredAt: serverTimestamp(),
@@ -471,18 +466,7 @@ export default {
           { merge: true }
         )
 
-        if (employeeEmail.value) {
-          const emailResult = await sendAttendancePinEmail({
-            recipient: employeeEmail.value,
-            fullName: employeeName.value,
-            attendancePin,
-          })
-          if (!emailResult.success) {
-            toast.warning(`Face saved. PIN email failed: ${emailResult.error}`)
-          }
-        }
-
-        toast.success(`Face registration saved. Your attendance PIN is: ${attendancePin}`)
+        toast.success('Face registration saved.')
       } catch (error) {
         console.error('Failed to save face registration:', error)
         toast.error(error?.message || 'Failed to save face registration.')
@@ -505,8 +489,6 @@ export default {
         `${firstName} ${lastName}`.trim() ||
         String(data.email || '').trim() ||
         'Unknown Staff'
-      employeeEmail.value = String(data.email || '').trim()
-
       alreadyRegistered.value = Boolean(data?.faceRegistration?.registered)
     }
 

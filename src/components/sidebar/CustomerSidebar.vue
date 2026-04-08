@@ -19,8 +19,11 @@ export default {
     const items = [
       { label: 'Home', icon: 'home', to: '/customer/home' },
       { label: 'Appointments', icon: 'calendar', to: '/customer/appointments' },
+      { label: 'Orders', icon: 'clipboard', to: '/customer/orders' },
       { label: 'Cart', icon: 'cart', to: '/customer/cart' },
-      { label: 'Profile', icon: 'profile', to: '/customer/profile' }
+      { label: 'Profile', icon: 'profile', to: '/customer/profile' },
+      { label: 'Notifications', icon: 'bell', to: '/notifications' },
+      { label: 'Report Issue', icon: 'reportIssue', to: '/support/report' }
     ]
 
     return { items }

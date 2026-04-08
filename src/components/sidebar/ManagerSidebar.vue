@@ -24,7 +24,7 @@ export default {
         icon: 'calendar',
         feature: 'attendance',
         children: [
-          { label: 'Add Attendance', icon: 'plus', to: '/manager/attendance/add', permission: 'attendance:create' },
+          { label: 'Scan Attendance QR', icon: 'qr', to: '/attendance/scan', permission: 'attendance:create' },
           { label: 'Attendance Record', icon: 'calendar', to: '/manager/attendance', permission: 'attendance:view' }
         ]
       },
@@ -43,12 +43,15 @@ export default {
         feature: 'inventory',
         children: [
           { label: 'Suppliers', icon: 'users', to: '/manager/suppliers', permission: 'inventory:view' },
-          { label: 'Purchase Requests', icon: 'cart', to: '/manager/purchase-requests', permission: 'inventory:create' },
+          { label: 'Purchase Requests', icon: 'cart', to: '/manager/purchase-requests', permissionsAny: ['inventory:create', 'inventory:review'] },
           { label: 'Item Catalog', icon: 'clipboard', to: '/manager/item-catalog', permission: 'inventory:view' }
         ]
       },
+      { label: 'Orders', icon: 'cart', to: '/manager/orders', permissionsAny: ['orders:view', 'inventory:view'] },
       { label: 'Product and Service Listing', icon: 'tag', to: '/manager/product-service-listing', feature: 'services', permission: 'services:view' },
-      { label: 'Archives', icon: 'archive', to: '/manager/archived-posts', permission: 'services:view' }
+      { label: 'Archives', icon: 'archive', to: '/manager/archived-posts', permission: 'services:view' },
+      { label: 'Notifications', icon: 'bell', to: '/notifications' },
+      { label: 'Report Issue', icon: 'reportIssue', to: '/support/report' }
     ]
 
     return { items }

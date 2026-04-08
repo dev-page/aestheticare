@@ -5,8 +5,8 @@
     <main class="flex-1 p-8">
       <div class="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h1 class="text-3xl font-bold text-white mb-2">Permissions</h1>
-          <p class="text-slate-400">Manage role permissions for platform users.</p>
+          <h1 class="text-3xl font-bold text-white mb-2">Role Management</h1>
+          <p class="text-slate-400">Manage platform role permissions and keep access rules organized.</p>
         </div>
 
         <div class="flex flex-wrap gap-2">
@@ -129,7 +129,7 @@ import { db } from '@/config/firebaseConfig'
 import SuperAdminSidebar from '@/components/sidebar/SuperAdminSidebar.vue'
 
 const defaultRoles = [
-  { key: 'Owner', label: 'Owner' },
+  { key: 'Owner', label: 'Clinic Admin' },
   { key: 'Manager', label: 'Manager' },
   { key: 'HR', label: 'HR' },
   { key: 'Finance', label: 'Finance' },
@@ -183,6 +183,7 @@ const normalizeRoleKey = (value) => {
   if (!compact) return ''
   if (compact === 'superadmin' || compact === 'systemadmin' || compact === 'sysadmin') return 'Superadmin'
   if (compact === 'hr') return 'HR'
+  if (compact === 'clinicadmin' || compact === 'clinicadministrator') return 'Clinic Admin'
   return `${compact.charAt(0).toUpperCase()}${compact.slice(1)}`
 }
 

@@ -10,9 +10,7 @@
 
       <p v-if="error" class="mb-4 text-sm text-rose-400">{{ error }}</p>
 
-      <section v-if="loading" class="bg-slate-800 border border-slate-700 rounded-xl p-6 text-slate-300">
-        Loading subscription details...
-      </section>
+      <OwnerPageSkeleton v-if="loading" />
 
       <section v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
@@ -33,6 +31,14 @@
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Payment Status</span>
               <span class="text-white font-semibold">{{ paymentStatusLabel }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Paid At</span>
+              <span class="text-white font-semibold">{{ paidAtLabel }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Expires At</span>
+              <span class="text-white font-semibold">{{ expiresAtLabel }}</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Payment ID</span>
@@ -87,11 +93,14 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { auth, db } from '@/config/firebaseConfig'
-import { collection, doc, getDoc, getDocs, onSnapshot, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
+import OwnerPageSkeleton from '@/components/common/OwnerPageSkeleton.vue'
+import { useSubscriptionStore } from '@/stores/subscription'
 
 const router = useRouter()
+const subscriptionStore = useSubscriptionStore()
 
 const loading = ref(true)
 const error = ref('')
@@ -101,6 +110,8 @@ const saveError = ref('')
 const planKey = ref('free-trial')
 const paymentStatus = ref('')
 const paymentId = ref('')
+const subscriptionStartedAt = ref(null)
+const subscriptionExpiresAt = ref(null)
 const planData = ref(null)
 const autoRenew = ref(false)
 let unsubscribeUser = null
@@ -111,7 +122,7 @@ const formatCurrency = (amount) => {
   const safe = Number.isFinite(value) ? value : 0
   return new Intl.NumberFormat('en-PH', {
     style: 'currency',
-    currency: 'PHP',
+    currency: 'PHP', currencyDisplay: 'code',
     maximumFractionDigits: 0,
   }).format(safe)
 }
@@ -123,10 +134,26 @@ const formatCycle = (cycle) => {
   return normalized
 }
 
+const toDateValue = (value) => {
+  if (!value) return null
+  if (typeof value?.toDate === 'function') return value.toDate()
+  if (value instanceof Date) return value
+  if (typeof value === 'number') return new Date(value)
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const formatDate = (value) => {
+  const date = toDateValue(value)
+  if (!date) return '-'
+  if (date.getTime() <= 0) return '-'
+  return new Intl.DateTimeFormat('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }).format(date)
+}
+
 const normalizePlanLabel = (value) => {
   const raw = String(value || '').trim().toLowerCase()
   if (!raw) return 'Not set'
-  if (raw.includes('free')) return 'Free Trial'
+  if (raw.includes('free')) return 'Free Plan'
   if (raw.includes('basic')) return 'Basic'
   if (raw.includes('premium')) return 'Premium'
   return value
@@ -134,20 +161,38 @@ const normalizePlanLabel = (value) => {
 
 const planLabel = computed(() => normalizePlanLabel(planKey.value))
 const planPrice = computed(() => formatCurrency(planData.value?.price || 0))
-const planCycle = computed(() => formatCycle(planData.value?.billingCycle || planData.value?.cycle || 'trial'))
-const planDescription = computed(() => planData.value?.description || 'No description available.')
-const planFeatures = computed(() => planData.value?.features || [])
+const planCycle = computed(() => {
+  if (planKey.value === 'free-trial' || planKey.value === 'free') return '-'
+  return formatCycle(planData.value?.billingCycle || planData.value?.cycle || 'trial')
+})
+const planDescription = computed(() => {
+  if (planKey.value === 'free-trial' || planKey.value === 'free') {
+    return 'Basic access for clinics getting started on the platform.'
+  }
+  return planData.value?.description || 'No description available.'
+})
+const planFeatures = computed(() => {
+  if (planKey.value === 'free-trial' || planKey.value === 'free') {
+    return ['Core modules', 'Limited users', 'Standard access']
+  }
+  return planData.value?.features || []
+})
 const paymentStatusLabel = computed(() => {
+  if (planKey.value === 'free-trial' || planKey.value === 'free') return '-'
   const raw = String(paymentStatus.value || '').trim().toLowerCase()
-  if (!raw) return 'Not set'
+  if (!raw) return '-'
   return raw.charAt(0).toUpperCase() + raw.slice(1)
 })
+const paidAtLabel = computed(() => formatDate(subscriptionStartedAt.value))
+const expiresAtLabel = computed(() => formatDate(subscriptionExpiresAt.value))
 
 const applySubscriptionData = async (userData = {}, clinicData = {}) => {
   const resolvedPlan = clinicData.subscriptionPlan || userData.subscriptionPlan || 'free-trial'
   planKey.value = String(resolvedPlan || 'free-trial').trim().toLowerCase()
   paymentStatus.value = clinicData.paymentStatus || userData.paymentStatus || ''
   paymentId.value = clinicData.paymentId || userData.paymentId || ''
+  subscriptionStartedAt.value = clinicData.subscriptionStartedAt || userData.subscriptionStartedAt || null
+  subscriptionExpiresAt.value = clinicData.subscriptionExpiresAt || userData.subscriptionExpiresAt || null
   const clinicAutoRenew = Object.prototype.hasOwnProperty.call(clinicData, 'subscriptionAutoRenew')
     ? clinicData.subscriptionAutoRenew
     : undefined
@@ -162,6 +207,43 @@ const applySubscriptionData = async (userData = {}, clinicData = {}) => {
       updateDoc(doc(db, 'users', auth.currentUser.uid), { subscriptionAutoRenew: false }),
       updateDoc(doc(db, 'clinics', auth.currentUser.uid), { subscriptionAutoRenew: false }),
     ])
+  }
+
+  if (!subscriptionStartedAt.value || !subscriptionExpiresAt.value) {
+    const paymentRef = String(paymentId.value || '').trim()
+    if (paymentRef) {
+      try {
+        const paymentSnap = await getDoc(doc(db, 'planPayments', paymentRef))
+        if (paymentSnap.exists()) {
+          const data = paymentSnap.data() || {}
+          const createdAt = toDateValue(data.createdAt)
+          const paidAt = toDateValue(data.paymongoPaidAt)
+          const planDays = planKey.value === 'free-trial' ? 14 : 30
+          const startDate = paidAt || createdAt
+          if (startDate && startDate.getTime() > 0) {
+            const expiresAt = new Date(startDate.getTime() + planDays * 24 * 60 * 60 * 1000)
+            subscriptionStartedAt.value = startDate
+            subscriptionExpiresAt.value = expiresAt
+            try {
+              await Promise.all([
+                updateDoc(doc(db, 'users', auth.currentUser.uid), {
+                  subscriptionStartedAt: startDate,
+                  subscriptionExpiresAt: expiresAt
+                }),
+                updateDoc(doc(db, 'clinics', auth.currentUser.uid), {
+                  subscriptionStartedAt: startDate,
+                  subscriptionExpiresAt: expiresAt
+                })
+              ])
+            } catch (_error) {
+              // ignore update errors
+            }
+          }
+        }
+      } catch (_error) {
+        // ignore payment lookup errors
+      }
+    }
   }
 }
 
@@ -217,6 +299,7 @@ const subscribeToUpdates = async () => {
     const clinicSnap = await getDoc(doc(db, 'clinics', currentUser.uid))
     const clinicData = clinicSnap.exists() ? clinicSnap.data() : {}
     await applySubscriptionData(userData, clinicData)
+    await subscriptionStore.refreshSubscription()
   })
 
   unsubscribeClinic = onSnapshot(doc(db, 'clinics', currentUser.uid), async (snap) => {
@@ -224,6 +307,7 @@ const subscribeToUpdates = async () => {
     const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
     const userData = userSnap.exists() ? userSnap.data() : {}
     await applySubscriptionData(userData, clinicData)
+    await subscriptionStore.refreshSubscription()
   })
 }
 
@@ -250,7 +334,8 @@ const goToPlans = () => {
 }
 
 const goToUpgrade = () => {
-  router.push({ path: '/subscription-features', query: { plan: planKey.value, from: 'owner' } })
+  const targetPlan = planKey.value === 'premium' ? 'premium' : 'basic'
+  router.push({ path: '/owner/account/plans', query: { plan: targetPlan } })
 }
 
 onMounted(async () => {
@@ -311,3 +396,4 @@ onUnmounted(() => {
   transform: translateX(24px);
 }
 </style>
+

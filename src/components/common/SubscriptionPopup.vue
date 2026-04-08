@@ -12,7 +12,22 @@
 
     <p v-if="error" class="popup-subtitle" style="color:#b91c1c;">{{ error }}</p>
 
-    <div class="plan-grid">
+    <div v-if="isLoading" class="plan-grid plan-grid-skeleton">
+      <div v-for="index in 3" :key="`skeleton-${index}`" class="plan-card skeleton-card">
+        <div class="skeleton-line skeleton-title"></div>
+        <div class="skeleton-line skeleton-price"></div>
+        <div class="skeleton-line skeleton-desc"></div>
+        <div class="skeleton-line skeleton-desc short"></div>
+        <div class="skeleton-list">
+          <div class="skeleton-line skeleton-item"></div>
+          <div class="skeleton-line skeleton-item"></div>
+          <div class="skeleton-line skeleton-item short"></div>
+        </div>
+        <div class="skeleton-chip"></div>
+      </div>
+    </div>
+
+    <div v-else class="plan-grid">
       <button
         v-for="plan in plans"
         :key="plan.id"
@@ -46,7 +61,7 @@
       </button>
     </div>
 
-    <div class="popup-actions">
+    <div class="popup-actions" :class="{ 'popup-actions-skeleton': isLoading }">
       <button type="button" class="btn-secondary" @click="toggleResume">
         Continue Registration
       </button>
@@ -69,6 +84,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/config/firebaseConfig'
 
@@ -78,10 +94,12 @@ const router = useRouter()
 const plans = ref([])
 const selectedPlan = ref('free-trial')
 const error = ref('')
+const isLoading = ref(true)
 const showResume = ref(false)
 const resumeEmail = ref('')
 const resumeError = ref('')
 const resumeLoading = ref(false)
+const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
 
 const defaultPlans = () => [
   {
@@ -121,7 +139,7 @@ const formatCurrency = (amount) => {
   const safe = Number.isFinite(value) ? value : 0
   return new Intl.NumberFormat('en-PH', {
     style: 'currency',
-    currency: 'PHP',
+    currency: 'PHP', currencyDisplay: 'code',
     maximumFractionDigits: 0,
   }).format(safe)
 }
@@ -155,6 +173,7 @@ const mergePlans = (dbPlansMap) => {
 
 const loadPlans = async () => {
   error.value = ''
+  isLoading.value = true
   try {
     const snapshot = await getDocs(collection(db, 'subscriptionPlans'))
     const dbPlans = new Map(snapshot.docs.map((docSnap) => [docSnap.id, docSnap.data()]))
@@ -169,6 +188,8 @@ const loadPlans = async () => {
     console.error('Failed to load subscription plans for popup:', err)
     error.value = 'Unable to load latest plans right now.'
     plans.value = mergePlans(new Map())
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -206,7 +227,7 @@ const cardClass = (plan) => {
 
 const continueWithPlan = () => {
   if (selectedPlan.value === 'free-trial') {
-    router.push({ name: 'register-clinic' })
+    router.push({ name: 'register', query: { account: 'clinic' } })
     emit('close')
     return
   }
@@ -225,6 +246,18 @@ const toggleResume = () => {
   resumeError.value = ''
 }
 
+const checkRegistrationStatus = async (emailValue) => {
+  try {
+    const res = await axios.post(`${OTP_API_BASE}/auth/check-registration-status`, {
+      email: String(emailValue || '').trim().toLowerCase()
+    })
+    return res?.data || null
+  } catch (error) {
+    console.error('Failed to check user email:', error)
+    return null
+  }
+}
+
 const resumeRegistration = async () => {
   const normalizedEmail = String(resumeEmail.value || '').trim().toLowerCase()
   resumeError.value = ''
@@ -236,12 +269,22 @@ const resumeRegistration = async () => {
 
   resumeLoading.value = true
   try {
-    const userSnap = await getDocs(query(
-      collection(db, 'users'),
-      where('email', '==', normalizedEmail)
-    ))
-    if (!userSnap.empty) {
-      resumeError.value = 'Account already registered.'
+    const status = await checkRegistrationStatus(normalizedEmail)
+    if (!status) {
+      resumeError.value = 'Unable to verify email right now.'
+      return
+    }
+    if (status.exists === true) {
+      if (status.resumeStep === 'active') {
+        resumeError.value = 'Account already registered.'
+        return
+      }
+      sessionStorage.setItem('resume_email', normalizedEmail)
+      await router.push({
+        name: 'register',
+        query: { account: 'clinic', resume: '1' },
+      })
+      emit('close')
       return
     }
 
@@ -276,8 +319,9 @@ const resumeRegistration = async () => {
     }
 
     router.push({
-      name: 'register-clinic',
+      name: 'register',
       query: {
+        account: 'clinic',
         plan: latestPayment.planId,
         paymentId: latestPayment.id,
         paymentStatus: 'paid',
@@ -339,6 +383,86 @@ onMounted(loadPlans)
   gap: 0.85rem;
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
+}
+
+.plan-grid-skeleton {
+  pointer-events: none;
+}
+
+.skeleton-card {
+  border: 1px solid rgba(198, 148, 108, 0.25);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(248, 234, 206, 0.55));
+}
+
+.skeleton-line,
+.skeleton-chip {
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(224, 197, 168, 0.55) 0%,
+    rgba(244, 228, 206, 0.9) 45%,
+    rgba(224, 197, 168, 0.55) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shine 1.4s ease-in-out infinite;
+}
+
+.skeleton-title {
+  height: 14px;
+  width: 40%;
+}
+
+.skeleton-price {
+  margin-top: 0.6rem;
+  height: 26px;
+  width: 55%;
+}
+
+.skeleton-desc {
+  margin-top: 0.6rem;
+  height: 12px;
+  width: 80%;
+  border-radius: 0.5rem;
+}
+
+.skeleton-desc.short {
+  width: 65%;
+}
+
+.skeleton-list {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.skeleton-item {
+  height: 10px;
+  width: 75%;
+  border-radius: 0.4rem;
+}
+
+.skeleton-item.short {
+  width: 55%;
+}
+
+.skeleton-chip {
+  margin-top: 0.9rem;
+  height: 20px;
+  width: 90px;
+}
+
+.popup-actions-skeleton {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+@keyframes skeleton-shine {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
 }
 
 .plan-card {
@@ -588,3 +712,4 @@ onMounted(loadPlans)
   }
 }
 </style>
+

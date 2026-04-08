@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { db } from '@/config/firebaseConfig'
 import { collection, query, where, getDocs } from 'firebase/firestore'
@@ -17,6 +17,9 @@ const newPassword = ref('')
 const confirmPassword = ref('')
 const otpInputRefs = ref([])
 const OTP_LENGTH = 6
+const RESEND_COOLDOWN_SECONDS = 60
+const resendCountdown = ref(0)
+let resendTimer = null
 
 const cancelReset = () => {
   router.push('/login')
@@ -58,10 +61,29 @@ const postToBackend = async (path, payload) => {
   throw lastError || new Error('Backend endpoint not found.')
 }
 
-const sendOtp = async () => {
+const clearResendTimer = () => {
+  if (!resendTimer) return
+  clearInterval(resendTimer)
+  resendTimer = null
+}
+
+const startResendCountdown = () => {
+  clearResendTimer()
+  resendCountdown.value = RESEND_COOLDOWN_SECONDS
+  resendTimer = setInterval(() => {
+    if (resendCountdown.value <= 1) {
+      resendCountdown.value = 0
+      clearResendTimer()
+      return
+    }
+    resendCountdown.value -= 1
+  }, 1000)
+}
+
+const requestOtp = async ({ advanceStep = true, successMessage = 'OTP sent to your email.' } = {}) => {
   if (!email.value) {
     toast.error('Please enter your email.')
-    return
+    return false
   }
 
   try {
@@ -71,7 +93,7 @@ const sendOtp = async () => {
 
     if (querySnapshot.empty) {
       toast.error('Email not found in our records.')
-      return
+      return false
     }
 
     const authCheck = await postToBackend('/auth/check-user', {
@@ -79,7 +101,7 @@ const sendOtp = async () => {
     })
     if (authCheck?.data?.success && authCheck?.data?.exists === false) {
       toast.error('No account found for this email in authentication.')
-      return
+      return false
     }
 
     generatedOtp.value = Math.floor(100000 + Math.random() * 900000).toString()
@@ -87,14 +109,36 @@ const sendOtp = async () => {
       recipient: email.value,
       otp: generatedOtp.value,
     })
-    toast.info('OTP sent to your email.')
-    step.value = 2
+    toast.info(successMessage)
+    if (advanceStep) {
+      step.value = 2
+    }
     clearOtpInputs()
     focusOtpInput(0)
+    startResendCountdown()
+    return true
   } catch (err) {
     console.error(err)
-    toast.error('Error checking email.')
+    const providerError =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message ||
+      'Failed to send OTP.'
+    toast.error(providerError)
+    return false
   }
+}
+
+const sendOtp = async () => {
+  await requestOtp()
+}
+
+const resendOtp = async () => {
+  if (resendCountdown.value > 0) return
+  await requestOtp({
+    advanceStep: false,
+    successMessage: 'A new OTP has been sent to your email.'
+  })
 }
 
 const verifyOtp = () => {
@@ -155,6 +199,11 @@ const resetPassword = async () => {
 }
 
 const otpCode = computed(() => otpDigits.value.join(''))
+const resendCountdownLabel = computed(() => {
+  const minutes = String(Math.floor(resendCountdown.value / 60)).padStart(2, '0')
+  const seconds = String(resendCountdown.value % 60).padStart(2, '0')
+  return `${minutes}:${seconds}`
+})
 
 const setOtpInputRef = (el, index) => {
   if (el) otpInputRefs.value[index] = el
@@ -198,6 +247,10 @@ const handleOtpPaste = (event) => {
   const nextIndex = Math.min(pastedDigits.length, OTP_LENGTH - 1)
   focusOtpInput(nextIndex)
 }
+
+onBeforeUnmount(() => {
+  clearResendTimer()
+})
 </script>
 
 <template>
@@ -268,6 +321,20 @@ const handleOtpPaste = (event) => {
           >
             Verify OTP
           </button>
+        </div>
+        <div class="space-y-2">
+          <button
+            @click="resendOtp"
+            type="button"
+            :disabled="resendCountdown > 0"
+            class="w-full py-2 border border-gold-700 text-gold-700 rounded hover:bg-gold-50 disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+          >
+            Resend OTP
+          </button>
+          <p class="text-center text-xs text-gray-500">
+            <span v-if="resendCountdown > 0">You can resend another OTP in {{ resendCountdownLabel }}.</span>
+            <span v-else>You can request another OTP now.</span>
+          </p>
         </div>
       </div>
 

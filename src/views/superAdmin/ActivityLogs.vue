@@ -61,16 +61,16 @@ export default {
       return timestamp.toDate().toLocaleString()
     }
 
-    const normalizeRole = (value) => {
-      const compact = String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
-      if (!compact) return ''
-      if (compact === 'superadmin' || compact === 'systemadmin' || compact === 'sysadmin') return 'Superadmin'
-      if (compact === 'owner') return 'Owner'
-      if (compact === 'customer') return 'Customer'
-      return `${compact.charAt(0).toUpperCase()}${compact.slice(1)}`
-    }
+      const normalizeRole = (value) => {
+        const compact = String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
+        if (!compact) return ''
+        if (compact === 'superadmin' || compact === 'systemadmin' || compact === 'sysadmin') return 'Superadmin'
+        if (compact === 'owner' || compact === 'clinicadmin' || compact === 'clinicadministrator') return 'Clinic Admin'
+        if (compact === 'customer') return 'Customer'
+        return `${compact.charAt(0).toUpperCase()}${compact.slice(1)}`
+      }
 
-    const allowedRoles = new Set(['Superadmin', 'Owner', 'Customer'])
+      const allowedRoles = new Set(['Superadmin', 'Clinic Admin', 'Customer'])
 
     const loadLogs = async () => {
       loading.value = true

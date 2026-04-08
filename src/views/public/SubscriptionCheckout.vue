@@ -1,7 +1,8 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-cream-50 via-cream-100 to-gold-100 px-4 py-10">
-    <div class="mx-auto w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <section class="bg-white/80 border border-gold-200 rounded-2xl p-6">
+  <div class="min-h-screen bg-gradient-to-br from-cream-50 via-cream-100 to-gold-100">
+    <div class="mx-auto w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-6 px-4 py-10">
+      <Transition name="checkout-panel" appear>
+        <section v-if="showPanels" class="checkout-panel delay-0 bg-white/80 border border-gold-200 rounded-2xl p-6">
         <p class="text-xs tracking-widest uppercase text-gold-700 mb-2">Subscription Checkout</p>
         <h1 class="text-3xl font-semibold text-charcoal-800 mb-2">Complete Your Plan Payment</h1>
         <p class="text-sm text-charcoal-600 mb-6">Choose a payment method for PayMongo.</p>
@@ -83,9 +84,11 @@
         >
           Back to Plans
         </button>
-      </section>
+        </section>
+      </Transition>
 
-      <section class="bg-charcoal-900 text-cream-50 rounded-2xl p-6">
+      <Transition name="checkout-panel" appear>
+        <section v-if="showPanels" class="checkout-panel delay-1 bg-charcoal-900 text-cream-50 rounded-2xl p-6">
         <h2 class="text-xl font-semibold mb-4">Order Summary</h2>
 
         <div v-if="selectedPlan" class="space-y-3">
@@ -117,21 +120,24 @@
         </div>
 
         <div v-else class="text-sm text-rose-300">No paid plan selected. Please go back and choose Basic or Premium.</div>
-      </section>
+        </section>
+      </Transition>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore'
 import Swal from 'sweetalert2'
 import { auth, db } from '@/config/firebaseConfig'
 import { onAuthStateChanged } from 'firebase/auth'
+import { useSubscriptionStore } from '@/stores/subscription'
 
 const route = useRoute()
 const router = useRouter()
+const subscriptionStore = useSubscriptionStore()
 
 const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
 const PENDING_PAYMONGO_KEY = 'subscription_checkout_pending_paymongo'
@@ -139,6 +145,7 @@ const PENDING_PAYMONGO_KEY = 'subscription_checkout_pending_paymongo'
 const saving = ref(false)
 const error = ref('')
 const plans = ref([])
+const showPanels = ref(false)
 
 const payerFirstName = ref('')
 const payerLastName = ref('')
@@ -220,7 +227,7 @@ const formatCurrency = (amount) => {
   const safe = Number.isFinite(value) ? value : 0
   return new Intl.NumberFormat('en-PH', {
     style: 'currency',
-    currency: 'PHP',
+    currency: 'PHP', currencyDisplay: 'code',
     minimumFractionDigits: 2,
   }).format(safe)
 }
@@ -380,7 +387,7 @@ const cancelUrl = `${window.location.origin}/subscription/checkout?plan=${select
         {
           name: selectedPlan.value.name,
           amount: toCentavos(selectedPlan.value.price),
-          currency: 'PHP',
+          currency: 'PHP', currencyDisplay: 'code',
           quantity: 1,
         },
       ],
@@ -490,7 +497,7 @@ const handlePayMongoReturn = async () => {
       planId: pending.planId,
       planName: pending.planName,
       amount: Number(pending.amount || 0),
-      currency: 'PHP',
+      currency: 'PHP', currencyDisplay: 'code',
       billingCycle: pending.billingCycle || 'month',
       payerFirstName: pending.payerFirstName,
       payerLastName: pending.payerLastName,
@@ -516,7 +523,7 @@ const handlePayMongoReturn = async () => {
           payerName: `${pending.payerFirstName || ''} ${pending.payerLastName || ''}`.trim(),
           planName: pending.planName,
           amount: Number(pending.amount || 0),
-          currency: 'PHP',
+          currency: 'PHP', currencyDisplay: 'code',
           referenceNumber: pending.referenceNumber,
           paymentMethod: paymentMethodType,
         }),
@@ -555,6 +562,8 @@ const handlePayMongoReturn = async () => {
         })
       ])
 
+      await subscriptionStore.refreshSubscription()
+
       await Swal.fire({
         title: 'Payment Successful',
         text: 'Redirecting you back to your subscription settings.',
@@ -575,9 +584,26 @@ const handlePayMongoReturn = async () => {
       showConfirmButton: false,
     })
 
+    try {
+      sessionStorage.setItem('register_clinic_draft', JSON.stringify({
+        email: pending.payerEmail,
+        firstName: pending.payerFirstName,
+        lastName: pending.payerLastName,
+        selectedPlan: pending.planId,
+        paymentStatus: 'paid',
+        paymentId: paymentDoc.id,
+      }))
+      if (pending.payerEmail) {
+        sessionStorage.setItem('resume_email', pending.payerEmail)
+      }
+    } catch (_error) {
+      // ignore session storage failures
+    }
+
     await router.replace({
-      name: 'register-clinic',
+      name: 'register',
       query: {
+        account: 'clinic',
         plan: pending.planId,
         paymentId: paymentDoc.id,
         paymentStatus: 'paid',
@@ -596,12 +622,49 @@ const handlePayMongoReturn = async () => {
 }
 
 const goBack = () => {
+  if (shouldPrefill.value) {
+    router.push({ path: '/owner/account/plans', query: { plan: selectedPlanId.value || 'basic' } })
+    return
+  }
   router.push({ name: 'subscription-features', query: { plan: selectedPlanId.value || 'basic' } })
 }
 
 onMounted(async () => {
+  showPanels.value = true
   await loadPlans()
   await handlePayMongoReturn()
   await prefillFromAccount()
 })
+
+onBeforeRouteLeave((_to, _from, next) => {
+  if (!showPanels.value) {
+    next()
+    return
+  }
+  showPanels.value = false
+  window.setTimeout(() => next(), 260)
+})
 </script>
+
+<style scoped>
+
+.checkout-panel-enter-active,
+.checkout-panel-leave-active {
+  transition: opacity 0.32s ease, transform 0.32s ease;
+}
+
+.checkout-panel-enter-from,
+.checkout-panel-leave-to {
+  opacity: 0;
+  transform: translateY(16px) scale(0.98);
+}
+
+.checkout-panel-enter-active.delay-1 {
+  transition-delay: 120ms;
+}
+
+.checkout-panel-leave-active.delay-1 {
+  transition-delay: 0ms;
+}
+</style>
+

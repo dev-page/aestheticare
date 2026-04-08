@@ -1,34 +1,84 @@
 <template>
   <div
-    :style="{ width: collapsed ? '6rem' : '18rem' }"
-    class="relative flex-shrink-0 transition-all duration-300"
+    :style="containerStyle"
+    :class="['relative flex-shrink-0', enableTransitions ? 'transition-all duration-300' : '']"
   >
+    <button
+      v-if="isSmallScreen && collapsed"
+      type="button"
+      class="readonly-exempt fixed left-2 top-3 z-50 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#5a3927] bg-[#1f120b] text-[#f3e7e0] shadow-2xl"
+      :aria-label="'Expand sidebar'"
+      title="Expand sidebar"
+      @click="toggleCollapsed"
+    >
+      <Icon icon="mdi:menu" class="h-4 w-4" />
+    </button>
     <aside
-      :style="{ width: collapsed ? '5rem' : '17rem' }"
-      class="readonly-exempt fixed left-0 top-0 bottom-0 z-40 bg-[#1f120b] border border-[#3a2417] rounded-tr-2xl rounded-br-2xl shadow-2xl flex flex-col transition-all duration-300 overflow-hidden"
+      :style="asideStyle"
+      :class="[
+        'readonly-exempt fixed left-0 top-0 bottom-0 z-40 bg-[#1f120b] border border-[#3a2417] rounded-tr-2xl rounded-br-2xl shadow-2xl flex flex-col overflow-hidden',
+        isSmallScreen && collapsed ? '-translate-x-full' : 'translate-x-0',
+        enableTransitions ? 'transition-all duration-300' : ''
+      ]"
     >
       <div class="p-4 border-b border-[#3a2417]">
         <div class="flex items-center gap-3">
-          <div v-if="!collapsed" class="min-w-0">
-            <h2 class="text-white font-semibold text-lg truncate">{{ title }}</h2>
-            <p class="text-[#c9b3a5] text-xs truncate">{{ subtitle }}</p>
-          </div>
-          <div class="ml-auto"></div>
+          <template v-if="showSkeleton">
+            <div class="h-10 w-10 rounded-lg border border-[#5a3927] bg-[#3a2417] animate-pulse"></div>
+            <div v-if="!collapsed" class="min-w-0 flex-1 space-y-2">
+              <div class="h-4 w-28 rounded bg-[#3a2417] animate-pulse"></div>
+              <div class="h-3 w-20 rounded bg-[#3a2417] animate-pulse"></div>
+            </div>
+          </template>
+          <template v-else>
+            <div v-if="!collapsed" class="min-w-0">
+              <h2 class="text-white font-semibold text-lg truncate">{{ title }}</h2>
+              <p class="text-[#c9b3a5] text-xs truncate">{{ subtitle }}</p>
+            </div>
+          </template>
+          <button
+            v-if="isSmallScreen"
+            type="button"
+            class="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#5a3927] bg-[#2a180f] text-[#f3e7e0]"
+            :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            @click="toggleCollapsed"
+          >
+            <Icon :icon="collapsed ? 'mdi:menu-open' : 'mdi:menu-close'" class="h-4 w-4" />
+          </button>
+          <div v-else class="ml-auto"></div>
         </div>
       </div>
 
       <nav class="sidebar-scroll flex-1 p-3 overflow-y-auto">
-      <ul class="space-y-1">
-        <li v-for="item in visibleItems" :key="item.key || item.to || item.label">
+      <ul v-if="showSkeleton" class="space-y-2">
+        <li v-for="index in skeletonCount" :key="index">
+          <div
+            :class="[
+              'flex items-center rounded-lg border border-[#3a2417] bg-[#2a180f]',
+              collapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2.5'
+            ]"
+          >
+            <div class="h-8 w-8 rounded-lg border border-[#5a3927] bg-[#3a2417] animate-pulse"></div>
+            <div v-if="!collapsed" class="flex-1">
+              <div class="h-3 w-24 rounded bg-[#3a2417] animate-pulse"></div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <ul v-else class="space-y-1">
+        <li v-for="item in visibleItems" :key="item.key || item.to || item.label" class="relative">
           <template v-if="isGroup(item)">
             <button
               @click="toggleGroup(item)"
               :class="[
                 'group relative w-full flex items-center rounded-lg transition-colors',
                 collapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2.5',
-                'text-[#e8d8cf] hover:text-white hover:bg-[#3a2417]'
+                item.locked
+                  ? 'text-[#b99b88] bg-[#24160f]'
+                  : 'text-[#e8d8cf] hover:text-white hover:bg-[#3a2417]'
               ]"
-              :title="collapsed ? item.label : ''"
+              :title="collapsed ? item.lockTitle || item.label : item.lockTitle || ''"
             >
                 <span
                 :class="[
@@ -36,9 +86,14 @@
                   'bg-[#3a2417] border-[#5a3927] text-[#f3e7e0]'
                 ]"
               >
-                <Icon :icon="iconName(item.icon)" class="w-4 h-4" />
+                <Icon :icon="item.locked ? 'mdi:lock-outline' : iconName(item.icon)" class="w-4 h-4" />
               </span>
               <span v-if="!collapsed" class="text-sm truncate">{{ item.label }}</span>
+              <Icon
+                v-if="!collapsed && item.locked"
+                icon="mdi:lock-outline"
+                class="w-4 h-4 text-amber-300"
+              />
               <svg
                 v-if="!collapsed"
                 class="w-4 h-4 ml-auto transition-transform"
@@ -57,54 +112,77 @@
               </span>
             </button>
 
-            <ul v-if="!collapsed && isGroupOpen(item)" class="mt-1 ml-4 space-y-1">
+            <ul
+              v-if="!isSmallScreen && !collapsed && isGroupOpen(item)"
+              class="mt-1 ml-4 space-y-1"
+            >
               <li v-for="child in item.children" :key="child.to">
-                <router-link
-                  :to="child.to"
+                <component
+                  :is="child.locked ? 'button' : 'router-link'"
+                  :to="child.locked ? undefined : child.to"
+                  :disabled="child.locked"
+                  @click="handleItemNavigation"
                   :class="[
                     'group flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
-                    isExactActive(child.to)
+                    child.locked
+                      ? 'w-full cursor-not-allowed text-[#9f8578] bg-[#24160f] opacity-80'
+                      : isExactActive(child.to)
                       ? 'bg-[#6b3f27] text-white'
                       : 'text-[#e8d8cf] hover:text-white hover:bg-[#3a2417]'
                   ]"
+                  :title="child.lockTitle || ''"
                 >
                   <span
                     :class="[
                       'h-7 w-7 rounded-lg border flex items-center justify-center',
-                      isExactActive(child.to)
+                      child.locked
+                        ? 'bg-[#2f1d13] border-[#5a3927] text-amber-300'
+                        : isExactActive(child.to)
                         ? 'bg-[#8b5a3c] text-white border-[#8b5a3c]'
                         : 'bg-[#3a2417] border-[#5a3927] text-[#f3e7e0]'
                     ]"
                   >
-                    <Icon :icon="iconName(child.icon)" class="w-3.5 h-3.5" />
+                    <Icon :icon="child.locked ? 'mdi:lock-outline' : iconName(child.icon)" class="w-3.5 h-3.5" />
                   </span>
                   <span class="text-sm truncate">{{ child.label }}</span>
-                </router-link>
+                  <span v-if="child.locked" class="ml-auto text-[10px] uppercase tracking-[0.18em] text-amber-300">
+                    Locked
+                  </span>
+                </component>
               </li>
             </ul>
+
+            <!-- mobile submenu uses the same expanded in-flow accordion as desktop -->
           </template>
 
           <template v-else>
-            <router-link
-              :to="item.to"
+            <component
+              :is="item.locked ? 'button' : 'router-link'"
+              :to="item.locked ? undefined : item.to"
+              :disabled="item.locked"
+              @click="handleItemNavigation"
               :class="[
-                'group relative flex items-center rounded-lg transition-colors',
+                'group relative w-full flex items-center rounded-lg transition-colors',
                 collapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2.5',
-                isActive(item.to)
+                item.locked
+                  ? 'cursor-not-allowed text-[#9f8578] bg-[#24160f] opacity-80'
+                  : isActive(item.to)
                   ? 'bg-[#6b3f27] text-white'
                   : 'text-[#e8d8cf] hover:text-white hover:bg-[#3a2417]'
               ]"
-              :title="collapsed ? item.label : ''"
+              :title="collapsed ? item.lockTitle || item.label : item.lockTitle || ''"
             >
               <span
                 :class="[
                   'relative h-8 w-8 rounded-lg border flex items-center justify-center',
-                  isActive(item.to)
+                  item.locked
+                    ? 'bg-[#2f1d13] border-[#5a3927] text-amber-300'
+                    : isActive(item.to)
                     ? 'bg-[#8b5a3c] text-white border-[#8b5a3c]'
                     : 'bg-[#3a2417] border-[#5a3927] text-[#f3e7e0]'
                 ]"
               >
-                <Icon :icon="iconName(item.icon)" class="w-4 h-4" />
+                <Icon :icon="item.locked ? 'mdi:lock-outline' : iconName(item.icon)" class="w-4 h-4" />
                 <span
                   v-if="item.badge && Number(item.badge) > 0"
                   class="absolute -top-1 -right-1 h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-[10px] leading-4 text-white font-semibold flex items-center justify-center"
@@ -113,8 +191,13 @@
                 </span>
               </span>
               <span v-if="!collapsed" class="text-sm truncate">{{ item.label }}</span>
+              <Icon
+                v-if="!collapsed && item.locked"
+                icon="mdi:lock-outline"
+                class="ml-auto w-4 h-4 text-amber-300"
+              />
               <span
-                v-if="!collapsed && item.badge && Number(item.badge) > 0"
+                v-else-if="!collapsed && item.badge && Number(item.badge) > 0"
                 class="ml-auto rounded-full bg-red-500 text-white text-[10px] font-semibold px-2 py-0.5"
               >
                 {{ item.badge }}
@@ -125,7 +208,7 @@
               >
                 {{ item.label }}
               </span>
-            </router-link>
+            </component>
           </template>
         </li>
       </ul>
@@ -154,7 +237,16 @@
           </template>
         </div>
 
+        <div v-if="showSkeleton" class="mt-2">
+          <div
+            :class="[
+              'w-full rounded-lg border border-[#5a3927] bg-[#2a180f] animate-pulse',
+              collapsed ? 'h-10' : 'h-10'
+            ]"
+          ></div>
+        </div>
         <button
+          v-else
           @click="logout"
           :class="[
             'mt-2 w-full rounded-lg border border-[#5a3927] text-[#f0e2d8] hover:bg-[#3a2417] hover:text-white transition-colors',
@@ -175,7 +267,7 @@
 <script>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getFirestore, doc, getDoc } from 'firebase/firestore'
+import { getFirestore, collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
 import { Icon } from '@iconify/vue'
 import Swal from 'sweetalert2'
@@ -206,17 +298,39 @@ export default {
     const { hasFeature, initSubscription, activePlan, isLoading: subscriptionLoading } = useSubscription()
     const { hasPermission, effectivePermissions, loading: permissionsLoading } = usePermissions()
 
+    const enableTransitions = ref(false)
+    const lastVisibleItems = ref([])
     const storageKey = `sidebar:${props.panelKey}:collapsed`
     const groupStorageKey = `sidebar:${props.panelKey}:groups`
     const collapsed = ref(localStorage.getItem(storageKey) === '1')
+    const isSmallScreen = ref(false)
+    const wasSmallScreen = ref(false)
     const userStorageKey = `sidebar:${props.panelKey}:user`
     const displayName = ref(props.defaultName)
     const displayEmail = ref(props.defaultEmail)
     const openGroups = ref({})
+    const notificationsUnread = ref(0)
+    const notificationsRoleKey = ref('')
+    let unsubscribeNotificationsUser = null
+    let unsubscribeNotificationsRole = null
+    const notificationsUserCache = ref([])
+    const notificationsRoleCache = ref([])
 
     const userInitial = computed(() => {
       const source = String(displayName.value || '').trim()
       return source ? source.charAt(0).toUpperCase() : 'U'
+    })
+
+    const containerStyle = computed(() => {
+      if (isSmallScreen.value) return { width: '0rem' }
+      return { width: collapsed.value ? '5rem' : '17rem' }
+    })
+
+    const asideStyle = computed(() => {
+      if (isSmallScreen.value) {
+        return { width: collapsed.value ? '5rem' : '17rem' }
+      }
+      return { width: collapsed.value ? '5rem' : '17rem' }
     })
 
     const isGroup = (item) => Array.isArray(item?.children) && item.children.length > 0
@@ -229,52 +343,99 @@ export default {
     }
 
     const getItemPermissions = (item) => {
-      if (!item) return []
-      if (Array.isArray(item.permissions)) return item.permissions
-      if (item.permission) return [item.permission]
-      if (item.to) {
+      if (!item) {
+        return { all: [], any: [] }
+      }
+
+      const allPermissions = Array.isArray(item.permissions)
+        ? [...item.permissions]
+        : item.permission
+          ? [item.permission]
+          : []
+
+      const anyPermissions = Array.isArray(item.permissionsAny)
+        ? [...item.permissionsAny]
+        : item.permissionAny
+          ? [item.permissionAny]
+          : []
+
+      if (item.to && !allPermissions.length && !anyPermissions.length) {
         const routeMatch = router.getRoutes().find((route) => route.path === item.to)
         if (routeMatch?.meta?.requiresPermission) {
-          return [routeMatch.meta.requiresPermission]
+          allPermissions.push(routeMatch.meta.requiresPermission)
         }
       }
-      return []
+
+      return { all: allPermissions, any: anyPermissions }
     }
 
     const isItemAllowed = (item) => {
       const required = getItemFeatures(item)
       const requiredPermissions = getItemPermissions(item)
       const featureAllowed = !required.length || required.every((feature) => hasFeature(feature))
-      const permissionAllowed = !requiredPermissions.length || requiredPermissions.every((perm) => hasPermission(perm))
+      const permissionAllowed =
+        (!requiredPermissions.all.length || requiredPermissions.all.every((perm) => hasPermission(perm))) &&
+        (!requiredPermissions.any.length || requiredPermissions.any.some((perm) => hasPermission(perm)))
       return featureAllowed && permissionAllowed
     }
 
-    const filterItems = (items = []) => {
-      const filtered = []
-      items.forEach((item) => {
-        if (isGroup(item)) {
-          if (!isItemAllowed(item)) return
-          const children = filterItems(item.children || [])
-          if (!children.length) return
-          filtered.push({ ...item, children })
-          return
-        }
-        if (isItemAllowed(item)) {
-          filtered.push(item)
-        }
-      })
-      return filtered
+    const lockTitleForItem = (item) => {
+      const features = getItemFeatures(item)
+      if (features.length) {
+        return 'Locked on the Free plan. Upgrade your subscription to access this feature.'
+      }
+      return 'You do not have access to this item.'
     }
+
+    const decorateItems = (items = [], inheritedLocked = false) =>
+      items.map((item) => {
+        const locked = inheritedLocked || !isItemAllowed(item)
+        const nextItem = {
+          ...item,
+          locked,
+          lockTitle: locked ? lockTitleForItem(item) : '',
+        }
+
+        if (isGroup(item)) {
+          nextItem.children = decorateItems(item.children || [], locked)
+        }
+
+        return nextItem
+      })
+
+    const withBadges = (items = []) =>
+      items.map((item) => {
+        const nextItem = {
+          ...item,
+          badge: item?.to === '/notifications' ? notificationsUnread.value : item.badge,
+        }
+        if (isGroup(item)) {
+          nextItem.children = withBadges(item.children || [])
+        }
+        return nextItem
+      })
+
+    const hasVisibleChild = (item) =>
+      !isGroup(item) || (Array.isArray(item.children) && item.children.some((child) => !child.locked))
 
     const visibleItems = computed(() => {
       activePlan.value
       subscriptionLoading.value
       effectivePermissions.value
       if (subscriptionLoading.value || permissionsLoading.value) {
-        return props.items
+        return lastVisibleItems.value.length ? lastVisibleItems.value : []
       }
-      return filterItems(props.items)
+      const decorated = withBadges(decorateItems(props.items)).filter(hasVisibleChild)
+      lastVisibleItems.value = decorated
+      return decorated
     })
+
+    const sidebarLoading = computed(
+      () => isLoading.value || subscriptionLoading.value || permissionsLoading.value
+    )
+    const showSkeleton = ref(false)
+    let skeletonTimer = null
+    const skeletonCount = computed(() => (collapsed.value ? 7 : 8))
 
     const isActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
     const isExactActive = (path) => route.path === path
@@ -302,6 +463,11 @@ export default {
       if (collapsed.value) {
         collapsed.value = false
         localStorage.setItem(storageKey, '0')
+        window.dispatchEvent(
+          new CustomEvent('sidebar-collapsed-change', {
+            detail: { panelKey: props.panelKey, collapsed: false }
+          })
+        )
         openGroups.value[key] = true
         persistGroups()
         return
@@ -319,6 +485,23 @@ export default {
           detail: { panelKey: props.panelKey, collapsed: collapsed.value }
         })
       )
+    }
+
+    const closeSidebar = () => {
+      if (!isSmallScreen.value || collapsed.value) return
+      collapsed.value = true
+      localStorage.setItem(storageKey, '1')
+      window.dispatchEvent(
+        new CustomEvent('sidebar-collapsed-change', {
+          detail: { panelKey: props.panelKey, collapsed: true }
+        })
+      )
+    }
+
+    const handleItemNavigation = () => {
+      if (isSmallScreen.value) {
+        closeSidebar()
+      }
     }
 
     const iconName = (name) => {
@@ -347,12 +530,16 @@ export default {
         activity: 'mdi:pulse',
         archive: 'mdi:archive-outline',
         report: 'mdi:file-chart-outline',
+        reportIssue: 'mdi:bug-outline',
         shield: 'mdi:shield-check-outline',
         profile: 'mdi:account-circle-outline',
         bell: 'mdi:bell-outline',
         plus: 'mdi:plus-circle-outline',
         search: 'mdi:magnify',
         money: 'mdi:currency-usd',
+        key: 'mdi:key-outline',
+        qr: 'mdi:qrcode-scan',
+        check: 'mdi:check-circle-outline',
         video: 'mdi:video-outline'
       }
 
@@ -384,7 +571,66 @@ export default {
       const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim()
       displayName.value = fullName || displayName.value
       displayEmail.value = data.email || displayEmail.value
+      const rawRole = String(data.role || '').trim().toLowerCase()
+      if (rawRole.includes('superadmin')) {
+        notificationsRoleKey.value = 'Superadmin'
+      } else if (rawRole.includes('clinic admin') || rawRole === 'clinicadmin' || rawRole === 'owner') {
+        notificationsRoleKey.value = 'Owner'
+      } else {
+        notificationsRoleKey.value = String(data.role || '').trim()
+      }
+      startNotificationBadgeListener(user.uid, notificationsRoleKey.value)
       persistUserDetails()
+    }
+
+    const updateNotificationsUnread = () => {
+      const combined = [...notificationsUserCache.value, ...notificationsRoleCache.value]
+      const map = new Map()
+      combined.forEach((item) => {
+        if (!item || !item.id) return
+        if (map.has(item.id)) return
+        map.set(item.id, item)
+      })
+      notificationsUnread.value = Array.from(map.values()).filter((item) => !item.read && !item.deleted).length
+    }
+
+    const startNotificationBadgeListener = (userId, roleKey) => {
+      if (!userId) return
+      if (unsubscribeNotificationsUser) {
+        unsubscribeNotificationsUser()
+        unsubscribeNotificationsUser = null
+      }
+      if (unsubscribeNotificationsRole) {
+        unsubscribeNotificationsRole()
+        unsubscribeNotificationsRole = null
+      }
+
+      unsubscribeNotificationsUser = onSnapshot(
+        query(collection(db, 'notifications'), where('recipientUserId', '==', userId)),
+        (snapshot) => {
+          notificationsUserCache.value = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data()
+          }))
+          updateNotificationsUnread()
+        }
+      )
+
+      if (roleKey) {
+        unsubscribeNotificationsRole = onSnapshot(
+          query(collection(db, 'notifications'), where('recipientRole', '==', roleKey)),
+          (snapshot) => {
+            notificationsRoleCache.value = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data()
+            }))
+            updateNotificationsUnread()
+          }
+        )
+      } else {
+        notificationsRoleCache.value = []
+        updateNotificationsUnread()
+      }
     }
 
     const logout = async () => {
@@ -422,8 +668,35 @@ export default {
 
     let unsubscribe = null
     let sidebarToggleHandler = null
+    let viewportHandler = null
+
+    const syncCollapsedWithViewport = () => {
+      const small = window.matchMedia('(max-width: 767px)').matches
+      isSmallScreen.value = small
+      if (small && !wasSmallScreen.value) {
+        collapsed.value = localStorage.getItem(storageKey) === '1'
+        window.dispatchEvent(
+          new CustomEvent('sidebar-collapsed-change', {
+            detail: { panelKey: props.panelKey, collapsed: collapsed.value }
+          })
+        )
+      }
+      if (!small && wasSmallScreen.value) {
+        const stored = localStorage.getItem(storageKey) === '1'
+        collapsed.value = stored
+        window.dispatchEvent(
+          new CustomEvent('sidebar-collapsed-change', {
+            detail: { panelKey: props.panelKey, collapsed: collapsed.value }
+          })
+        )
+      }
+      wasSmallScreen.value = small
+    }
 
     onMounted(async () => {
+      requestAnimationFrame(() => {
+        enableTransitions.value = true
+      })
       loadCachedUserDetails()
       sidebarToggleHandler = (event) => {
         const detail = event?.detail || {}
@@ -450,6 +723,10 @@ export default {
 
       initSubscription()
 
+      syncCollapsedWithViewport()
+      viewportHandler = () => syncCollapsedWithViewport()
+      window.addEventListener('resize', viewportHandler)
+
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         await loadUserDetails(user)
       })
@@ -467,19 +744,47 @@ export default {
       }
     )
 
+    watch(
+      sidebarLoading,
+      (loading) => {
+        if (skeletonTimer) {
+          clearTimeout(skeletonTimer)
+          skeletonTimer = null
+        }
+        if (loading) {
+          skeletonTimer = setTimeout(() => {
+            showSkeleton.value = true
+          }, 180)
+        } else {
+          showSkeleton.value = false
+        }
+      },
+      { immediate: true }
+    )
+
     onUnmounted(() => {
       if (unsubscribe) unsubscribe()
       if (sidebarToggleHandler) {
         window.removeEventListener('sidebar-toggle-request', sidebarToggleHandler)
       }
+      if (viewportHandler) {
+        window.removeEventListener('resize', viewportHandler)
+      }
+      if (unsubscribeNotificationsUser) unsubscribeNotificationsUser()
+      if (unsubscribeNotificationsRole) unsubscribeNotificationsRole()
+      if (skeletonTimer) {
+        clearTimeout(skeletonTimer)
+      }
     })
 
     return {
       collapsed,
+      closeSidebar,
       displayName,
       displayEmail,
       userInitial,
       visibleItems,
+      enableTransitions,
       isGroup,
       isActive,
       isExactActive,
@@ -489,7 +794,16 @@ export default {
       toggleCollapsed,
       iconName,
       logout,
-      isLoading
+      isLoading,
+      sidebarLoading,
+      showSkeleton,
+      containerStyle,
+      asideStyle,
+      handleItemNavigation,
+      hasFeature,
+      hasPermission,
+      isSmallScreen,
+      skeletonCount
     }
   }
 }

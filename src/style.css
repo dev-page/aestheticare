@@ -60,6 +60,32 @@
   --color-charcoal-900: #24180f;
 }
 
+html,
+body,
+#app {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+table {
+  width: 100%;
+}
+
 /* Shared panel palette: dark mocha + bronze accents */
 .owner-theme,
 .module-theme {
@@ -253,12 +279,12 @@
 
 /* Contrast guards for text on dark customer surfaces */
 .customer-theme :is(.bg-slate-800, .bg-slate-700, .bg-slate-700\/60, .bg-slate-600) .text-white,
-.customer-theme :is(.bg-[#7c4a30], .bg-[#8b5a3f], .bg-[#4a2718]) .text-white {
+.customer-theme :is(.bg-\[\#7c4a30\], .bg-\[\#8b5a3f\], .bg-\[\#4a2718\]) .text-white {
   color: #f7eadf !important;
 }
 
 .customer-theme :is(.bg-slate-800, .bg-slate-700, .bg-slate-700\/60, .bg-slate-600) :is(.text-slate-500, .text-slate-400, .text-slate-300, .text-slate-200),
-.customer-theme :is(.bg-[#7c4a30], .bg-[#8b5a3f], .bg-[#4a2718]) :is(.text-slate-500, .text-slate-400, .text-slate-300, .text-slate-200) {
+.customer-theme :is(.bg-\[\#7c4a30\], .bg-\[\#8b5a3f\], .bg-\[\#4a2718\]) :is(.text-slate-500, .text-slate-400, .text-slate-300, .text-slate-200) {
   color: #ead3c1 !important;
 }
 
@@ -379,4 +405,103 @@
 
 .Toastify__progress-bar {
   background: linear-gradient(90deg, #c6946c 0%, #e6c196 100%) !important;
+}
+
+@media (max-width: 1023px) {
+  .min-w-\[900px\],
+  .min-w-\[800px\],
+  .min-w-\[700px\],
+  .min-w-\[500px\] {
+    min-width: 100% !important;
+  }
+}
+
+@media (max-width: 767px) {
+  :is(.owner-theme, .module-theme, .customer-theme) {
+    font-size: 0.86rem;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) :is(.max-w-7xl, .max-w-6xl, .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl) {
+    max-width: 100% !important;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) :is(.w-full, .flex-1) {
+    min-width: 0;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) :is(.overflow-x-auto, .overflow-y-auto) {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) :is(h1) {
+    font-size: clamp(1.15rem, 4.4vw, 1.5rem) !important;
+    line-height: 1.2 !important;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) :is(h2) {
+    font-size: clamp(1rem, 3.8vw, 1.25rem) !important;
+    line-height: 1.25 !important;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) :is(h3) {
+    font-size: clamp(0.95rem, 3.4vw, 1.1rem) !important;
+    line-height: 1.3 !important;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) :is(p, li, label, button, input, select, textarea) {
+    font-size: 0.84rem;
+  }
+
+  .owner-theme main,
+  .module-theme main,
+  .customer-theme main {
+    padding: 1rem !important;
+  }
+
+  .owner-theme .p-8,
+  .module-theme .p-8,
+  .customer-theme .p-8 {
+    padding: 1rem !important;
+  }
+
+  .owner-theme .px-8,
+  .module-theme .px-8,
+  .customer-theme .px-8 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .owner-theme .rounded-\[2rem\],
+  .module-theme .rounded-\[2rem\],
+  .customer-theme .rounded-\[2rem\] {
+    border-radius: 1.25rem !important;
+  }
+
+  .owner-theme .rounded-3xl,
+  .module-theme .rounded-3xl,
+  .customer-theme .rounded-3xl {
+    border-radius: 1.25rem !important;
+  }
+
+  .owner-theme .rounded-2xl,
+  .module-theme .rounded-2xl,
+  .customer-theme .rounded-2xl {
+    border-radius: 1rem !important;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) table {
+    font-size: 0.78rem;
+  }
+
+  :is(.owner-theme, .module-theme, .customer-theme) th,
+  :is(.owner-theme, .module-theme, .customer-theme) td {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  .Toastify__toast-container {
+    width: calc(100vw - 1rem) !important;
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+  }
 }

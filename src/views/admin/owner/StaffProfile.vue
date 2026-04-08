@@ -1,6 +1,6 @@
 <script>
-import { ref, onMounted, computed } from 'vue'
-import { getFirestore, collection, getDocs, updateDoc, doc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore'
+import { ref, onMounted, computed, watch } from 'vue'
+import { getFirestore, collection, getDocs, updateDoc, doc, query, where, serverTimestamp } from 'firebase/firestore'
 import { getApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
@@ -16,6 +16,7 @@ export default {
     const auth = getAuth(getApp())
     const staffList = ref([])
     const branches = ref([])
+    const customRoles = ref([])
 
     const showEditModal = ref(false)
     const searchQuery = ref('')
@@ -27,25 +28,48 @@ export default {
       email: '',
       phoneNumber: '',
       role: '',
+      customRoleId: '',
+      customRoleName: '',
       branchId: '',
       userType: 'Staff',
       status: 'Active'
     })
 
-    const roleOptions = ['HR', 'Manager', 'Receptionist', 'Practitioner','Finance']
+    const chunkArray = (items, size = 10) => {
+      const chunks = []
+      for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size))
+      }
+      return chunks
+    }
 
     const loadStaff = async () => {
-      const snapshot = await getDocs(collection(db, "users"))
-      const ownerBranchIds = new Set(branches.value.map(branch => branch.id))
-      const staffDocs = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter((user) => user.userType === 'Staff' && ownerBranchIds.has(user.branchId) && !user.archived)
+      const ownerBranchIds = branches.value.map(branch => branch.id).filter(Boolean)
+      if (ownerBranchIds.length === 0) {
+        staffList.value = []
+        return
+      }
+
+      let staffDocs = []
+      const chunks = chunkArray(ownerBranchIds)
+      for (const chunk of chunks) {
+        const staffQuery = query(
+          collection(db, "users"),
+          where("branchId", "in", chunk),
+          where("userType", "==", "Staff")
+        )
+        const snapshot = await getDocs(staffQuery)
+        staffDocs = staffDocs.concat(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+      }
+
+      staffDocs = staffDocs.filter((user) => !user.archived)
       staffList.value = staffDocs.map(staff => {
         const branch = branches.value.find(b => b.id === staff.branchId)
         return {
           ...staff,
           clinicBranch: branch ? branch.clinicBranch : '',
-          clinicLocation: branch ? branch.clinicLocation : ''
+          clinicLocation: branch ? branch.clinicLocation : '',
+          customRoleName: String(staff.customRoleName || '').trim()
         }
       })
     }
@@ -68,15 +92,62 @@ export default {
         clinicLocation: doc.data().clinicLocation}))
     }
 
+    const loadCustomRoles = async () => {
+      const user = auth.currentUser
+      if (!user) {
+        customRoles.value = []
+        return
+      }
+
+      const rolesSnapshot = await getDocs(
+        query(collection(db, 'clinicRoles'), where('ownerId', '==', user.uid))
+      )
+      customRoles.value = rolesSnapshot.docs
+        .map((roleDoc) => {
+          const data = roleDoc.data() || {}
+          const permissions = Array.isArray(data.permissions)
+            ? data.permissions.map((value) => String(value || '').trim()).filter(Boolean)
+            : []
+
+          return {
+            id: roleDoc.id,
+            name: String(data.name || '').trim(),
+            permissions,
+          }
+        })
+        .filter((role) => role.name && role.permissions.length > 0)
+        .sort((left, right) => left.name.localeCompare(right.name))
+    }
+
     onMounted(async() => {
       await loadBranches()
+      await loadCustomRoles()
       await loadStaff()
 
     })
 
+    watch(
+      () => currentStaff.value.customRoleId,
+      (nextCustomRoleId) => {
+        const selectedRole = customRoles.value.find((role) => role.id === nextCustomRoleId)
+        currentStaff.value.customRoleName = selectedRole?.name || ''
+        currentStaff.value.role = selectedRole?.name || currentStaff.value.role || ''
+      }
+    )
+
     const openEditModal = (staff) => {
-      currentStaff.value = { ...staff }
+      currentStaff.value = {
+        ...staff,
+        customRoleId: String(staff.customRoleId || '').trim(),
+        customRoleName: String(staff.customRoleName || '').trim(),
+      }
       showEditModal.value = true
+    }
+
+    const updateCurrentStaffLocation = () => {
+      const branch = branches.value.find((entry) => entry.id === currentStaff.value.branchId)
+      currentStaff.value.clinicBranch = branch?.clinicBranch || ''
+      currentStaff.value.clinicLocation = branch?.clinicLocation || ''
     }
 
     const deactivateStaff = async (staff) => {
@@ -120,44 +191,13 @@ export default {
       }
     }
 
-    const deleteStaff = async (staff) => {
-      if (!staff?.id) {
-        toast.error("Invalid staff record.")
-        return
-      }
-
-      const fullName = `${staff.firstName} ${staff.lastName}`
-
-      const result = await Swal.fire({
-        title: 'Confirm Delete',
-        text: `You are about to delete ${fullName}. This action cannot be undone.`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, delete',
-        cancelButtonText: 'Cancel'
-      })
-
-      if (!result.isConfirmed) {
-        toast.info("Deletion cancelled.")
-        return
-      }
-
-      try {
-        await deleteDoc(doc(db, "users", staff.id))
-        staffList.value = staffList.value.filter((s) => s.id !== staff.id)
-        toast.success(`Employee has been deleted successfully.`)
-        await loadStaff()
-      } catch (error) {
-        console.error("Error deleting staff:", error)
-        toast.error("Failed to delete employee.")
-      }
-    }
 
     const saveStaff = async () => {
-      const { firstName, lastName, email, phoneNumber, role, clinicBranch, clinicLocation } = currentStaff.value
+      const { firstName, lastName, email, phoneNumber, clinicBranch, clinicLocation } = currentStaff.value
       const fullName = `${firstName} ${lastName}`
+      const selectedRole = customRoles.value.find((entry) => entry.id === currentStaff.value.customRoleId)
 
-      if (!firstName.trim() || !lastName.trim() || !email.trim() || !phoneNumber.trim() || !role.trim() || !clinicBranch.trim() || !clinicLocation.trim()) {
+      if (!firstName.trim() || !lastName.trim() || !email.trim() || !phoneNumber.trim() || !clinicBranch.trim() || !clinicLocation.trim()) {
         toast.error('All fields are required.')
         return
       }
@@ -184,10 +224,14 @@ export default {
           await updateDoc(staffRef, { 
             firstName: currentStaff.value.firstName.trim(),
             lastName: currentStaff.value.lastName.trim(),
+            fullName: `${currentStaff.value.firstName.trim()} ${currentStaff.value.lastName.trim()}`.trim(),
             email: currentStaff.value.email.trim(),
             phoneNumber: currentStaff.value.phoneNumber,
-            role: currentStaff.value.role,
+            role: selectedRole?.name || currentStaff.value.role || null,
+            customRoleId: currentStaff.value.customRoleId || null,
+            customRoleName: selectedRole?.name || null,
             branchId: currentStaff.value.branchId,
+            clinicLocation: currentStaff.value.clinicLocation,
             status: nextStatus,
             archived: shouldArchive,
             archivedAt: shouldArchive ? serverTimestamp() : null
@@ -218,12 +262,12 @@ export default {
       showEditModal,
       currentStaff,
       openEditModal,
+      updateCurrentStaffLocation,
       deactivateStaff,
-      deleteStaff,
       saveStaff,
       searchQuery,
       filteredStaffList,
-      roleOptions
+      customRoles
     }
   }
 }
@@ -273,7 +317,10 @@ export default {
               <td class="py-2 px-2 sm:py-3 sm:px-4 font-medium">{{ staff.firstName }} {{ staff.lastName }}</td>
               <td class="py-2 px-2 sm:py-3 sm:px-4">{{ staff.email }}</td>
               <td class="py-2 px-2 sm:py-3 sm:px-4">{{ staff.phoneNumber || '-' }}</td>
-              <td class="py-2 px-2 sm:py-3 sm:px-4">{{ staff.role || '-' }}</td>
+              <td class="py-2 px-2 sm:py-3 sm:px-4">
+                <div>{{ staff.role || '-' }}</div>
+                <div v-if="staff.customRoleName" class="text-xs text-cyan-300">{{ staff.customRoleName }}</div>
+              </td>
               <td class="py-2 px-2 sm:py-3 sm:px-4">{{ staff.clinicBranch }}</td>
               <td class="py-2 px-2 sm:py-3 sm:px-4">{{ staff.clinicLocation || '-' }}</td>
               <td class="py-2 px-2 sm:py-3 sm:px-4">
@@ -292,8 +339,8 @@ export default {
                 <button @click="openEditModal(staff)" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition flex-1 sm:flex-none">
                   Edit
                 </button>
-                <button @click="deleteStaff(staff)" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition flex-1 sm:flex-none">
-                  Delete
+                <button @click="deactivateStaff(staff)" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition flex-1 sm:flex-none">
+                  Disable
                 </button>
               </td>
             </tr>
@@ -340,17 +387,17 @@ export default {
             </div>
 
             <div>
-              <label class="block text-slate-400 mb-1">Role</label>
-              <select v-model="currentStaff.role"
+              <label class="block text-slate-400 mb-1">Custom Role</label>
+              <select v-model="currentStaff.customRoleId"
                 class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option disabled value="">Select role</option>
-                <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+                <option v-for="role in customRoles" :key="role.id" :value="role.id">{{ role.name }}</option>
               </select>
-              </div>
+            </div>
 
             <div>
               <label class="block text-slate-400 mb-1">Branch</label>
               <select v-model="currentStaff.branchId"
+                @change="updateCurrentStaffLocation"
                 class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option disabled value="">Select branch</option>
                 <option v-for="branch in branches" :key="branch.id" :value="branch.id">

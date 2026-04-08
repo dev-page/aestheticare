@@ -29,7 +29,15 @@ export default {
 
     const items = computed(() => [
       { label: 'Dashboard', icon: 'home', to: '/receptionist/dashboard' },
-      { label: 'Add Attendance', icon: 'plus', to: '/receptionist/attendance/add', feature: 'attendance', permission: 'attendance:create' },
+      {
+        key: 'attendance',
+        label: 'Attendance',
+        icon: 'calendar',
+        feature: 'attendance',
+        children: [
+          { label: 'Scan Attendance QR', icon: 'qr', to: '/attendance/scan', permission: 'attendance:create' }
+        ]
+      },
       {
         key: 'clients',
         label: 'Clients',
@@ -44,12 +52,12 @@ export default {
         label: 'Appointments',
         icon: 'calendar',
         children: [
-          { label: 'Appointment List', icon: 'clipboard', to: '/receptionist/appointments', permission: 'appointments:view' },
-          { label: 'Add Appointment', icon: 'plus', to: '/receptionist/appointments/add', permission: 'appointments:create' }
+          { label: 'Appointments', icon: 'clipboard', to: '/receptionist/appointments', permission: 'appointments:view' },
+          { label: 'Appointment Requests', icon: 'calendar-check', to: '/receptionist/appointment-requests', permission: 'appointments:review' }
         ]
       },
       { label: 'POS', icon: 'cash', to: '/receptionist/pos', feature: 'pos_payments', permission: 'payments:create' },
-      { label: 'Inbox', icon: 'inbox', to: '/receptionist/inbox', badge: unreadCount.value },
+      { label: 'Inbox', icon: 'inbox', to: '/receptionist/inbox', permission: 'inbox:view', badge: unreadCount.value },
       {
         key: 'transactions',
         label: 'Transactions',
@@ -58,7 +66,9 @@ export default {
           { label: 'History', icon: 'chart', to: '/receptionist/transactions/history', permission: 'payments:view' }
         ]
       },
-      { label: 'Activity Logs', icon: 'activity', to: '/receptionist/activity-logs' }
+      { label: 'Activity Logs', icon: 'activity', to: '/receptionist/activity-logs' },
+      { label: 'Notifications', icon: 'bell', to: '/notifications' },
+      { label: 'Report Issue', icon: 'reportIssue', to: '/support/report' }
     ])
 
     const startMessageListener = () => {

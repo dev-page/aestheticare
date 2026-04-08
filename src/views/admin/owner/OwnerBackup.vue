@@ -3,6 +3,8 @@
     <OwnerSidebar />
 
     <main class="flex-1 p-8">
+      <OwnerPageSkeleton v-if="loading" />
+      <div v-else>
       <div class="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <h1 class="text-3xl font-bold text-white mb-2">Backup Database</h1>
@@ -106,6 +108,7 @@
           </table>
         </div>
       </section>
+      </div>
     </main>
   </div>
 
@@ -152,6 +155,7 @@ import { auth, db, storage } from '@/config/firebaseConfig'
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { getDownloadURL, ref as storageRef } from 'firebase/storage'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
+import OwnerPageSkeleton from '@/components/common/OwnerPageSkeleton.vue'
 
 const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
 

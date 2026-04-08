@@ -1,7 +1,7 @@
 <template>
   <teleport to="body">
     <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black bg-opacity-50" @click="closeModal"></div>
+      <div class="absolute inset-0 bg-black bg-opacity-50" @click="handleBackdropClick"></div>
       <div :class="['relative rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col', panelClass]">
         <div class="flex justify-between items-center p-4 border-b">
           <slot name="header">
@@ -33,13 +33,21 @@
 </template>
 
 <script setup>
-import { defineEmits, defineProps } from 'vue'
+import { defineEmits, defineProps, onBeforeUnmount, watch } from 'vue'
 import Button from './Button.vue'
+
+let openModalCount = 0
+let savedBodyOverflow = ''
+let savedHtmlOverflow = ''
 
 const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false
+  },
+  closeOnBackdrop: {
+    type: Boolean,
+    default: true
   },
   showConfirm: {
     type: Boolean,
@@ -60,4 +68,40 @@ const emit = defineEmits(['close', 'confirm'])
 const closeModal = () => {
   emit('close')
 }
+
+const handleBackdropClick = () => {
+  if (!props.closeOnBackdrop) return
+  closeModal()
+}
+
+const lockBodyScroll = (shouldLock) => {
+  if (typeof document === 'undefined') return
+  if (shouldLock) {
+    if (openModalCount === 0) {
+      savedBodyOverflow = document.body.style.overflow
+      savedHtmlOverflow = document.documentElement.style.overflow
+    }
+    openModalCount += 1
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+  } else {
+    openModalCount = Math.max(0, openModalCount - 1)
+    if (openModalCount === 0) {
+      document.body.style.overflow = savedBodyOverflow || ''
+      document.documentElement.style.overflow = savedHtmlOverflow || ''
+    }
+  }
+}
+
+watch(
+  () => props.isOpen,
+  (isOpen) => {
+    lockBodyScroll(isOpen)
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  lockBodyScroll(false)
+})
 </script>

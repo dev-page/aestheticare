@@ -26,9 +26,7 @@
         </div>
       </div>
 
-      <div v-if="loading" class="bg-slate-800 rounded-xl border border-slate-700 p-8 text-slate-300">
-        Loading clinic page...
-      </div>
+      <OwnerPageSkeleton v-if="loading" />
 
       <div v-else-if="!selectedBranch" class="bg-slate-800 rounded-xl border border-slate-700 p-8 text-slate-300">
         No branches found for this owner account.
@@ -320,12 +318,14 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, storage } from '@/config/firebaseConfig'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
+import OwnerPageSkeleton from '@/components/common/OwnerPageSkeleton.vue'
 import { toast } from 'vue3-toastify'
 import { useSubscription } from '@/composables/useSubscription'
+import { hasExpiredSuspension, restoreExpiredSuspension } from '@/utils/centerSuspension'
 
 export default {
   name: 'ClinicPage',
-  components: { OwnerSidebar },
+  components: { OwnerSidebar, OwnerPageSkeleton },
   setup() {
     const db = getFirestore(getApp())
     const { isExpired, initSubscription } = useSubscription()
@@ -378,7 +378,7 @@ export default {
 
     const formatAmount = (value) => {
       const numeric = Number(value || 0)
-      return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(numeric)
+      return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', currencyDisplay: 'code' }).format(numeric)
     }
 
     const formatDate = (timestamp) => {
@@ -504,10 +504,26 @@ export default {
           query(collection(db, 'clinics'), where('ownerId', '==', user.uid))
         )
 
-        branches.value = clinicsSnapshot.docs.map((snap) => {
-          const data = snap.data()
-          return { id: snap.id, ...data, isPublished: data.isPublished === true }
-        })
+        branches.value = await Promise.all(
+          clinicsSnapshot.docs.map(async (snap) => {
+            const data = snap.data()
+            if (hasExpiredSuspension(data)) {
+              await restoreExpiredSuspension(db, snap.id, data)
+              return {
+                id: snap.id,
+                ...data,
+                status: 'Active',
+                moderationStatus: 'Resolved',
+                isPublished: true,
+                suspendedAt: null,
+                suspensionEndsAt: null,
+                suspensionReason: '',
+                suspensionSource: ''
+              }
+            }
+            return { id: snap.id, ...data, isPublished: data.isPublished === true }
+          })
+        )
         if (isExpired.value && branches.value.length) {
           await autoUnpublishExpiredBranches()
         }
@@ -649,6 +665,13 @@ export default {
 
     const togglePublish = async () => {
       if (!selectedBranch.value?.id || saving.value || isExpired.value) return
+      const normalizedStatus = String(selectedBranch.value.status || '').trim().toLowerCase()
+      const normalizedModerationStatus = String(selectedBranch.value.moderationStatus || '').trim().toLowerCase()
+      const isSuspended = normalizedStatus.includes('suspend') || normalizedModerationStatus.includes('suspend')
+      if (isSuspended) {
+        toast.error('This center is suspended and cannot be published until super admin restores it.')
+        return
+      }
       saving.value = true
       try {
         const nextState = !(selectedBranch.value.isPublished === true)
@@ -726,3 +749,4 @@ export default {
   }
 }
 </script>
+
