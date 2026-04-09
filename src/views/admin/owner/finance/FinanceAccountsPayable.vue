@@ -118,8 +118,8 @@
         </div>
       </div>
 
-      <div v-if="showReceiptModal" class="fixed inset-0 bg-black/60 z-50 p-4 flex items-center justify-center">
-        <div class="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-xl p-5 max-h-[90vh] overflow-auto">
+      <div v-if="showReceiptModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center">
+        <div class="w-full max-w-3xl rounded-xl border border-slate-700 bg-slate-900 p-5 max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <div class="flex items-start justify-between mb-4">
             <div>
               <h2 class="text-xl font-semibold text-white">Payment Receipt</h2>

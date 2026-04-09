@@ -90,8 +90,8 @@
   </main>
 
   <transition name="fade">
-    <div v-if="showRedirectPopup" class="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center px-4">
-      <div class="w-full max-w-md rounded-2xl bg-white border border-gold-200 shadow-2xl p-6">
+    <div v-if="showRedirectPopup" class="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-4 sm:items-center">
+      <div class="w-full max-w-md rounded-2xl border border-gold-200 bg-white p-6 shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <h3 class="text-lg font-semibold text-charcoal-800">Redirecting...</h3>
         <p class="text-sm text-charcoal-500 mt-1">Please wait while we redirect you to login.</p>
         <div class="mt-5 h-2 w-full bg-gold-100 rounded-full overflow-hidden">

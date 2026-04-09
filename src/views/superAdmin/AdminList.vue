@@ -77,10 +77,10 @@
 
       <div
         v-if="showAddModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-6"
+        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 px-4 py-6 sm:items-center"
         @click.self="closeAddModal"
       >
-        <div class="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <div class="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl max-h-[calc(100dvh-3rem)] overflow-y-auto">
           <div class="flex items-start justify-between gap-4">
             <div>
               <h2 class="text-2xl font-bold text-white">Add Admin</h2>

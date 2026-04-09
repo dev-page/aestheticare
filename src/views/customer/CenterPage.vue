@@ -528,8 +528,8 @@
       </span>
     </button>
 
-    <div v-if="showChatModal" class="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 p-4">
-      <div class="w-full max-w-lg rounded-2xl bg-slate-800 border border-slate-700 shadow-xl">
+    <div v-if="showChatModal" class="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 p-4 md:items-center">
+      <div class="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-xl">
         <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700">
           <div>
             <h3 class="text-white font-semibold">Chat with {{ center.name || 'Clinic' }}</h3>
@@ -553,7 +553,7 @@
             </button>
           </div>
         </div>
-        <div ref="chatScrollRef" class="px-4 py-4 max-h-[45vh] overflow-y-auto space-y-3">
+        <div ref="chatScrollRef" class="flex-1 space-y-3 overflow-y-auto px-4 py-4 min-h-0">
           <div v-if="chatMessages.length === 0" class="text-sm text-slate-400 text-center">No messages yet. Say hello!</div>
           <div
             v-for="message in chatMessages"
@@ -576,7 +576,7 @@
             </div>
           </div>
         </div>
-        <div class="px-4 py-3 border-t border-slate-700">
+        <div class="border-t border-slate-700 px-4 py-3">
           <div class="flex items-center gap-2">
             <input
               v-model="chatInput"
@@ -596,8 +596,8 @@
       </div>
     </div>
 
-    <div v-if="showReportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div class="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-800 shadow-xl">
+    <div v-if="showReportModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center">
+      <div class="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-xl">
         <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
           <div>
             <h3 class="text-lg font-semibold text-white">Report This Center</h3>
@@ -608,7 +608,7 @@
           </button>
         </div>
 
-        <form class="space-y-4 px-5 py-5" @submit.prevent="submitCenterReport">
+        <form class="flex-1 space-y-4 overflow-y-auto px-5 py-5 min-h-0" @submit.prevent="submitCenterReport">
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Category</label>

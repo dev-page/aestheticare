@@ -2432,8 +2432,8 @@ const submitDocuments = async () => {
           <span class="form-side-bubble f-bubble-3 hidden lg:block" aria-hidden="true"></span>
 
           <form class="space-y-4 w-full max-w-[560px] pt-3 lg:pt-5" @submit.prevent="registerClinic">
-            <div v-if="approvalRedirecting" class="fixed inset-0 z-50 flex items-center justify-center bg-charcoal-900/60 backdrop-blur">
-              <div class="w-[90%] max-w-md rounded-2xl border border-gold-200/80 bg-white/90 p-6 text-center shadow-2xl">
+            <div v-if="approvalRedirecting" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-charcoal-900/60 p-4 backdrop-blur sm:items-center">
+              <div class="w-[90%] max-w-md rounded-2xl border border-gold-200/80 bg-white/90 p-6 text-center shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
                 <div class="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-gold-600 border-t-transparent"></div>
                 <h3 class="text-lg font-semibold text-charcoal-700">Registration approved</h3>
                 <p class="mt-2 text-sm text-charcoal-600">Redirecting you to the login page...</p>

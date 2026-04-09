@@ -1,8 +1,8 @@
 <template>
   <teleport to="body">
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
       <div class="absolute inset-0 bg-black bg-opacity-50" @click="handleBackdropClick"></div>
-      <div :class="['relative rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col', panelClass]">
+      <div :class="['relative rounded-lg shadow-lg max-w-4xl w-full mx-auto max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col', panelClass]">
         <div class="flex justify-between items-center p-4 border-b">
           <slot name="header">
             <h3 v-if="title" class="text-lg font-semibold">{{ title }}</h3>
@@ -14,7 +14,7 @@
           </button>
         </div>
 
-        <div class="p-2 overflow-y-auto flex-1">
+        <div class="p-2 overflow-y-auto flex-1 min-h-0">
           <slot name="body">
             <slot />
           </slot>

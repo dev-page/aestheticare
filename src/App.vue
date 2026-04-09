@@ -82,9 +82,9 @@
 
   <div
     v-if="showConnectionModal"
-    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4"
+    class="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center"
   >
-    <div class="w-full max-w-md rounded-3xl border border-amber-500/50 bg-[#1b0f08] p-8 shadow-2xl">
+    <div class="w-full max-w-md rounded-3xl border border-amber-500/50 bg-[#1b0f08] p-8 shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
       <div class="flex flex-col items-center text-center gap-6">
         <img
           :src="disconnectIllustration"

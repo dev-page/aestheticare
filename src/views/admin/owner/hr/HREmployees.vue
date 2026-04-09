@@ -117,8 +117,8 @@
       </div>
 
       <!-- Add Employee Modal -->
-      <div v-if="showAddModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-slate-800 rounded-xl p-8 max-w-2xl w-full mx-4 border border-slate-700">
+      <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+        <div class="w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-800 p-8 max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <h2 class="text-2xl font-bold text-white mb-6">Add New Employee</h2>
           <form @submit.prevent="addEmployee" class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
@@ -183,8 +183,8 @@
       </div>
 
       <!-- Edit Employee Modal -->
-      <div v-if="showEditModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-slate-800 rounded-xl p-8 max-w-2xl w-full mx-4 border border-slate-700">
+      <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+        <div class="w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-800 p-8 max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <h2 class="text-2xl font-bold text-white mb-6">Edit Employee</h2>
           <form @submit.prevent="saveEmployee" class="space-y-4">
             <div class="grid grid-cols-2 gap-4">

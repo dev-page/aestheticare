@@ -4,6 +4,11 @@ export const resolveApiBaseUrl = (configuredUrl, { devFallbackUrl = '' } = {}) =
     return explicit
   }
 
+  const legacyApiUrl = String(import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+  if (legacyApiUrl) {
+    return legacyApiUrl
+  }
+
   if (import.meta.env.DEV && devFallbackUrl) {
     return String(devFallbackUrl).trim().replace(/\/+$/, '')
   }

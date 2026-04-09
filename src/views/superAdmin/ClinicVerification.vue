@@ -62,8 +62,8 @@
         </table>
       </section>
 
-      <div v-if="showModal && selectedRecord" class="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-4">
-        <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-700 rounded-2xl p-6">
+      <div v-if="showModal && selectedRecord" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/65 p-4 sm:items-center">
+        <div class="w-full max-w-4xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-slate-900 border border-slate-700 rounded-2xl p-6">
           <div class="flex items-start justify-between gap-4 mb-6">
             <div>
               <h2 class="text-2xl text-white font-semibold">Clinic Registration Details</h2>

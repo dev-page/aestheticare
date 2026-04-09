@@ -73,9 +73,9 @@
 
       <div
         v-if="showSummaryModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-4 sm:items-center"
       >
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl shadow-xl">
+        <div class="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-xl">
           <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
             <div>
               <h3 class="text-lg font-semibold text-white">Payroll Summary Details</h3>
@@ -88,7 +88,7 @@
               &times;
             </button>
           </div>
-          <div class="px-5 py-4">
+          <div class="flex-1 overflow-y-auto px-5 py-4 min-h-0">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-slate-300 mb-4">
               <div class="bg-slate-800 rounded-lg px-4 py-3 border border-slate-700">
                 <div class="text-xs uppercase text-slate-400 mb-1">Employees</div>
