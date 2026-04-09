@@ -213,7 +213,7 @@
         loop
         playsinline
       >
-        <source src="@/assets/home_vid.mp4" type="video/mp4" />
+        <source :src="homeVideo" type="video/mp4" />
       </video>
       <div class="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,11,9,0.38)_0%,rgba(24,16,12,0.18)_34%,rgba(21,14,11,0.18)_66%,rgba(16,11,9,0.34)_100%)]"></div>
       <div class="absolute inset-0 bg-black/18"></div>
@@ -552,10 +552,8 @@ import { useAuth } from "@/composables/useAuth";
 import Modal from "@/components/common/Modal.vue";
 import SubscriptionPopup from "@/components/common/SubscriptionPopup.vue";
 import bg from '@/assets/bg.jpg'
-import appointmentLanding from '@/assets/apointment_landing.jpg'
-import inventoryLanding from '@/assets/inventory_landing.jpg'
-import meetingRoomLanding from '@/assets/meetingroom_landing.jpg'
-import staffInsightLanding from '@/assets/staffinsight_landing.jpg'
+import homePicture from '@/assets/home_picture.jpg'
+import homeVideo from '@/assets/home_vid.mp4'
 
 export default {
   name: "HomePage",
@@ -591,7 +589,7 @@ export default {
         description: "Automate bookings, assign practitioners, and reduce no-shows with reminders tuned for high-volume aesthetic clinics.",
         miniEyebrow: "Core System",
         miniTitle: "Appointments",
-        image: appointmentLanding,
+        image: homePicture,
       },
       {
         eyebrow: "Clinical Precision",
@@ -607,7 +605,7 @@ export default {
         description: "Track usage per service, monitor stock thresholds, and avoid treatment delays with real-time supply visibility.",
         miniEyebrow: "Clinic Ops",
         miniTitle: "Inventory",
-        image: inventoryLanding,
+        image: homePicture,
       },
       {
         eyebrow: "Team Visibility",
@@ -615,7 +613,7 @@ export default {
         description: "Review practitioner productivity, service completion rates, and schedule utilization across your branches.",
         miniEyebrow: "People",
         miniTitle: "Staff Insights",
-        image: staffInsightLanding,
+        image: bg,
       },
       {
         eyebrow: "Growth Intelligence",
@@ -623,7 +621,7 @@ export default {
         description: "Visualize top-performing services, monthly trends, and conversion metrics to guide better business decisions.",
         miniEyebrow: "Growth",
         miniTitle: "Analytics",
-        image: meetingRoomLanding,
+        image: homePicture,
       },
     ];
 
