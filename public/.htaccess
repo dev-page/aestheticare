@@ -7,6 +7,22 @@
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # Send everything else to the SPA entry point
+  # Only rewrite extension-less routes to the SPA entry point.
+  # Missing JS/CSS chunks should stay as 404s instead of being rewritten to HTML.
+  RewriteCond %{REQUEST_URI} !\.[^/]+$
   RewriteRule . /index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  # Prevent stale HTML shells from holding on to old hashed asset names.
+  <FilesMatch "^(index\.html|index\.htm)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+
+  # Hashed assets can be cached aggressively because their names change on each build.
+  <FilesMatch "\.(js|mjs|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|otf)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
 </IfModule>
