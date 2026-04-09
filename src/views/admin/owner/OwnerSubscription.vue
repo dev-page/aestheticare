@@ -93,11 +93,12 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { auth, db } from '@/config/firebaseConfig'
-import { collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, onSnapshot, updateDoc } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import OwnerPageSkeleton from '@/components/common/OwnerPageSkeleton.vue'
 import { useSubscriptionStore } from '@/stores/subscription'
+import { getPlanSelectionState, getPlanLabel, normalizePlanId } from '@/utils/subscriptionPlans'
 
 const router = useRouter()
 const subscriptionStore = useSubscriptionStore()
@@ -160,6 +161,7 @@ const normalizePlanLabel = (value) => {
 }
 
 const planLabel = computed(() => normalizePlanLabel(planKey.value))
+const currentPlanId = computed(() => normalizePlanId(planKey.value))
 const planPrice = computed(() => formatCurrency(planData.value?.price || 0))
 const planCycle = computed(() => {
   if (planKey.value === 'free-trial' || planKey.value === 'free') return '-'
@@ -334,8 +336,15 @@ const goToPlans = () => {
 }
 
 const goToUpgrade = () => {
-  const targetPlan = planKey.value === 'premium' ? 'premium' : 'basic'
-  router.push({ path: '/owner/account/plans', query: { plan: targetPlan } })
+  const targetPlan = currentPlanId.value === 'free' || currentPlanId.value === 'free-trial'
+    ? 'basic'
+    : 'premium'
+  const state = getPlanSelectionState(currentPlanId.value, targetPlan)
+  if (!state.allowed) {
+    saveError.value = `${getPlanLabel(planKey.value)} is already your current plan.`
+    return
+  }
+  router.push({ path: '/owner/account/plans', query: { plan: targetPlan, currentPlan: currentPlanId.value } })
 }
 
 onMounted(async () => {

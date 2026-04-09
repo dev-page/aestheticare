@@ -47,8 +47,8 @@
       </div>
     </div>
 
-    <div v-else class="plan-grid">
-      <div
+      <div v-else class="plan-grid">
+        <div
         v-for="plan in plans"
         :key="plan.id"
         class="plan-option"
@@ -58,6 +58,7 @@
           class="plan-card group"
           :class="{
             'plan-card-active': selectedPlan === plan.id,
+            'plan-card-free': plan.id === 'free',
             'plan-card-basic': plan.id === 'basic',
             'plan-card-premium': plan.recommended
           }"
@@ -105,9 +106,20 @@ const plans = ref([]);
 const error = ref("");
 const isLoading = ref(true);
 
-const selectedPlan = ref("basic");
+const selectedPlan = ref("free");
 
 const defaultPlans = () => [
+  {
+    id: "free",
+    name: "Free Plan",
+    price: "PHP 0",
+    cycle: "",
+    description: "A starter plan for clinics that are just getting started.",
+    features: ["Core modules", "Limited users", "Standard support"],
+    trialDays: 0,
+    isActive: true,
+    recommended: false,
+  },
   {
     id: "basic",
     name: "Basic",
@@ -183,7 +195,7 @@ const loadPlans = async () => {
     plans.value = activePlans.length ? activePlans : merged;
 
     if (!plans.value.some((plan) => plan.id === selectedPlan.value)) {
-      selectedPlan.value = plans.value[0]?.id || "basic";
+      selectedPlan.value = plans.value[0]?.id || "free";
     }
   } catch (err) {
     console.error("Failed to load public subscription plans:", err);
@@ -497,6 +509,11 @@ onMounted(loadPlans);
   transform: translateY(-4px);
   outline: 2px solid rgba(255, 244, 224, 0.7);
   outline-offset: -2px;
+}
+
+.plan-card-free {
+  border-color: rgba(176, 137, 96, 0.36);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(250, 242, 229, 0.82));
 }
 
 .plan-card-basic {

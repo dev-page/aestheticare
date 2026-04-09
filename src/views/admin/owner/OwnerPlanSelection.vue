@@ -29,14 +29,21 @@
       </section>
 
       <section v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <p v-if="!plans.some((plan) => isSelectable(plan.id))" class="lg:col-span-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {{ getSelectionHint }}
+        </p>
         <button
           v-for="plan in plans"
           :key="plan.id"
           type="button"
           class="text-left rounded-2xl border p-6 transition-all"
-          :class="selectedPlan === plan.id
-            ? 'border-amber-400 bg-slate-800 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]'
-            : 'border-slate-700 bg-slate-800 hover:border-slate-500 hover:bg-slate-800/90'"
+          :class="[
+            selectedPlan === plan.id
+              ? 'border-amber-400 bg-slate-800 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]'
+              : 'border-slate-700 bg-slate-800 hover:border-slate-500 hover:bg-slate-800/90',
+            !isSelectable(plan.id) ? 'opacity-55 cursor-not-allowed' : ''
+          ]"
+          :disabled="!isSelectable(plan.id)"
           @click="selectedPlan = plan.id"
         >
           <div class="flex items-start justify-between gap-4 mb-4">
@@ -62,6 +69,10 @@
           <ul class="space-y-2 text-sm text-slate-200">
             <li v-for="feature in plan.features" :key="feature">- {{ feature }}</li>
           </ul>
+
+          <p v-if="!isSelectable(plan.id)" class="mt-4 text-xs text-amber-300">
+            {{ selectionMessage(plan.id) }}
+          </p>
         </button>
       </section>
 
@@ -87,21 +98,34 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/config/firebaseConfig'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
+import { useSubscriptionStore } from '@/stores/subscription'
+import { getPlanSelectionMessage, getPlanSelectionState, normalizePlanId } from '@/utils/subscriptionPlans'
 
 const router = useRouter()
 const route = useRoute()
+const subscriptionStore = useSubscriptionStore()
 
 const loading = ref(true)
 const error = ref('')
-const selectedPlan = ref('basic')
+const selectedPlan = ref('')
 const plans = ref([])
+const currentPlan = computed(() => normalizePlanId(route.query.currentPlan || subscriptionStore.activePlan || ''))
 
 const defaultPlans = () => [
+  {
+    id: 'free-trial',
+    name: 'Free Plan',
+    price: 0,
+    billingCycle: 'trial',
+    description: 'Try the core clinic tools at no cost.',
+    features: ['Core modules', 'Limited users', 'Standard support'],
+    isActive: true,
+  },
   {
     id: 'basic',
     name: 'Basic',
@@ -162,6 +186,7 @@ const loadPlans = async () => {
   error.value = ''
   loading.value = true
   try {
+    await subscriptionStore.initSubscription()
     const requestedPlan = String(route.query.plan || '').trim().toLowerCase()
     if (requestedPlan) {
       selectedPlan.value = requestedPlan
@@ -173,8 +198,16 @@ const loadPlans = async () => {
     const activePlans = merged.filter((plan) => plan.isActive)
     plans.value = activePlans.length ? activePlans : merged
 
-    if (!plans.value.some((plan) => plan.id === selectedPlan.value)) {
-      selectedPlan.value = plans.value[0]?.id || 'basic'
+    const allowedPlans = plans.value.filter((plan) => getPlanSelectionState(currentPlan.value, plan.id).allowed)
+    const initialPlan =
+      allowedPlans.find((plan) => plan.id === selectedPlan.value)?.id ||
+      allowedPlans[0]?.id ||
+      ''
+
+    if (initialPlan) {
+      selectedPlan.value = initialPlan
+    } else if (plans.value.some((plan) => plan.id === selectedPlan.value)) {
+      selectedPlan.value = ''
     }
   } catch (err) {
     console.error('Failed to load owner subscription plans:', err)
@@ -187,12 +220,31 @@ const loadPlans = async () => {
 
 const continueWithPlan = () => {
   if (!selectedPlan.value) return
-  router.push({ path: '/subscription/checkout', query: { plan: selectedPlan.value, from: 'owner' } })
+  const state = getPlanSelectionState(currentPlan.value, selectedPlan.value)
+  if (!state.allowed) {
+    error.value = getPlanSelectionMessage(currentPlan.value, selectedPlan.value)
+    return
+  }
+  router.push({ path: '/subscription/checkout', query: { plan: selectedPlan.value, from: 'owner', currentPlan: currentPlan.value } })
 }
 
 const goBack = () => {
   router.push('/owner/account/subscription')
 }
+
+const isSelectable = (planId) => getPlanSelectionState(currentPlan.value, planId).allowed
+
+const selectionMessage = (planId) => getPlanSelectionMessage(currentPlan.value, planId)
+
+const getSelectionHint = computed(() => {
+  if (getPlanSelectionState(currentPlan.value, 'premium').allowed) {
+    return 'Choose a higher plan to continue.'
+  }
+  if (getPlanSelectionState(currentPlan.value, 'basic').allowed) {
+    return 'You can upgrade to Basic or Premium.'
+  }
+  return 'No higher plans are available from your current subscription.'
+})
 
 onMounted(loadPlans)
 </script>

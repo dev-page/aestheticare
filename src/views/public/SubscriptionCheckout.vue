@@ -71,11 +71,15 @@
         <button
           type="button"
           class="mt-6 w-full rounded-xl bg-gold-700 text-white py-3 font-semibold hover:bg-gold-800 disabled:opacity-60"
-          :disabled="saving || !selectedPlan"
+          :disabled="saving || !canContinue"
           @click="startPayMongoCheckout"
         >
           {{ saving ? 'Redirecting...' : 'Proceed to PayMongo' }}
         </button>
+
+        <p v-if="selectedPlan && !selectionState.allowed" class="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {{ selectionMessage }}
+        </p>
 
         <button
           type="button"
@@ -119,7 +123,10 @@
           </div>
         </div>
 
-        <div v-else class="text-sm text-rose-300">No paid plan selected. Please go back and choose Basic or Premium.</div>
+        <div v-else class="text-sm text-rose-300">
+          <span v-if="!selectedPlan">No paid plan selected. Please go back and choose Basic or Premium.</span>
+          <span v-else>{{ selectionMessage }}</span>
+        </div>
         </section>
       </Transition>
     </div>
@@ -135,6 +142,7 @@ import { auth, db } from '@/config/firebaseConfig'
 import { onAuthStateChanged } from 'firebase/auth'
 import { useSubscriptionStore } from '@/stores/subscription'
 import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
+import { getPlanSelectionMessage, getPlanSelectionState, normalizePlanId } from '@/utils/subscriptionPlans'
 
 const route = useRoute()
 const router = useRouter()
@@ -162,6 +170,7 @@ const fieldErrors = ref({
 })
 
 const shouldPrefill = computed(() => String(route.query.from || '').trim().toLowerCase() === 'owner')
+const currentPlanId = computed(() => normalizePlanId(route.query.currentPlan || subscriptionStore.activePlan))
 
 const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
@@ -216,7 +225,6 @@ const defaultPlans = () => [
   },
 ]
 
-const normalizePlanId = (value) => String(value || '').trim().toLowerCase()
 const toCentavos = (pesoAmount) => Math.round(Number(pesoAmount || 0) * 100)
 
 const selectedPlanId = computed(() => normalizePlanId(route.query.plan))
@@ -224,6 +232,19 @@ const selectedPlanId = computed(() => normalizePlanId(route.query.plan))
 const selectedPlan = computed(() => {
   return plans.value.find((plan) => plan.id === selectedPlanId.value && plan.id !== 'free-trial') || null
 })
+const selectionState = computed(() => {
+  if (!selectedPlan.value) {
+    return { allowed: false, reason: 'missing-plan' }
+  }
+  return getPlanSelectionState(currentPlanId.value, selectedPlan.value.id)
+})
+const selectionMessage = computed(() => {
+  if (!selectedPlan.value) {
+    return 'Please choose a Basic or Premium plan first.'
+  }
+  return getPlanSelectionMessage(currentPlanId.value, selectedPlan.value.id)
+})
+const canContinue = computed(() => Boolean(selectedPlan.value) && selectionState.value.allowed)
 
 const formatCurrency = (amount) => {
   const value = Number(amount)
@@ -292,6 +313,10 @@ const loadPlans = async () => {
 const validateForm = () => {
   if (!selectedPlan.value) {
     error.value = 'Please select Basic or Premium plan first.'
+    return false
+  }
+  if (!selectionState.value.allowed) {
+    error.value = selectionMessage.value
     return false
   }
   if (!selectedPlan.value.isActive) {
@@ -634,6 +659,7 @@ const goBack = () => {
 
 onMounted(async () => {
   showPanels.value = true
+  await subscriptionStore.initSubscription()
   await loadPlans()
   await handlePayMongoReturn()
   await prefillFromAccount()
