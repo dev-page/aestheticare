@@ -3055,7 +3055,7 @@ const submitDocuments = async () => {
       <div class="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-cream-300/40 blur-3xl"></div>
     </div>
 
-    <nav class="fixed top-0 inset-x-0 z-50 bg-gradient-to-r from-cream-50/95 via-cream-100/95 to-gold-50/95 backdrop-blur-md border-b border-gold-200/70 shadow-[0_6px_18px_rgba(54,34,22,0.08)]">
+    <nav class="public-glass-nav fixed top-0 inset-x-0 z-50">
       <div class="relative max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <button
           type="button"
@@ -3086,9 +3086,13 @@ const submitDocuments = async () => {
 
             <div class="mt-8 grid gap-4 lg:grid-cols-2">
               <button type="button" class="choice-card" @click="chooseCustomer">
-                <div>
+                <div class="choice-card-copy">
                   <span class="choice-icon" aria-hidden="true">
-                    <Icon icon="mdi:account-group-outline" class="h-7 w-7" />
+                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M16 21v-1.5a4.5 4.5 0 0 0-4.5-4.5h-1A4.5 4.5 0 0 0 6 19.5V21" />
+                      <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+                      <path d="M20 21v-1a3.5 3.5 0 0 0-2.5-3.35" />
+                    </svg>
                   </span>
                   <p class="choice-kicker">Personal Access</p>
                   <h2 class="choice-title">Register as Customer</h2>
@@ -3098,9 +3102,15 @@ const submitDocuments = async () => {
               </button>
 
               <button type="button" class="choice-card" @click="chooseClinic">
-                <div>
+                <div class="choice-card-copy">
                   <span class="choice-icon" aria-hidden="true">
-                    <Icon icon="mdi:clinic" class="h-7 w-7" />
+                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M6 21V8.5L12 4l6 4.5V21" />
+                      <path d="M9 21v-5h6v5" />
+                      <path d="M10.5 11.5h3" />
+                      <path d="M12 10v3" />
+                      <path d="M8 14h.01M16 14h.01M8 17h.01M16 17h.01" />
+                    </svg>
                   </span>
                   <p class="choice-kicker">Business Access</p>
                   <h2 class="choice-title">Register as Clinic Admin</h2>
@@ -3135,6 +3145,13 @@ const submitDocuments = async () => {
   display: none;
 }
 
+.public-glass-nav {
+  background: linear-gradient(90deg, rgba(255, 251, 244, 0.9), rgba(251, 238, 213, 0.84));
+  border-bottom: 1px solid rgba(214, 169, 123, 0.34);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(54, 34, 22, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+}
+
 .nav-brand {
   font-family: "Bodoni Moda", "Playfair Display", serif;
   font-style: italic;
@@ -3167,7 +3184,9 @@ const submitDocuments = async () => {
   padding: 1.4rem 1.5rem;
   border-radius: 1.55rem;
   border: 1px solid rgba(198, 148, 108, 0.22);
-  background: linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(250, 241, 227, 0.92));
+  background:
+    radial-gradient(circle at top right, rgba(255, 247, 236, 0.22), transparent 28%),
+    linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(250, 241, 227, 0.92));
   box-shadow: 0 18px 42px rgba(54, 34, 22, 0.1);
   backdrop-filter: blur(14px);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -3177,6 +3196,10 @@ const submitDocuments = async () => {
   transform: translateY(-3px);
   border-color: rgba(159, 105, 70, 0.42);
   box-shadow: 0 22px 46px rgba(54, 34, 22, 0.16);
+}
+
+.choice-card-copy {
+  min-width: 0;
 }
 
 .choice-kicker {
@@ -3229,6 +3252,7 @@ const submitDocuments = async () => {
   color: #fff;
   font-size: 0.88rem;
   font-weight: 700;
+  box-shadow: 0 12px 26px rgba(111, 63, 42, 0.16);
 }
 
 .business-type-card {

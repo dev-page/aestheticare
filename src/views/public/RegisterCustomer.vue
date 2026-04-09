@@ -687,7 +687,7 @@ onBeforeUnmount(() => {
       <div class="absolute bottom-0 right-0 w-80 h-80 rounded-full bg-cream-300/40 blur-3xl"></div>
     </div>
 
-    <nav class="fixed top-0 inset-x-0 z-50 bg-gradient-to-r from-cream-50/95 via-cream-100/95 to-gold-50/95 backdrop-blur-md border-b border-gold-200/70 shadow-[0_6px_18px_rgba(54,34,22,0.08)]">
+    <nav class="public-glass-nav fixed top-0 inset-x-0 z-50">
       <div class="relative max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <button
           type="button"
@@ -1027,6 +1027,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.public-glass-nav {
+  background: linear-gradient(90deg, rgba(255, 251, 244, 0.9), rgba(251, 238, 213, 0.84));
+  border-bottom: 1px solid rgba(214, 169, 123, 0.34);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(54, 34, 22, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+}
+
+:global(body) {
+  font-family: "Playfair Display", serif;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1036,9 +1047,10 @@ onBeforeUnmount(() => {
 }
 
 .nav-brand {
-  font-family: "Playfair Display", "Times New Roman", serif;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   background: linear-gradient(120deg, #3c2519 0%, #9f6946 42%, #c99673 70%, #744a33 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -1046,9 +1058,10 @@ onBeforeUnmount(() => {
 }
 
 .register-title {
-  font-family: "Playfair Display", "Times New Roman", serif;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.03em;
   background: linear-gradient(120deg, #4a2c1e 0%, #996341 40%, #c89066 72%, #7b4e35 100%);
   -webkit-background-clip: text;
   background-clip: text;

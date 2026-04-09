@@ -1,6 +1,11 @@
 <template>
   <div class="subscription-page w-full">
-    <nav class="pricing-nav">
+    <div class="pointer-events-none absolute inset-0">
+      <div class="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-gold-200/35 blur-3xl"></div>
+      <div class="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-cream-300/35 blur-3xl"></div>
+    </div>
+
+    <nav class="public-glass-nav pricing-nav">
       <div class="pricing-nav-inner">
         <div class="pricing-breadcrumb">
           <router-link to="/" class="breadcrumb-link">Home</router-link>
@@ -192,7 +197,9 @@ const loadPlans = async () => {
 const selectedPlanData = computed(() => plans.value.find((plan) => plan.id === selectedPlan.value) || null);
 
 const ctaLabel = computed(() => {
-  return selectedPlanData.value ? "Continue with Selected Plan" : "Continue";
+  const current = selectedPlanData.value;
+  if (!current) return "Continue";
+  return `Continue with ${current.name}`;
 });
 
 const continueWithPlan = () => {
@@ -205,15 +212,34 @@ onMounted(loadPlans);
 <style scoped>
 .subscription-page {
   width: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.34), transparent 28%),
+    radial-gradient(circle at 82% 12%, rgba(198, 148, 108, 0.18), transparent 24%),
+    linear-gradient(180deg, #fffdf8 0%, #fbf4e8 52%, #f7eddc 100%);
+  padding-bottom: 1.5rem;
+}
+
+:global(body) {
+  font-family: "Playfair Display", serif;
+}
+
+.public-glass-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(90deg, rgba(255, 251, 244, 0.9), rgba(251, 238, 213, 0.84));
+  border-bottom: 1px solid rgba(214, 169, 123, 0.34);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(54, 34, 22, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .pricing-nav {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: linear-gradient(90deg, rgba(255, 251, 244, 0.96), rgba(251, 238, 213, 0.94));
-  border-bottom: 1px solid rgba(214, 169, 123, 0.35);
-  backdrop-filter: blur(12px);
 }
 
 .pricing-nav-inner {
@@ -237,9 +263,16 @@ onMounted(loadPlans);
 }
 
 .subscription-popup {
+  position: relative;
+  z-index: 1;
   padding: 1rem 1.25rem 1.5rem;
   max-width: 1320px;
   margin: 0 auto;
+  border: 1px solid rgba(198, 148, 108, 0.24);
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 22px 54px rgba(54, 34, 22, 0.1);
 }
 
 .breadcrumb-link {
@@ -316,9 +349,11 @@ onMounted(loadPlans);
 }
 
 .popup-title {
-  font-family: "Playfair Display", "Times New Roman", serif;
-  font-size: clamp(1.7rem, 2.4vw, 2.1rem);
-  line-height: 1.05;
+  font-family: "Bodoni Moda", "Playfair Display", "Times New Roman", serif;
+  font-style: italic;
+  font-size: clamp(2rem, 3vw, 2.85rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
   background: linear-gradient(120deg, #4a2c1e 0%, #996341 44%, #c89066 72%, #7b4e35 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -328,8 +363,9 @@ onMounted(loadPlans);
 .popup-subtitle {
   margin-top: 0.35rem;
   color: #5f4b3a;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   max-width: 760px;
+  line-height: 1.55;
 }
 
 .plan-grid {
@@ -439,23 +475,25 @@ onMounted(loadPlans);
   position: relative;
   overflow: hidden;
   text-align: left;
-  border-radius: 1rem;
+  border-radius: 1.45rem;
   border: 1px solid rgba(198, 148, 108, 0.34);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.8), rgba(248, 234, 206, 0.56));
+  background:
+    radial-gradient(circle at top right, rgba(255, 247, 236, 0.18), transparent 24%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(248, 234, 206, 0.58));
   min-height: 330px;
   padding: 1.45rem 1.25rem 1.5rem;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease;
 }
 
 .plan-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-4px);
   border-color: rgba(198, 148, 108, 0.62);
-  box-shadow: 0 10px 22px rgba(54, 34, 22, 0.12);
+  box-shadow: 0 16px 30px rgba(54, 34, 22, 0.12);
 }
 
 .plan-card-active {
   border-color: rgba(123, 78, 53, 0.9);
-  box-shadow: 0 18px 34px rgba(111, 63, 42, 0.22);
+  box-shadow: 0 20px 40px rgba(111, 63, 42, 0.2);
   transform: translateY(-4px);
   outline: 2px solid rgba(255, 244, 224, 0.7);
   outline-offset: -2px;
@@ -522,14 +560,16 @@ onMounted(loadPlans);
 }
 
 .plan-name {
-  font-size: 1rem;
+  font-family: "Bodoni Moda", "Playfair Display", "Times New Roman", serif;
+  font-style: italic;
+  font-size: 1.15rem;
   font-weight: 700;
   color: #3b281d;
 }
 
 .plan-price {
   margin-top: 0.15rem;
-  font-size: 1.65rem;
+  font-size: 1.9rem;
   font-weight: 800;
   color: #6f3f2a;
 }
@@ -572,16 +612,14 @@ onMounted(loadPlans);
 
 .btn-primary {
   width: 100%;
-  border-radius: 0.8rem;
-  padding: 0.72rem 0.95rem;
-  font-weight: 600;
+  border-radius: 1rem;
+  padding: 0.82rem 1rem;
+  font-weight: 700;
   transition: all 0.2s ease;
-}
-
-.btn-primary {
   border: 1px solid transparent;
   color: #fff;
   background: linear-gradient(120deg, #9f6946 0%, #7b4e35 100%);
+  box-shadow: 0 12px 26px rgba(111, 63, 42, 0.16);
 }
 
 .btn-primary:hover {
