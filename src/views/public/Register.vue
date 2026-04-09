@@ -3104,12 +3104,32 @@ const submitDocuments = async () => {
               <button type="button" class="choice-card" @click="chooseClinic">
                 <div class="choice-card-copy">
                   <span class="choice-icon" aria-hidden="true">
-                    <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M6 21V8.5L12 4l6 4.5V21" />
-                      <path d="M9 21v-5h6v5" />
-                      <path d="M10.5 11.5h3" />
-                      <path d="M12 10v3" />
-                      <path d="M8 14h.01M16 14h.01M8 17h.01M16 17h.01" />
+                    <svg class="h-7 w-7" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                      <circle cx="24" cy="24" r="19.5" stroke="url(#clinicLogoRing)" stroke-width="2.2" />
+                      <circle cx="24" cy="24" r="13.5" fill="#fff8eb" fill-opacity="0.42" />
+                      <path
+                        d="M24 13.2L32.7 34.8H28.2L26.1 29.7H21.9L19.8 34.8H15.3L24 13.2Z"
+                        fill="#7b4e35"
+                      />
+                      <path
+                        d="M19.5 24.7H28.5"
+                        stroke="#fff8eb"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
+                      <path
+                        d="M34.2 16.2H37.2M35.7 14.7V17.7"
+                        stroke="#9f6946"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                      />
+                      <defs>
+                        <linearGradient id="clinicLogoRing" x1="10" y1="10" x2="38" y2="38" gradientUnits="userSpaceOnUse">
+                          <stop stop-color="#fff8eb" />
+                          <stop offset="0.48" stop-color="#d7aa7d" />
+                          <stop offset="1" stop-color="#9f6946" />
+                        </linearGradient>
+                      </defs>
                     </svg>
                   </span>
                   <p class="choice-kicker">Business Access</p>

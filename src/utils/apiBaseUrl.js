@@ -14,7 +14,7 @@ export const resolveApiBaseUrl = (configuredUrl, { devFallbackUrl = '' } = {}) =
   }
 
   if (typeof window !== 'undefined' && window.location?.origin) {
-    return String(window.location.origin).trim().replace(/\/+$/, '')
+    return '/api'
   }
 
   return ''

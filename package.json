@@ -12,9 +12,11 @@
   },
   "dependencies": {
     "@iconify/vue": "^5.0.0",
+    "@sendgrid/mail": "^8.1.6",
     "@tailwindcss/vite": "^4.2.0",
     "axios": "^1.13.4",
     "chart.js": "^4.5.1",
+    "firebase-admin": "^12.0.0",
     "firebase": "^12.9.0",
     "html5-qrcode": "^2.3.8",
     "pinia": "^3.0.4",
