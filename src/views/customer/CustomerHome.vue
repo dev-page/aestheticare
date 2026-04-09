@@ -1,9 +1,9 @@
 <template>
-  <div class="flex customer-theme min-h-screen bg-cream-100">
+  <div class="customer-home-shell flex customer-theme min-h-screen bg-cream-100">
     <CustomerSidebar class="flex-shrink-0" />
 
-    <main class="flex-1 px-0 md:px-0 py-0">
-      <div class="sticky top-14 z-30 w-full bg-[#7c4a30] border-b border-[#8f5f46] shadow-sm pl-6 md:pl-10 pr-6 md:pr-10 py-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end rounded-bl-2xl rounded-br-2xl">
+    <main class="customer-home-main flex-1 px-0 md:px-0 py-0">
+      <div class="customer-search-rail sticky top-14 z-30 w-full pl-6 md:pl-10 pr-6 md:pr-10 py-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end rounded-bl-2xl rounded-br-2xl">
         <div class="md:col-span-2 relative">
           <input
             v-model="search"
@@ -31,8 +31,8 @@
         </div>
       </div>
 
-      <div class="px-6 md:px-10 py-8">
-      <section class="mt-0 mb-10 bg-white border border-gold-200 rounded-2xl p-6 md:p-8 shadow-sm">
+      <div class="customer-home-content px-6 md:px-10 py-8">
+      <section class="customer-nearby-card mt-0 mb-10 bg-white border border-gold-200 rounded-2xl p-6 md:p-8 shadow-sm">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h2 class="text-xl font-semibold text-charcoal-800">Nearby You</h2>
@@ -83,13 +83,13 @@
         <p v-else class="mt-6 text-sm text-charcoal-500">No nearby centers yet. Enable location to see results.</p>
       </section>
 
-      <div v-if="loading" class="text-charcoal-500 text-center py-16">Loading centers...</div>
-      <div v-else-if="errorMessage" class="text-red-500 text-center py-16">{{ errorMessage }}</div>
+      <div v-if="loading" class="state-panel text-charcoal-500 text-center py-16">Loading centers...</div>
+      <div v-else-if="errorMessage" class="state-panel text-red-500 text-center py-16">{{ errorMessage }}</div>
       <div v-else-if="filteredCenters.length" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
         <div
           v-for="center in filteredCenters"
           :key="center.id"
-          class="bg-white border border-gold-200 rounded-2xl shadow-sm hover:shadow-xl transition duration-300"
+          class="customer-center-card bg-white border border-gold-200 rounded-2xl shadow-sm hover:shadow-xl transition duration-300"
         >
           <div class="h-44 bg-gradient-to-br from-gold-100 to-cream-200 rounded-t-2xl overflow-hidden">
             <img v-if="center.bannerPicture" :src="center.bannerPicture" alt="Center banner" class="h-full w-full object-cover" />
@@ -123,7 +123,7 @@
         </div>
       </div>
 
-      <div v-else class="text-center py-24 text-charcoal-400">No centers found.</div>
+      <div v-else class="state-panel text-center py-24 text-charcoal-400">No centers found.</div>
       </div>
 
     </main>
@@ -234,3 +234,138 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.customer-home-shell {
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.34), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(198, 148, 108, 0.2), transparent 20%),
+    linear-gradient(180deg, #25150f 0%, #1b100b 100%);
+}
+
+.customer-home-main {
+  min-width: 0;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.34), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(198, 148, 108, 0.2), transparent 20%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.customer-search-rail {
+  background:
+    linear-gradient(180deg, #7a4a30 0%, #6b4028 100%);
+  border-bottom: 1px solid rgba(230, 193, 150, 0.18);
+  box-shadow: 0 10px 24px rgba(54, 34, 22, 0.14);
+}
+
+.customer-home-content {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.customer-nearby-card,
+.state-panel,
+.customer-center-card {
+  border-radius: 1.75rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.customer-nearby-card {
+  background: rgba(255, 255, 255, 0.82) !important;
+}
+
+.state-panel {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.customer-center-card {
+  overflow: hidden;
+  background: rgba(255, 251, 244, 0.96);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.customer-center-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 30px 72px rgba(84, 54, 34, 0.18);
+}
+
+.customer-search-rail input,
+.customer-search-rail select {
+  height: 3.45rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(230, 193, 150, 0.72);
+  background: rgba(139, 90, 63, 0.9) !important;
+  color: #fff3e6 !important;
+}
+
+.customer-search-rail input::placeholder {
+  color: rgba(255, 242, 228, 0.72);
+}
+
+.customer-search-rail input:focus,
+.customer-search-rail select:focus {
+  outline: none;
+  border-color: rgba(248, 229, 189, 0.95);
+  box-shadow: 0 0 0 4px rgba(214, 169, 123, 0.16);
+}
+
+.customer-search-rail svg {
+  color: rgba(255, 242, 228, 0.92);
+}
+
+.customer-search-rail option {
+  color: #342419;
+}
+
+.customer-nearby-card h2,
+.customer-center-card h3 {
+  font-family: "Playfair Display", "Times New Roman", serif;
+}
+
+.customer-nearby-card button,
+.customer-center-card button {
+  border-radius: 0.9rem;
+  background: linear-gradient(120deg, #8d5a3b 0%, #6e4330 100%);
+  border: 1px solid rgba(126, 78, 53, 0.24);
+  box-shadow: 0 14px 26px rgba(111, 63, 42, 0.14);
+}
+
+.customer-nearby-card .bg-gold-700,
+.customer-center-card .bg-gold-700 {
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 48%, #6e4330 100%) !important;
+}
+
+.customer-nearby-card .bg-gold-100,
+.customer-center-card .bg-gold-100 {
+  background: #fbf1dc !important;
+  color: #8a5b3d !important;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+}
+
+.customer-nearby-card .border-gold-200,
+.customer-center-card .border-gold-200 {
+  border-color: rgba(230, 193, 150, 0.8) !important;
+}
+
+.customer-nearby-card .bg-cream-100\/70 {
+  background: rgba(255, 247, 231, 0.72) !important;
+}
+
+.customer-center-card .text-charcoal-500,
+.customer-nearby-card .text-charcoal-500,
+.customer-center-card .text-charcoal-600 {
+  color: rgba(76, 54, 40, 0.76) !important;
+}
+
+.customer-home-main > .px-6 {
+  padding-top: 1.35rem;
+}
+
+@media (max-width: 767px) {
+  .customer-search-rail {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+</style>

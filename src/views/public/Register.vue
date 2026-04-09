@@ -1717,6 +1717,13 @@ const initLocationMap = async () => {
     })
   }
 
+  // Google Maps can render blank inside a freshly opened modal unless we
+  // nudge it after the container has painted.
+  requestAnimationFrame(() => {
+    window.google?.maps?.event?.trigger(locationMap, 'resize')
+    locationMap?.setCenter(defaultCaviteCenter)
+  })
+
   const restoreMarkerToSavedLocation = () => {
     const lat = Number(clinicLocationLat.value)
     const lng = Number(clinicLocationLng.value)

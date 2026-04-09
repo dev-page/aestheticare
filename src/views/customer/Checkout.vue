@@ -1,53 +1,53 @@
 <template>
-  <div class="flex customer-theme bg-slate-900 min-h-screen">
+  <div class="customer-checkout-shell flex customer-theme min-h-screen bg-cream-100">
     <CustomerSidebar />
 
-    <main class="flex-1 p-8">
+    <main class="customer-checkout-main flex-1 p-6 md:p-8">
       <button
         type="button"
-        class="mb-3 inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
+        class="customer-back-btn mb-3 inline-flex items-center gap-2 transition-colors"
         @click="goBack"
       >
         <span class="text-lg leading-none">‹</span>
         <span class="text-sm font-medium">Back</span>
       </button>
 
-      <h1 class="text-2xl font-bold text-white mb-6">Checkout</h1>
+      <h1 class="customer-page-title mb-6">Checkout</h1>
 
-      <div class="bg-slate-800 rounded-lg shadow-md p-6 border border-slate-700 mb-8">
-        <h2 class="text-xl font-semibold text-purple-400 mb-4">Order Summary</h2>
+      <div class="customer-panel mb-8 p-6">
+        <h2 class="customer-section-title mb-4">Order Summary</h2>
         <div v-for="item in selectedItems" :key="item.id" class="flex justify-between items-center border-b border-slate-700 py-3">
           <div>
-            <p class="text-white font-medium">{{ item.name }}</p>
-            <p class="text-slate-400 text-sm">Qty: {{ item.quantity }}</p>
+            <p class="customer-item-name font-medium">{{ item.name }}</p>
+            <p class="customer-muted text-sm">Qty: {{ item.quantity }}</p>
           </div>
-          <p class="text-purple-400 font-semibold">PHP {{ (Number(item.price || 0) * Number(item.quantity || 0)).toFixed(2) }}</p>
+          <p class="customer-accent font-semibold">PHP {{ (Number(item.price || 0) * Number(item.quantity || 0)).toFixed(2) }}</p>
         </div>
         <div class="mt-4 space-y-2">
-          <div class="flex justify-between text-slate-300">
+          <div class="customer-meta-row flex justify-between">
             <span>Subtotal</span>
             <span>PHP {{ subtotal.toFixed(2) }}</span>
           </div>
-          <div class="flex justify-between text-slate-300">
+          <div class="customer-meta-row flex justify-between">
             <span>System commission ({{ productCommissionPercent }}%)</span>
             <span>PHP {{ commissionAmount.toFixed(2) }}</span>
           </div>
-          <div class="flex justify-between text-white font-semibold text-lg mt-2">
+          <div class="customer-total-row flex justify-between font-semibold text-lg mt-2">
             <span>Total due</span>
             <span>PHP {{ subtotal.toFixed(2) }}</span>
           </div>
-          <div class="flex justify-between text-slate-400 text-sm">
+          <div class="customer-muted flex justify-between text-sm">
             <span>Clinic share after commission</span>
             <span>PHP {{ merchantNetAmount.toFixed(2) }}</span>
           </div>
         </div>
       </div>
 
-      <div class="bg-slate-800 rounded-lg shadow-md p-6 border border-slate-700 mb-8">
-        <h2 class="text-xl font-semibold text-purple-400 mb-4">Delivery Information</h2>
+      <div class="customer-panel mb-8 p-6">
+        <h2 class="customer-section-title mb-4">Delivery Information</h2>
         <form class="space-y-4" @submit.prevent>
-          <input type="text" placeholder="Full Name" v-model="delivery.fullName" class="w-full p-3 rounded bg-slate-700 text-white border border-slate-600" />
-          <input type="text" placeholder="Address" v-model="delivery.address" class="w-full p-3 rounded bg-slate-700 text-white border border-slate-600" />
+          <input type="text" placeholder="Full Name" v-model="delivery.fullName" class="customer-field w-full p-3 rounded" />
+          <input type="text" placeholder="Address" v-model="delivery.address" class="customer-field w-full p-3 rounded" />
           <input
             type="text"
             placeholder="Phone Number"
@@ -55,24 +55,24 @@
             inputmode="numeric"
             maxlength="10"
             @input="delivery.phone = sanitizePhone(delivery.phone)"
-            class="w-full p-3 rounded bg-slate-700 text-white border border-slate-600"
+            class="customer-field w-full p-3 rounded"
           />
         </form>
       </div>
 
-      <div class="bg-slate-800 rounded-lg shadow-md p-6 border border-slate-700 mb-8">
-        <h2 class="text-xl font-semibold text-purple-400 mb-4">Payment Method</h2>
+      <div class="customer-panel mb-8 p-6">
+        <h2 class="customer-section-title mb-4">Payment Method</h2>
         <div class="space-y-3">
-          <label class="flex items-center gap-2 text-white">
+          <label class="customer-radio-row flex items-center gap-2">
             <input type="radio" value="GCash" v-model="paymentMethod" />
             GCash
           </label>
-          <label class="flex items-center gap-2 text-white">
+          <label class="customer-radio-row flex items-center gap-2">
             <input type="radio" value="Card" v-model="paymentMethod" />
             Credit/Debit Card
           </label>
         </div>
-        <p class="mt-3 text-xs text-slate-400">Payment is processed in full through PayMongo before the order is created.</p>
+        <p class="customer-muted mt-3 text-xs">Payment is processed in full through PayMongo before the order is created.</p>
       </div>
 
       <div class="flex justify-end">
@@ -80,7 +80,7 @@
           type="button"
           :disabled="saving"
           @click="startPayMongoCheckout"
-          class="px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-60 text-white rounded-lg font-semibold"
+          class="customer-primary-btn px-6 py-3 disabled:opacity-60 text-white rounded-lg font-semibold"
         >
           {{ saving ? 'Processing...' : 'Proceed to Payment' }}
         </button>
@@ -465,3 +465,121 @@ onMounted(() => {
   })
 })
 </script>
+
+<style scoped>
+.customer-checkout-shell {
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.34), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(198, 148, 108, 0.2), transparent 20%),
+    linear-gradient(180deg, #25150f 0%, #1b100b 100%);
+}
+
+.customer-checkout-main {
+  min-width: 0;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.28), transparent 24%),
+    radial-gradient(circle at 84% 12%, rgba(198, 148, 108, 0.14), transparent 18%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.customer-back-btn {
+  color: #6e4330;
+}
+
+.customer-back-btn:hover {
+  color: #3d281d;
+}
+
+.customer-page-title {
+  margin: 0;
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: clamp(2rem, 2.8vw, 2.7rem);
+  line-height: 1;
+}
+
+.customer-panel {
+  border-radius: 1.75rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.customer-section-title {
+  margin: 0;
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: 1.35rem;
+}
+
+.customer-item-name {
+  color: #2f1d14;
+}
+
+.customer-accent {
+  color: #8d5a3b;
+}
+
+.customer-muted {
+  color: rgba(76, 54, 40, 0.76);
+}
+
+.customer-meta-row {
+  color: rgba(76, 54, 40, 0.84);
+}
+
+.customer-total-row {
+  color: #2f1d14;
+}
+
+.customer-field {
+  border: 1px solid rgba(230, 193, 150, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: #342419;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.customer-field::placeholder {
+  color: rgba(120, 92, 69, 0.65);
+}
+
+.customer-field:focus {
+  border-color: rgba(198, 148, 108, 0.9);
+  box-shadow: 0 0 0 4px rgba(214, 169, 123, 0.16);
+}
+
+.customer-radio-row {
+  color: #3d281d;
+}
+
+.customer-radio-row input {
+  accent-color: #8d5a3b;
+}
+
+.customer-primary-btn {
+  border: 1px solid rgba(126, 78, 53, 0.24);
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 48%, #6e4330 100%);
+  box-shadow: 0 14px 26px rgba(111, 63, 42, 0.14);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.customer-primary-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+@media (max-width: 767px) {
+  .customer-checkout-main {
+    padding: 1rem;
+  }
+
+  .customer-panel {
+    border-radius: 1.35rem;
+  }
+
+  .customer-primary-btn {
+    width: 100%;
+  }
+}
+</style>

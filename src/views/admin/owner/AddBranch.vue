@@ -211,12 +211,6 @@ export default {
     }
 
     const syncBranchAdminName = () => {
-      if (currentBranch.value.isMainBranch && !String(currentBranch.value.branchAdminId || '').trim()) {
-        currentBranch.value.branchAdminId = ownerProfile.value.branchAdminId
-        currentBranch.value.branchAdminName = ownerProfile.value.branchAdminName
-        return
-      }
-
       const selected = branchAdmins.value.find((admin) => admin.id === currentBranch.value.branchAdminId)
       currentBranch.value.branchAdminName = selected?.fullName || ''
     }
@@ -504,16 +498,7 @@ export default {
         toast.error('Revenue cannot be negative.')
         return
       }
-      if (!String(currentBranch.value.branchAdminId || '').trim()) {
-        if (currentBranch.value.isMainBranch) {
-          currentBranch.value.branchAdminId = ownerProfile.value.branchAdminId
-          currentBranch.value.branchAdminName = ownerProfile.value.branchAdminName
-        } else {
-          toast.error('Please select a branch admin before activating this branch.')
-          return
-        }
-      }
-      if (!String(currentBranch.value.branchAdminName || '').trim()) {
+      if (String(currentBranch.value.branchAdminId || '').trim() && !String(currentBranch.value.branchAdminName || '').trim()) {
         syncBranchAdminName()
       }
 
@@ -598,10 +583,6 @@ export default {
       await refreshOwnerProfile()
       await loadBranches()
       await loadBranchAdmins()
-      if (ownerProfile.value.branchAdminId) {
-        currentBranch.value.branchAdminId = ownerProfile.value.branchAdminId
-        currentBranch.value.branchAdminName = ownerProfile.value.branchAdminName
-      }
     })
 
     return {
@@ -753,12 +734,12 @@ export default {
               @change="syncBranchAdminName"
               class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Select branch admin</option>
+              <option value="">No branch admin for now</option>
               <option v-for="admin in branchAdmins" :key="admin.id" :value="admin.id">
                 {{ admin.fullName }}{{ admin.role ? ` - ${admin.role}` : '' }}{{ admin.isOwner ? ' (Clinic Admin)' : '' }}
               </option>
             </select>
-            <p class="mt-1 text-xs text-slate-400">Choose who will manage this branch before it is activated.</p>
+            <p class="mt-1 text-xs text-slate-400">You can leave this blank for now and assign a branch admin later.</p>
           </div>
 
           <div class="rounded-lg border border-slate-700 bg-slate-900/40 px-4 py-3">

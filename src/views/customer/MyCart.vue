@@ -1,52 +1,52 @@
 <template>
-  <div class="flex customer-theme bg-slate-900 min-h-screen">
+  <div class="cart-shell flex customer-theme min-h-screen">
     <CustomerSidebar />
 
-    <main class="flex-1 p-8">
-      <h1 class="text-2xl font-bold text-white mb-6">My Cart</h1>
+    <main class="cart-main flex-1 p-6 md:p-8">
+      <h1 class="cart-title mb-6">My Cart</h1>
 
-      <div v-if="cartItems.length === 0" class="text-slate-300">Your cart is empty.</div>
+      <div v-if="cartItems.length === 0" class="cart-empty-panel">Your cart is empty.</div>
 
-      <div v-else class="space-y-6">
+      <div v-else class="cart-list">
         <div
           v-for="item in cartItems"
           :key="item.id"
-          class="bg-slate-800 rounded-lg shadow-md p-4 border border-slate-700 flex gap-4 items-start"
+          class="cart-item-card"
         >
-          <input type="checkbox" v-model="item.selected" class="mt-2 h-5 w-5 accent-purple-600" />
+          <input type="checkbox" v-model="item.selected" class="cart-checkbox" />
 
-          <div class="w-24 h-24 bg-slate-700 rounded-lg overflow-hidden">
+          <div class="cart-item-image">
             <img v-if="item.imageUrl" :src="item.imageUrl" alt="Product image" class="h-full w-full object-cover" />
           </div>
 
-          <div class="flex-1">
-            <h2 class="text-white font-semibold">{{ item.name }}</h2>
-            <p class="text-slate-400 text-sm">Variation: {{ item.variation || 'Default' }}</p>
-            <p class="text-slate-400 text-sm">Center: {{ item.branchName || 'AesthetiCare' }}</p>
-            <p class="text-purple-400 font-semibold mt-1">PHP {{ Number(item.price || 0).toFixed(2) }}</p>
+          <div class="cart-item-body">
+            <h2 class="cart-item-title">{{ item.name }}</h2>
+            <p class="cart-item-meta">Variation: {{ item.variation || 'Default' }}</p>
+            <p class="cart-item-meta">Center: {{ item.branchName || 'AesthetiCare' }}</p>
+            <p class="cart-item-price">PHP {{ Number(item.price || 0).toFixed(2) }}</p>
 
-            <div class="flex items-center gap-2 mt-3">
-              <button @click="decreaseQty(item)" class="px-2 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded">-</button>
-              <span class="text-white">{{ item.quantity }}</span>
-              <button @click="increaseQty(item)" class="px-2 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded">+</button>
+            <div class="cart-qty-row">
+              <button @click="decreaseQty(item)" class="cart-qty-button">-</button>
+              <span class="cart-qty-value">{{ item.quantity }}</span>
+              <button @click="increaseQty(item)" class="cart-qty-button">+</button>
             </div>
           </div>
 
-          <button @click="removeItem(item.id)" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded">Remove</button>
+          <button @click="removeItem(item.id)" class="cart-remove-button">Remove</button>
         </div>
       </div>
 
-      <div class="bg-slate-800 rounded-lg shadow-md p-6 border border-slate-700 mt-8">
-        <div class="flex justify-between items-center mb-4">
-          <p class="text-white text-lg font-semibold">Selected Items: {{ selectedItems.length }}</p>
-          <p class="text-white text-lg font-semibold">Subtotal: PHP {{ cartSubtotal.toFixed(2) }}</p>
+      <div class="cart-summary-panel mt-8">
+        <div class="cart-summary-head mb-4">
+          <p class="cart-summary-value">Selected Items: {{ selectedItems.length }}</p>
+          <p class="cart-summary-value">Subtotal: PHP {{ cartSubtotal.toFixed(2) }}</p>
         </div>
 
-        <div class="flex justify-between items-center">
-          <p class="text-slate-400 text-sm">Review your selected products before checkout.</p>
+        <div class="cart-summary-footer">
+          <p class="cart-summary-note">Review your selected products before checkout.</p>
           <button
             @click="checkout"
-            class="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg"
+            class="cart-checkout-button"
             :disabled="selectedItems.length === 0"
           >
             Check Out
@@ -95,3 +95,211 @@ const checkout = () => {
   router.push({ name: 'customer-checkout' })
 }
 </script>
+
+<style scoped>
+.cart-shell {
+  display: flex;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.34), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(198, 148, 108, 0.2), transparent 20%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.cart-main {
+  flex: 1;
+  min-width: 0;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.24), transparent 24%),
+    radial-gradient(circle at 84% 12%, rgba(198, 148, 108, 0.14), transparent 18%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.cart-title {
+  margin: 0;
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1;
+}
+
+.cart-content {
+  padding: 1.5rem 1.4rem 2rem;
+}
+
+.cart-empty-panel,
+.cart-item-card,
+.cart-summary-panel {
+  border-radius: 1.75rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.cart-empty-panel {
+  margin-top: 1.35rem;
+  padding: 1.4rem 1.25rem;
+  color: rgba(76, 54, 40, 0.76);
+}
+
+.cart-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.35rem;
+}
+
+.cart-item-card {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.1rem;
+}
+
+.cart-checkbox {
+  margin-top: 0.4rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: #8d5a3b;
+}
+
+.cart-item-image {
+  width: 6rem;
+  height: 6rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #ead6b8 0%, #dcb489 48%, #c6946c 100%);
+}
+
+.cart-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cart-item-title {
+  margin: 0;
+  color: #2f1d14;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.cart-item-meta {
+  margin: 0.35rem 0 0;
+  color: rgba(76, 54, 40, 0.76);
+  font-size: 0.88rem;
+}
+
+.cart-item-price {
+  margin: 0.55rem 0 0;
+  color: #a56b44;
+  font-weight: 700;
+}
+
+.cart-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.cart-qty-button,
+.cart-remove-button,
+.cart-checkout-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.95rem;
+  font-weight: 700;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.cart-qty-button {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fff8ef;
+  color: #6f4a35;
+}
+
+.cart-qty-value {
+  min-width: 1.5rem;
+  color: #3d281d;
+  font-weight: 700;
+  text-align: center;
+}
+
+.cart-remove-button {
+  padding: 0.72rem 1rem;
+  border: 1px solid rgba(175, 98, 98, 0.28);
+  background: linear-gradient(120deg, #ca7c7c 0%, #b85e5e 48%, #974444 100%);
+  color: #fff8f2;
+}
+
+.cart-summary-panel {
+  margin-top: 1.35rem;
+  padding: 1.25rem;
+}
+
+.cart-summary-head,
+.cart-summary-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cart-summary-value {
+  margin: 0;
+  color: #3d281d;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.cart-summary-note {
+  color: rgba(76, 54, 40, 0.76);
+  margin: 0;
+}
+
+.cart-checkout-button {
+  padding: 0.82rem 1.35rem;
+  border: 1px solid rgba(126, 78, 53, 0.24);
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 48%, #6e4330 100%);
+  color: #fff8eb;
+}
+
+.cart-checkout-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cart-qty-button:hover,
+.cart-remove-button:hover,
+.cart-checkout-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+@media (min-width: 1280px) {
+  .cart-content {
+    padding: 1.7rem 2rem 2.2rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .cart-content {
+    padding: 1rem 1rem 1.5rem;
+  }
+
+  .cart-item-card,
+  .cart-summary-head,
+  .cart-summary-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cart-remove-button,
+  .cart-checkout-button {
+    width: 100%;
+  }
+}
+</style>

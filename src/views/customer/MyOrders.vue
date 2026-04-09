@@ -1,64 +1,61 @@
 ﻿<template>
-  <div class="flex customer-theme bg-slate-900 min-h-screen">
+  <div class="orders-shell flex customer-theme min-h-screen">
     <CustomerSidebar />
 
-    <main class="flex-1 p-8">
-      <div class="mb-8">
-        <h1 class="text-2xl font-bold text-white mb-2">My Orders</h1>
-        <p class="text-slate-400">Track your orders placed through the platform.</p>
+    <main class="orders-main flex-1 p-6 md:p-8">
+      <div class="orders-header mb-8">
+        <h1 class="orders-title mb-2">My Orders</h1>
+        <p class="orders-subtitle">Track your orders placed through the platform.</p>
       </div>
 
-      <div class="bg-[#2a180f] rounded-xl p-6 border border-[#4b2f1c]">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+      <div class="orders-panel">
+        <div class="orders-toolbar mb-4">
           <input
             v-model="search"
             type="text"
             placeholder="Search order id or payment method..."
-            class="w-full md:max-w-sm bg-slate-900 text-[#f3e3cf] placeholder:text-[#c7a98c] px-4 py-2 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-gold-500"
+            class="orders-search-input"
           />
-          <div class="text-sm text-slate-400">Total Orders: {{ filteredOrders.length }}</div>
+          <div class="orders-total">Total Orders: {{ filteredOrders.length }}</div>
         </div>
 
-        <div class="overflow-x-auto">
-          <table class="min-w-full text-left">
-            <thead class="text-slate-400 text-xs uppercase tracking-wider">
+        <div class="orders-table-wrap">
+          <table class="orders-table">
+            <thead>
               <tr>
-                <th class="py-3 px-4">Order ID</th>
-                <th class="py-3 px-4">Items</th>
-                <th class="py-3 px-4">Total</th>
-                <th class="py-3 px-4">Payment</th>
-                <th class="py-3 px-4">Status</th>
-                <th class="py-3 px-4">Created At</th>
-                <th class="py-3 px-4">Action</th>
+                <th>Order ID</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>Payment</th>
+                <th>Status</th>
+                <th>Created At</th>
+                <th>Action</th>
               </tr>
             </thead>
-            <tbody class="text-slate-200">
+            <tbody>
               <tr v-if="!loading && filteredOrders.length === 0">
-                <td colspan="7" class="py-8 text-center text-slate-400">No orders found.</td>
+                <td colspan="7" class="orders-empty-cell">No orders found.</td>
               </tr>
-              <tr v-for="order in filteredOrders" :key="order.id" class="border-t border-slate-700">
-                <td class="py-3 px-4 text-slate-300">{{ order.id }}</td>
-                <td class="py-3 px-4">{{ order.items.length }}</td>
-                <td class="py-3 px-4 text-amber-300">PHP {{ Number(order.total || 0).toFixed(2) }}</td>
-                <td class="py-3 px-4">{{ order.paymentMethod || 'Cash' }}</td>
-                <td class="py-3 px-4">
-                  <span
-                    class="px-2 py-1 rounded-full text-xs font-semibold"
-                    :class="order.status === 'Completed'
-                      ? 'bg-emerald-500/20 text-emerald-300'
-                      : order.status === 'Cancelled'
-                        ? 'bg-red-500/20 text-red-300'
-                        : 'bg-amber-500/20 text-amber-300'"
-                  >
+              <tr v-for="order in filteredOrders" :key="order.id">
+                <td class="orders-primary-cell">{{ order.id }}</td>
+                <td>{{ order.items.length }}</td>
+                <td class="orders-total-cell">PHP {{ Number(order.total || 0).toFixed(2) }}</td>
+                <td>{{ order.paymentMethod || 'Cash' }}</td>
+                <td>
+                  <span class="orders-status-badge" :class="order.status === 'Completed'
+                    ? 'orders-status-completed'
+                    : order.status === 'Cancelled'
+                      ? 'orders-status-cancelled'
+                      : 'orders-status-pending'">
                     {{ order.status || 'Pending' }}
                   </span>
                 </td>
-                <td class="py-3 px-4">{{ formatDate(order.createdAt) }}</td>
-                <td class="py-3 px-4">
-                  <div class="flex items-center gap-2">
+                <td>{{ formatDate(order.createdAt) }}</td>
+                <td>
+                  <div class="orders-action-group">
                     <button
                       type="button"
-                      class="px-3 py-1 rounded-lg bg-gold-700 hover:bg-gold-800 text-white text-xs"
+                      class="orders-button orders-button-primary"
                       @click="openOrder(order)"
                     >
                       View
@@ -66,7 +63,7 @@
                     <button
                       v-if="canCancelOrder(order)"
                       type="button"
-                      class="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs"
+                      class="orders-button orders-button-danger"
                       @click="openCancelModal(order)"
                     >
                       Cancel
@@ -74,7 +71,7 @@
                     <button
                       v-if="canMarkReceived(order)"
                       type="button"
-                      class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs"
+                      class="orders-button orders-button-success"
                       @click="openReceiveModal(order)"
                     >
                       Order Received
@@ -82,7 +79,7 @@
                     <button
                       v-if="canRequestRefund(order)"
                       type="button"
-                      class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs"
+                      class="orders-button orders-button-accent"
                       @click="openRefundModal(order)"
                     >
                       Request Refund
@@ -96,134 +93,134 @@
       </div>
     </main>
 
-    <Modal :isOpen="showModal" @close="closeModal" :showConfirm="false" panelClass="bg-slate-900 border border-slate-700">
-      <div v-if="selectedOrder" class="text-slate-200">
-        <h2 class="text-xl font-semibold text-white mb-2">Order Details</h2>
-        <p class="text-sm text-slate-400 mb-4">Order ID: {{ selectedOrder.id }}</p>
+    <Modal :isOpen="showModal" @close="closeModal" :showConfirm="false" panelClass="orders-modal-shell">
+      <div v-if="selectedOrder" class="orders-modal-copy">
+        <h2 class="orders-modal-title mb-2">Order Details</h2>
+        <p class="orders-modal-subtitle mb-4">Order ID: {{ selectedOrder.id }}</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
-            <p class="text-xs uppercase text-slate-400">Delivery</p>
-            <p class="text-white font-semibold mt-1">{{ selectedOrder.delivery?.fullName || selectedOrder.customerName || 'Customer' }}</p>
-            <p class="text-xs text-slate-400">Phone: {{ selectedOrder.delivery?.phone || 'N/A' }}</p>
-            <p class="text-xs text-slate-400">Address: {{ selectedOrder.delivery?.address || 'N/A' }}</p>
+          <div class="orders-detail-card">
+            <p class="orders-detail-kicker">Delivery</p>
+            <p class="orders-detail-primary mt-1">{{ selectedOrder.delivery?.fullName || selectedOrder.customerName || 'Customer' }}</p>
+            <p class="orders-detail-muted">Phone: {{ selectedOrder.delivery?.phone || 'N/A' }}</p>
+            <p class="orders-detail-muted">Address: {{ selectedOrder.delivery?.address || 'N/A' }}</p>
           </div>
-          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
-            <p class="text-xs uppercase text-slate-400">Payment</p>
-            <p class="text-white font-semibold mt-1">{{ selectedOrder.paymentMethod || 'Cash' }}</p>
-            <p class="text-xs text-slate-400 mt-2">Total: PHP {{ Number(selectedOrder.total || 0).toFixed(2) }}</p>
-            <p class="text-xs text-slate-400">Status: {{ selectedOrder.status || 'Pending' }}</p>
-            <p v-if="selectedOrder.cancelledAt" class="text-xs text-slate-400">Cancelled: {{ formatDate(selectedOrder.cancelledAt) }}</p>
-            <p v-if="selectedOrder.receivedAt" class="text-xs text-slate-400">Received: {{ formatDate(selectedOrder.receivedAt) }}</p>
-            <p class="text-xs text-slate-400">Created: {{ formatDate(selectedOrder.createdAt) }}</p>
+          <div class="orders-detail-card">
+            <p class="orders-detail-kicker">Payment</p>
+            <p class="orders-detail-primary mt-1">{{ selectedOrder.paymentMethod || 'Cash' }}</p>
+            <p class="orders-detail-muted mt-2">Total: PHP {{ Number(selectedOrder.total || 0).toFixed(2) }}</p>
+            <p class="orders-detail-muted">Status: {{ selectedOrder.status || 'Pending' }}</p>
+            <p v-if="selectedOrder.cancelledAt" class="orders-detail-muted">Cancelled: {{ formatDate(selectedOrder.cancelledAt) }}</p>
+            <p v-if="selectedOrder.receivedAt" class="orders-detail-muted">Received: {{ formatDate(selectedOrder.receivedAt) }}</p>
+            <p class="orders-detail-muted">Created: {{ formatDate(selectedOrder.createdAt) }}</p>
           </div>
         </div>
 
-        <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <p class="text-xs uppercase text-slate-400 mb-3">Items</p>
+        <div class="orders-detail-card">
+          <p class="orders-detail-kicker mb-3">Items</p>
           <div v-for="item in selectedOrder.items" :key="item.id" class="flex items-start justify-between py-2 border-b border-slate-700 last:border-b-0">
             <div>
-              <p class="text-white font-medium">{{ item.name }}</p>
-              <p class="text-xs text-slate-400">Qty: {{ item.quantity }} • Branch: {{ item.branchName || 'N/A' }}</p>
+              <p class="orders-detail-primary">{{ item.name }}</p>
+              <p class="orders-detail-muted text-xs">Qty: {{ item.quantity }} • Branch: {{ item.branchName || 'N/A' }}</p>
             </div>
-            <div class="text-amber-300">PHP {{ Number(item.price || 0).toFixed(2) }}</div>
+            <div class="orders-detail-accent">PHP {{ Number(item.price || 0).toFixed(2) }}</div>
           </div>
         </div>
 
-        <div v-if="selectedOrder.deliveryReview || selectedOrder.deliveryProofUrl" class="bg-slate-800 rounded-lg p-4 border border-slate-700 mt-4">
-          <p class="text-xs uppercase text-slate-400 mb-3">Proof of Receipt</p>
+        <div v-if="selectedOrder.deliveryReview || selectedOrder.deliveryProofUrl" class="orders-detail-card mt-4">
+          <p class="orders-detail-kicker mb-3">Proof of Receipt</p>
           <div v-if="selectedOrder.deliveryRating" class="mb-3 flex items-center gap-1">
             <span
               v-for="star in 5"
               :key="`display-star-${star}`"
               class="text-lg"
-              :class="star <= Number(selectedOrder.deliveryRating || 0) ? 'text-amber-300' : 'text-slate-600'"
+              :class="star <= Number(selectedOrder.deliveryRating || 0) ? 'text-amber-300' : 'text-slate-500'"
             >
               ★
             </span>
           </div>
-          <p v-if="selectedOrder.deliveryReview" class="text-sm text-slate-200 whitespace-pre-wrap">{{ selectedOrder.deliveryReview }}</p>
+          <p v-if="selectedOrder.deliveryReview" class="orders-detail-primary text-sm whitespace-pre-wrap">{{ selectedOrder.deliveryReview }}</p>
           <a
             v-if="selectedOrder.deliveryProofUrl"
             :href="selectedOrder.deliveryProofUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex mt-3 px-3 py-2 rounded-lg bg-gold-700 hover:bg-gold-800 text-white text-xs"
+            class="orders-link-button inline-flex mt-3 px-3 py-2 text-xs"
           >
             View Proof Photo
           </a>
         </div>
 
-        <div v-if="selectedOrder.refundRequestId || selectedOrder.refundVoucherId" class="bg-slate-800 rounded-lg p-4 border border-slate-700 mt-4">
-          <p class="text-xs uppercase text-slate-400 mb-3">Refund Status</p>
-          <p class="text-sm text-slate-200">
+        <div v-if="selectedOrder.refundRequestId || selectedOrder.refundVoucherId" class="orders-detail-card mt-4">
+          <p class="orders-detail-kicker mb-3">Refund Status</p>
+          <p class="orders-detail-primary text-sm">
             {{ selectedOrder.refundRequestStatus || (selectedOrder.refundVoucherId ? 'Approved' : 'Not requested') }}
           </p>
-          <p v-if="selectedOrder.refundReason" class="mt-2 text-sm text-slate-300 whitespace-pre-wrap">{{ selectedOrder.refundReason }}</p>
+          <p v-if="selectedOrder.refundReason" class="orders-detail-muted mt-2 text-sm whitespace-pre-wrap">{{ selectedOrder.refundReason }}</p>
           <a
             v-if="selectedOrder.refundProofUrl"
             :href="selectedOrder.refundProofUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex mt-3 px-3 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-xs"
+            class="orders-link-button orders-link-button-accent inline-flex mt-3 px-3 py-2 text-xs"
           >
             View Refund Proof
           </a>
         </div>
 
-        <div v-if="selectedOrder.cancelReasonType || selectedOrder.cancelReasonDetails" class="bg-slate-800 rounded-lg p-4 border border-slate-700 mt-4">
-          <p class="text-xs uppercase text-slate-400 mb-3">Cancellation</p>
-          <p class="text-sm text-slate-200">{{ selectedOrder.cancelReasonType || 'No reason recorded' }}</p>
-          <p v-if="selectedOrder.cancelReasonDetails" class="mt-2 text-sm text-slate-300 whitespace-pre-wrap">{{ selectedOrder.cancelReasonDetails }}</p>
-          <p v-if="selectedOrder.paymentStatus === 'Refunded'" class="mt-3 text-xs text-emerald-300">
+        <div v-if="selectedOrder.cancelReasonType || selectedOrder.cancelReasonDetails" class="orders-detail-card mt-4">
+          <p class="orders-detail-kicker mb-3">Cancellation</p>
+          <p class="orders-detail-primary text-sm">{{ selectedOrder.cancelReasonType || 'No reason recorded' }}</p>
+          <p v-if="selectedOrder.cancelReasonDetails" class="orders-detail-muted mt-2 text-sm whitespace-pre-wrap">{{ selectedOrder.cancelReasonDetails }}</p>
+          <p v-if="selectedOrder.paymentStatus === 'Refunded'" class="mt-3 text-xs text-emerald-700">
             Refund initiated. Depending on your payment method, the amount may reflect within 24 hours or a few business days.
           </p>
         </div>
       </div>
     </Modal>
 
-    <Modal :isOpen="showReceiveModal" @close="closeReceiveModal" :showConfirm="false" panelClass="bg-slate-900 border border-slate-700">
-      <div class="text-slate-200">
-        <h2 class="text-xl font-semibold text-white mb-2">Confirm Order Received</h2>
-        <p class="text-sm text-slate-400 mb-4">
+    <Modal :isOpen="showReceiveModal" @close="closeReceiveModal" :showConfirm="false" panelClass="orders-modal-shell">
+      <div class="orders-modal-copy">
+        <h2 class="orders-modal-title mb-2">Confirm Order Received</h2>
+        <p class="orders-modal-subtitle mb-4">
           Upload a proof photo and leave a short review to confirm that you already received this order.
         </p>
 
         <div class="space-y-4">
           <div>
-            <label class="block text-sm text-slate-400 mb-2">Proof of Delivery Photo</label>
+            <label class="orders-field-label block text-sm mb-2">Proof of Delivery Photo</label>
             <input
               type="file"
               accept="image/*"
-              class="block w-full text-sm text-slate-200 file:mr-3 file:rounded file:border-0 file:bg-gold-700 file:px-3 file:py-2 file:text-white hover:file:bg-gold-800"
+              class="orders-file-input block w-full text-sm"
               @change="handleProofFileChange"
             />
-            <p v-if="receiveForm.fileName" class="mt-2 text-xs text-slate-400">Selected: {{ receiveForm.fileName }}</p>
+            <p v-if="receiveForm.fileName" class="mt-2 text-xs text-slate-500">Selected: {{ receiveForm.fileName }}</p>
           </div>
 
           <div>
-            <label class="block text-sm text-slate-400 mb-2">Delivery Rating</label>
+            <label class="orders-field-label block text-sm mb-2">Delivery Rating</label>
             <div class="flex items-center gap-2">
               <button
                 v-for="star in 5"
                 :key="`input-star-${star}`"
                 type="button"
                 class="text-3xl leading-none transition"
-                :class="star <= receiveForm.rating ? 'text-amber-300' : 'text-slate-500 hover:text-amber-200'"
+                :class="star <= receiveForm.rating ? 'text-amber-300' : 'text-slate-400 hover:text-amber-200'"
                 @click="receiveForm.rating = star"
               >
                 ★
               </button>
             </div>
-            <p class="mt-2 text-xs text-slate-400">Choose a rating from 1 to 5 stars.</p>
+            <p class="mt-2 text-xs text-slate-500">Choose a rating from 1 to 5 stars.</p>
           </div>
 
           <div>
-            <label class="block text-sm text-slate-400 mb-2">Delivery Review</label>
+            <label class="orders-field-label block text-sm mb-2">Delivery Review</label>
             <textarea
               v-model="receiveForm.review"
               rows="4"
-              class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
+              class="orders-textarea w-full rounded-lg px-3 py-2"
               placeholder="Describe the condition of the order and confirm that you received it."
             />
           </div>
@@ -232,14 +229,14 @@
             <button
               type="button"
               :disabled="isSubmittingReceive"
-              class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white"
+              class="orders-button orders-button-success"
               @click="confirmOrderReceived"
             >
               {{ isSubmittingReceive ? 'Submitting...' : 'Submit and Complete Order' }}
             </button>
             <button
               type="button"
-              class="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800"
+              class="orders-button orders-button-ghost"
               @click="closeReceiveModal"
             >
               Cancel
@@ -249,19 +246,19 @@
       </div>
     </Modal>
 
-    <Modal :isOpen="showRefundModal" @close="closeRefundModal" :showConfirm="false" panelClass="bg-slate-900 border border-slate-700">
-      <div class="text-slate-200">
-        <h2 class="text-xl font-semibold text-white mb-2">Request Refund</h2>
-        <p class="text-sm text-slate-400 mb-4">
+    <Modal :isOpen="showRefundModal" @close="closeRefundModal" :showConfirm="false" panelClass="orders-modal-shell">
+      <div class="orders-modal-copy">
+        <h2 class="orders-modal-title mb-2">Request Refund</h2>
+        <p class="orders-modal-subtitle mb-4">
           Submit your refund concern with supporting proof. The clinic owner/admin will review it and issue a voucher if approved.
         </p>
 
         <div class="space-y-4">
           <div>
-            <label class="block text-sm text-slate-400 mb-2">Reason</label>
+            <label class="orders-field-label block text-sm mb-2">Reason</label>
             <select
               v-model="refundRequestForm.issueType"
-              class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              class="orders-select w-full rounded-lg px-3 py-2"
             >
               <option value="">Select a refund reason</option>
               <option value="Damaged Item">Damaged Item</option>
@@ -273,38 +270,38 @@
           </div>
 
           <div>
-            <label class="block text-sm text-slate-400 mb-2">Details</label>
+            <label class="orders-field-label block text-sm mb-2">Details</label>
             <textarea
               v-model="refundRequestForm.reason"
               rows="4"
-              class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              class="orders-textarea w-full rounded-lg px-3 py-2"
               placeholder="Describe what went wrong with the order."
             />
           </div>
 
           <div>
-            <label class="block text-sm text-slate-400 mb-2">Proof Photo</label>
+            <label class="orders-field-label block text-sm mb-2">Proof Photo</label>
             <input
               type="file"
               accept="image/*"
-              class="block w-full text-sm text-slate-200 file:mr-3 file:rounded file:border-0 file:bg-purple-700 file:px-3 file:py-2 file:text-white hover:file:bg-purple-800"
+              class="orders-file-input block w-full text-sm"
               @change="handleRefundProofFileChange"
             />
-            <p v-if="refundRequestForm.fileName" class="mt-2 text-xs text-slate-400">Selected: {{ refundRequestForm.fileName }}</p>
+            <p v-if="refundRequestForm.fileName" class="mt-2 text-xs text-slate-500">Selected: {{ refundRequestForm.fileName }}</p>
           </div>
 
           <div class="flex items-center gap-3">
             <button
               type="button"
               :disabled="isSubmittingRefundRequest"
-              class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-60 text-white"
+              class="orders-button orders-button-accent"
               @click="submitRefundRequest"
             >
               {{ isSubmittingRefundRequest ? 'Submitting...' : 'Submit Refund Request' }}
             </button>
             <button
               type="button"
-              class="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800"
+              class="orders-button orders-button-ghost"
               @click="closeRefundModal"
             >
               Cancel
@@ -314,19 +311,19 @@
       </div>
     </Modal>
 
-    <Modal :isOpen="showCancelModal" @close="closeCancelModal" :showConfirm="false" panelClass="bg-slate-900 border border-slate-700">
-      <div class="text-slate-200">
-        <h2 class="text-xl font-semibold text-white mb-2">Cancel Order</h2>
-        <p class="text-sm text-slate-400 mb-4">
+    <Modal :isOpen="showCancelModal" @close="closeCancelModal" :showConfirm="false" panelClass="orders-modal-shell">
+      <div class="orders-modal-copy">
+        <h2 class="orders-modal-title mb-2">Cancel Order</h2>
+        <p class="orders-modal-subtitle mb-4">
           Choose a cancellation reason. If this order was already paid online, your refund will be processed after cancellation.
         </p>
 
         <div class="space-y-4">
           <div>
-            <label class="block text-sm text-slate-400 mb-2">Reason</label>
+            <label class="orders-field-label block text-sm mb-2">Reason</label>
             <select
               v-model="cancelForm.reasonType"
-              class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              class="orders-select orders-select-danger w-full rounded-lg px-3 py-2"
             >
               <option value="">Select a reason</option>
               <option value="Changed my mind">Changed my mind</option>
@@ -338,16 +335,16 @@
           </div>
 
           <div v-if="cancelForm.reasonType === 'Other'">
-            <label class="block text-sm text-slate-400 mb-2">Please specify</label>
+            <label class="orders-field-label block text-sm mb-2">Please specify</label>
             <textarea
               v-model="cancelForm.reasonDetails"
               rows="4"
-              class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              class="orders-textarea w-full rounded-lg px-3 py-2"
               placeholder="Tell us why you are cancelling this order."
             />
           </div>
 
-          <div class="rounded-lg border border-slate-700 bg-slate-800/70 px-4 py-3 text-xs text-slate-300">
+          <div class="orders-notice">
             Refund notice: if your payment was already processed online, the refund is initiated after cancellation and may reflect within 24 hours or a few business days depending on your payment method.
           </div>
 
@@ -355,14 +352,14 @@
             <button
               type="button"
               :disabled="isSubmittingCancel"
-              class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white"
+              class="orders-button orders-button-danger"
               @click="confirmCancelOrder"
             >
               {{ isSubmittingCancel ? 'Cancelling...' : 'Confirm Cancellation' }}
             </button>
             <button
               type="button"
-              class="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800"
+              class="orders-button orders-button-ghost"
               @click="closeCancelModal"
             >
               Keep Order
@@ -907,3 +904,323 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.orders-shell {
+  display: flex;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.34), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(198, 148, 108, 0.2), transparent 20%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.orders-main {
+  flex: 1;
+  min-width: 0;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.24), transparent 24%),
+    radial-gradient(circle at 84% 12%, rgba(198, 148, 108, 0.14), transparent 18%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.orders-content {
+  padding: 1.5rem 1.4rem 2rem;
+}
+
+.orders-header,
+.orders-panel,
+.orders-modal-shell,
+.orders-detail-card {
+  border-radius: 1.75rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.orders-header {
+  padding: 1.25rem;
+}
+
+.orders-panel {
+  padding: 1.25rem;
+}
+
+.orders-title {
+  margin: 0;
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1;
+}
+
+.orders-subtitle,
+.orders-total,
+.orders-detail-muted,
+.orders-modal-subtitle {
+  color: rgba(76, 54, 40, 0.76);
+}
+
+.orders-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.orders-search-input {
+  width: 100%;
+  max-width: 30rem;
+  min-height: 3.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(230, 193, 150, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: #342419;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.orders-search-input::placeholder {
+  color: #b08b6e;
+}
+
+.orders-search-input:focus,
+.orders-select:focus,
+.orders-textarea:focus {
+  border-color: rgba(198, 148, 108, 0.9);
+  box-shadow: 0 0 0 4px rgba(214, 169, 123, 0.16);
+}
+
+.orders-table-wrap {
+  overflow-x: auto;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(230, 193, 150, 0.72);
+  background: rgba(255, 251, 244, 0.94);
+}
+
+.orders-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.orders-table thead tr {
+  background: linear-gradient(180deg, #d8b891 0%, #c8a57d 100%);
+}
+
+.orders-table th {
+  padding: 1rem 1.05rem;
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #4d301f;
+}
+
+.orders-table td {
+  padding: 1rem 1.05rem;
+  border-top: 1px solid rgba(230, 193, 150, 0.5);
+  color: #6a4b39;
+  font-size: 0.94rem;
+  vertical-align: middle;
+}
+
+.orders-table tbody tr:nth-child(even) {
+  background: rgba(252, 245, 233, 0.76);
+}
+
+.orders-table tbody tr:hover {
+  background: rgba(245, 230, 209, 0.72);
+}
+
+.orders-primary-cell,
+.orders-detail-primary {
+  color: #2f1d14;
+  font-weight: 600;
+}
+
+.orders-total-cell,
+.orders-detail-accent {
+  color: #a56b44;
+  font-weight: 700;
+}
+
+.orders-empty-cell {
+  padding: 1.6rem 1rem;
+  text-align: center;
+  color: rgba(76, 54, 40, 0.76);
+}
+
+.orders-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.orders-status-completed {
+  background: rgba(95, 158, 107, 0.16);
+  color: #46744b;
+  border: 1px solid rgba(95, 158, 107, 0.22);
+}
+
+.orders-status-cancelled {
+  background: rgba(194, 96, 96, 0.14);
+  color: #9a4444;
+  border: 1px solid rgba(194, 96, 96, 0.22);
+}
+
+.orders-status-pending {
+  background: rgba(213, 160, 94, 0.18);
+  color: #8a5e1d;
+  border: 1px solid rgba(213, 160, 94, 0.28);
+}
+
+.orders-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.orders-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.65rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: transform 0.18s ease, filter 0.18s ease, background-color 0.18s ease;
+  border: 1px solid transparent;
+}
+
+.orders-button:hover,
+.orders-link-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.orders-button-primary,
+.orders-link-button {
+  border: 1px solid rgba(126, 78, 53, 0.24);
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 48%, #6e4330 100%);
+  color: #fff8eb;
+}
+
+.orders-button-success {
+  border: 1px solid rgba(79, 138, 89, 0.22);
+  background: linear-gradient(120deg, #6aa06f 0%, #4f8556 48%, #3f6d46 100%);
+  color: #f6fff5;
+}
+
+.orders-button-danger {
+  border: 1px solid rgba(175, 98, 98, 0.28);
+  background: linear-gradient(120deg, #ca7c7c 0%, #b85e5e 48%, #974444 100%);
+  color: #fff8f2;
+}
+
+.orders-button-accent,
+.orders-link-button-accent {
+  border: 1px solid rgba(135, 104, 172, 0.28);
+  background: linear-gradient(120deg, #9d7cc4 0%, #7f60ad 48%, #65458f 100%);
+  color: #fff8ff;
+}
+
+.orders-button-ghost {
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fff8ef;
+  color: #6f4a35;
+}
+
+.orders-modal-shell {
+  max-width: 70rem;
+  max-height: 90vh;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.orders-modal-copy {
+  color: #6a4b39;
+}
+
+.orders-modal-title {
+  margin: 0;
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: clamp(1.75rem, 2.5vw, 2.2rem);
+  line-height: 1.02;
+}
+
+.orders-detail-card {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.orders-detail-kicker,
+.orders-field-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8c6d55;
+}
+
+.orders-textarea,
+.orders-select,
+.orders-file-input {
+  border: 1px solid rgba(230, 193, 150, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: #342419;
+  outline: none;
+}
+
+.orders-select-danger:focus {
+  border-color: rgba(194, 96, 96, 0.9);
+  box-shadow: 0 0 0 4px rgba(194, 96, 96, 0.14);
+}
+
+.orders-notice {
+  border-radius: 1rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fff8ef;
+  color: #6a4b39;
+  padding: 0.85rem 1rem;
+  font-size: 0.82rem;
+}
+
+@media (min-width: 1280px) {
+  .orders-content {
+    padding: 1.7rem 2rem 2.2rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .orders-content {
+    padding: 1rem 1rem 1.5rem;
+  }
+
+  .orders-toolbar {
+    align-items: stretch;
+  }
+
+  .orders-search-input {
+    max-width: none;
+  }
+
+  .orders-action-group {
+    width: 100%;
+  }
+
+  .orders-button {
+    width: 100%;
+  }
+}
+</style>

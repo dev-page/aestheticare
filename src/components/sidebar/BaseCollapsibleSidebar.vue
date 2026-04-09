@@ -1,7 +1,7 @@
 <template>
   <div
     :style="containerStyle"
-    :class="['relative flex-shrink-0', enableTransitions ? 'transition-all duration-300' : '']"
+    :class="['customer-sidebar-shell relative flex-shrink-0', enableTransitions ? 'transition-all duration-300' : '']"
   >
     <button
       v-if="isSmallScreen && collapsed"
@@ -16,12 +16,12 @@
     <aside
       :style="asideStyle"
       :class="[
-        'readonly-exempt fixed left-0 top-0 bottom-0 z-40 bg-[#1f120b] border border-[#3a2417] rounded-tr-2xl rounded-br-2xl shadow-2xl flex flex-col overflow-hidden',
+        'customer-sidebar-panel readonly-exempt fixed left-0 top-0 bottom-0 z-40 bg-[#1f120b] border border-[#3a2417] rounded-tr-2xl rounded-br-2xl shadow-2xl flex flex-col overflow-hidden',
         isSmallScreen && collapsed ? '-translate-x-full' : 'translate-x-0',
         enableTransitions ? 'transition-all duration-300' : ''
       ]"
     >
-      <div class="p-4 border-b border-[#3a2417]">
+      <div class="customer-sidebar-header p-4 border-b border-[#3a2417]">
         <div class="flex items-center gap-3">
           <template v-if="showSkeleton">
             <div class="h-10 w-10 rounded-lg border border-[#5a3927] bg-[#3a2417] animate-pulse"></div>
@@ -50,7 +50,7 @@
         </div>
       </div>
 
-      <nav class="sidebar-scroll flex-1 p-3 overflow-y-auto">
+      <nav class="customer-sidebar-nav sidebar-scroll flex-1 p-3 overflow-y-auto">
       <ul v-if="showSkeleton" class="space-y-2">
         <li v-for="index in skeletonCount" :key="index">
           <div
@@ -216,7 +216,7 @@
       </ul>
     </nav>
 
-      <div class="p-3 border-t border-[#3a2417]">
+      <div class="customer-sidebar-footer p-3 border-t border-[#3a2417]">
         <div
           class="flex items-center rounded-lg border border-[#3a2417] bg-[#150d08]"
           :class="collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2'"
@@ -811,6 +811,124 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.customer-sidebar-shell {
+  position: relative;
+}
+
+.customer-sidebar-panel {
+  background:
+    linear-gradient(180deg, rgba(37, 22, 15, 0.98) 0%, rgba(26, 15, 10, 0.98) 100%) !important;
+  border-color: rgba(70, 42, 27, 0.95) !important;
+  box-shadow: 0 28px 60px rgba(28, 16, 10, 0.28) !important;
+}
+
+.customer-sidebar-header {
+  background:
+    linear-gradient(180deg, rgba(46, 27, 18, 0.98) 0%, rgba(34, 20, 13, 0.98) 100%);
+  border-bottom-color: rgba(89, 55, 36, 0.85) !important;
+}
+
+.customer-sidebar-nav {
+  background:
+    radial-gradient(circle at top left, rgba(181, 127, 92, 0.08), transparent 24%),
+    rgba(28, 16, 10, 0.98);
+}
+
+.customer-sidebar-footer {
+  background: rgba(20, 12, 8, 0.98);
+  border-top-color: rgba(89, 55, 36, 0.85) !important;
+}
+
+.customer-sidebar-panel :deep(h2) {
+  color: #fff5eb;
+}
+
+.customer-sidebar-panel :deep(p) {
+  color: rgba(243, 231, 224, 0.78);
+}
+
+.customer-sidebar-panel :deep(button),
+.customer-sidebar-panel :deep(a) {
+  border-radius: 1rem;
+}
+
+.customer-sidebar-panel :deep(.bg-\[\#3a2417\]) {
+  background: rgba(58, 36, 23, 0.92) !important;
+}
+
+.customer-sidebar-panel :deep(.bg-\[\#24160f\]) {
+  background: rgba(33, 19, 12, 0.96) !important;
+}
+
+.customer-sidebar-panel :deep(.bg-\[\#2a180f\]) {
+  background: rgba(39, 23, 14, 0.95) !important;
+}
+
+.customer-sidebar-panel :deep(.bg-\[\#150d08\]) {
+  background: rgba(23, 14, 9, 0.98) !important;
+}
+
+.customer-sidebar-panel :deep(.border-\[\#3a2417\]) {
+  border-color: rgba(89, 55, 36, 0.72) !important;
+}
+
+.customer-sidebar-panel :deep(.border-\[\#5a3927\]) {
+  border-color: rgba(118, 78, 52, 0.8) !important;
+}
+
+.customer-sidebar-panel :deep(.text-\[\#e8d8cf\]),
+.customer-sidebar-panel :deep(.text-\[\#f0e2d8\]),
+.customer-sidebar-panel :deep(.text-\[\#f3e7e0\]) {
+  color: rgba(247, 236, 226, 0.96) !important;
+}
+
+.customer-sidebar-panel :deep(.text-\[\#c9b3a5\]) {
+  color: rgba(233, 206, 189, 0.76) !important;
+}
+
+.customer-sidebar-panel :deep(.hover\:bg-\[\#3a2417\]:hover) {
+  background: rgba(88, 55, 35, 0.9) !important;
+}
+
+.customer-sidebar-panel :deep(.bg-\[\#6b3f27\]),
+.customer-sidebar-panel :deep(.bg-\[\#8b5a3c\]) {
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 48%, #6e4330 100%) !important;
+}
+
+.customer-sidebar-panel :deep(.bg-red-500) {
+  background: #d06565 !important;
+}
+
+.customer-sidebar-panel :deep(.bg-\[\#24160f\].opacity-80),
+.customer-sidebar-panel :deep(.opacity-80) {
+  opacity: 0.9 !important;
+}
+
+.customer-sidebar-panel :deep(.rounded-lg),
+.customer-sidebar-panel :deep(.rounded-xl) {
+  border-radius: 1rem !important;
+}
+
+.customer-sidebar-panel :deep(.rounded-md) {
+  border-radius: 0.9rem !important;
+}
+
+.customer-sidebar-panel :deep(.rounded-full) {
+  border-radius: 999px !important;
+}
+
+.customer-sidebar-panel :deep(.shadow-2xl) {
+  box-shadow: 0 28px 60px rgba(28, 16, 10, 0.28) !important;
+}
+
+@media (max-width: 767px) {
+  .customer-sidebar-panel {
+    border-radius: 0 1.5rem 1.5rem 0 !important;
+  }
+}
+</style>
 
 <style scoped>
 .sidebar-scroll {

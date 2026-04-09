@@ -1,17 +1,24 @@
 <template>
-  <div class="flex customer-theme bg-slate-900 min-h-screen">
+  <div class="appointments-shell flex customer-theme min-h-screen">
     <CustomerSidebar />
 
-    <main class="flex-1 p-8">
-      <h1 class="text-2xl font-bold text-white mb-6">My Appointments</h1>
+    <main class="appointments-main flex-1 p-6 md:p-8">
+      <h1 class="appointments-title mb-6">My Appointments</h1>
 
-      <section class="mb-10">
-        <h2 class="text-xl font-semibold text-cyan-300 mb-4">Online Consultations</h2>
+      <section class="appointments-panel mb-10">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">Active Bookings</p>
+            <h2 class="panel-title">Online Consultations</h2>
+          </div>
+          <p class="panel-note">{{ loading ? 'Loading consultations...' : `${onlineConsultationAppointments.length} consultation${onlineConsultationAppointments.length === 1 ? '' : 's'}` }}</p>
+        </div>
         <div v-if="loading" class="text-slate-300">Loading consultations...</div>
-        <div v-else-if="!onlineConsultationAppointments.length" class="rounded-xl border border-slate-700 bg-slate-800 p-4 text-slate-400">
+        <div v-else-if="!onlineConsultationAppointments.length" class="state-panel">
           No online consultations yet.
         </div>
-        <table v-else class="w-full text-left border-collapse">
+        <div v-else class="appointments-table-wrap">
+        <table class="appointments-table">
           <thead>
             <tr class="bg-slate-700 text-white">
               <th class="p-3">Service</th>
@@ -77,12 +84,20 @@
             </tr>
           </tbody>
         </table>
+        </div>
       </section>
 
-      <section>
-        <h2 class="text-xl font-semibold text-purple-400 mb-4">Upcoming Appointments</h2>
+      <section class="appointments-panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">Upcoming</p>
+            <h2 class="panel-title">Upcoming Appointments</h2>
+          </div>
+          <p class="panel-note">{{ loading ? 'Loading appointments...' : `${upcomingAppointments.length} appointment${upcomingAppointments.length === 1 ? '' : 's'}` }}</p>
+        </div>
         <div v-if="loading" class="text-slate-300">Loading appointments...</div>
-        <table v-else class="w-full text-left border-collapse">
+        <div v-else class="appointments-table-wrap">
+        <table class="appointments-table">
           <thead>
             <tr class="bg-slate-700 text-white">
               <th class="p-3">Service</th>
@@ -122,11 +137,20 @@
             </tr>
           </tbody>
         </table>
+        </div>
       </section>
 
-      <section class="mt-10">
-        <h2 class="text-xl font-semibold text-purple-400 mb-4">Past Appointments</h2>
-        <table class="w-full text-left border-collapse">
+      <section class="appointments-panel mt-10">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">History</p>
+            <h2 class="panel-title">Past Appointments</h2>
+          </div>
+          <p class="panel-note">{{ loading ? 'Loading appointments...' : `${pastAppointments.length} appointment${pastAppointments.length === 1 ? '' : 's'}` }}</p>
+        </div>
+        <div v-if="loading" class="text-slate-300">Loading appointments...</div>
+        <div v-else class="appointments-table-wrap">
+        <table class="appointments-table">
           <thead>
             <tr class="bg-slate-700 text-white">
               <th class="p-3">Service</th>
@@ -149,6 +173,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
       </section>
     </main>
 
@@ -1043,3 +1068,574 @@ const reschedule = async (appt) => {
 
 onMounted(loadAppointments)
 </script>
+
+<style scoped>
+.appointments-shell {
+  display: flex;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.34), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(198, 148, 108, 0.2), transparent 20%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.appointments-main {
+  flex: 1;
+  min-width: 0;
+  background:
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.24), transparent 24%),
+    radial-gradient(circle at 84% 12%, rgba(198, 148, 108, 0.14), transparent 18%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.appointments-title {
+  margin: 0;
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1;
+}
+
+.appointments-content {
+  display: grid;
+  gap: 1.35rem;
+}
+
+.appointments-panel,
+.state-panel {
+  border-radius: 1.75rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.appointments-panel {
+  padding: 1.25rem;
+}
+
+.panel-head,
+.request-modal-head,
+.request-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panel-kicker,
+.request-modal-kicker,
+.request-card-kicker,
+.request-field-label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8c6d55;
+}
+
+.panel-title {
+  margin: 0.55rem 0 0;
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  line-height: 1;
+}
+
+.panel-note,
+.request-modal-summary,
+.request-selected-date,
+.request-action-note {
+  color: rgba(76, 54, 40, 0.76);
+}
+
+.panel-note {
+  margin: 0;
+  align-self: center;
+  font-size: 0.88rem;
+}
+
+.appointments-table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(230, 193, 150, 0.72);
+  background: rgba(255, 251, 244, 0.94);
+}
+
+.appointments-table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+}
+
+.appointments-table thead tr {
+  background: linear-gradient(180deg, #d8b891 0%, #c8a57d 100%);
+}
+
+.appointments-table th {
+  padding: 1rem 1.05rem;
+  text-align: left;
+  color: #4d301f;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.appointments-table td {
+  padding: 1rem 1.05rem;
+  border-top: 1px solid rgba(230, 193, 150, 0.5);
+  color: #6a4b39;
+  font-size: 0.95rem;
+  vertical-align: middle;
+}
+
+.appointments-table tbody tr:nth-child(even) {
+  background: rgba(252, 245, 233, 0.76);
+}
+
+.appointments-table tbody tr:hover {
+  background: rgba(245, 230, 209, 0.72);
+}
+
+.table-primary {
+  color: #2f1d14;
+  font-weight: 600;
+}
+
+.table-empty-cell {
+  padding: 1.4rem 1rem;
+  text-align: center;
+  color: rgba(76, 54, 40, 0.76);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-badge-primary {
+  background: rgba(181, 127, 92, 0.16);
+  color: #7c4f34;
+  border: 1px solid rgba(181, 127, 92, 0.28);
+}
+
+.status-badge-warning {
+  background: rgba(213, 160, 94, 0.18);
+  color: #8a5e1d;
+  border: 1px solid rgba(213, 160, 94, 0.28);
+}
+
+.status-badge-danger {
+  background: rgba(194, 96, 96, 0.14);
+  color: #9a4444;
+  border: 1px solid rgba(194, 96, 96, 0.22);
+}
+
+.status-badge-muted {
+  background: rgba(157, 139, 121, 0.16);
+  color: #6f6258;
+  border: 1px solid rgba(157, 139, 121, 0.22);
+}
+
+.appointment-button,
+.request-button,
+.request-nav-button,
+.request-close-button {
+  transition: transform 0.18s ease, filter 0.18s ease, background-color 0.18s ease;
+}
+
+.appointment-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.85rem;
+  padding: 0.8rem 1.15rem;
+  border-radius: 1rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.appointment-button:disabled,
+.request-nav-button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.appointment-button-secondary {
+  border: 1px solid rgba(126, 78, 53, 0.24);
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 48%, #6e4330 100%);
+  color: #fff8eb;
+}
+
+.appointment-button-danger {
+  border: 1px solid rgba(175, 98, 98, 0.28);
+  background: linear-gradient(120deg, #ca7c7c 0%, #b85e5e 48%, #974444 100%);
+  color: #fff8f2;
+}
+
+.appointment-button:hover:not(:disabled),
+.request-button:hover,
+.request-nav-button:hover:not(:disabled),
+.request-close-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.state-panel {
+  margin-top: 1rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: #342419;
+}
+
+.state-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #342419;
+}
+
+.request-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(35, 20, 12, 0.56);
+  backdrop-filter: blur(6px);
+}
+
+.request-modal-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 70rem;
+  max-height: 90vh;
+  overflow: hidden;
+  border-radius: 1.9rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.request-modal-head {
+  padding: 1.4rem 1.5rem;
+  border-bottom: 1px solid rgba(230, 193, 150, 0.8);
+}
+
+.request-modal-title {
+  margin: 0.45rem 0 0;
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: clamp(1.75rem, 2.5vw, 2.2rem);
+  line-height: 1.02;
+}
+
+.request-close-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fff8ef;
+  color: #6f4a35;
+}
+
+.request-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.4rem 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.request-policy-card,
+.request-card {
+  padding: 1rem;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.request-policy-card {
+  background: linear-gradient(180deg, rgba(255, 248, 235, 0.98), rgba(249, 236, 215, 0.94));
+  color: #674532;
+}
+
+.request-textarea {
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(230, 193, 150, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: #342419;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.request-textarea:focus {
+  border-color: rgba(198, 148, 108, 0.9);
+  box-shadow: 0 0 0 4px rgba(214, 169, 123, 0.16);
+}
+
+.request-reschedule-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+}
+
+.request-card-head {
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(230, 193, 150, 0.7);
+}
+
+.request-nav-button {
+  border-radius: 999px;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fff8ef;
+  color: #6f4a35;
+  padding: 0.65rem 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.request-weekdays,
+.request-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.request-weekdays {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8c6d55;
+}
+
+.request-calendar-grid {
+  margin-top: 0.8rem;
+}
+
+.request-day-button {
+  min-height: 4.6rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  padding: 0.55rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fffaf2;
+  color: #513626;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.request-day-other {
+  background: #f6efe6;
+  color: #a08a7a;
+}
+
+.request-day-available:hover {
+  transform: translateY(-1px);
+  border-color: rgba(181, 127, 92, 0.6);
+  background: #fff4e6;
+}
+
+.request-day-disabled {
+  opacity: 0.45;
+}
+
+.request-day-selected {
+  border-color: rgba(181, 127, 92, 0.85);
+  background: rgba(181, 127, 92, 0.16);
+  color: #6f4330;
+}
+
+.request-day-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: #d7a764;
+}
+
+.request-day-disabled .request-day-dot {
+  background: #b6a79a;
+}
+
+.request-day-selected .request-day-dot {
+  background: #8d5a3b;
+}
+
+.request-duration-pill,
+.request-info-card {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+}
+
+.request-duration-pill {
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fff8ef;
+  color: #7c5b44;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.request-info-card {
+  margin-top: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fffaf2;
+  color: #6a4b39;
+  font-size: 0.92rem;
+}
+
+.request-info-card-warn {
+  border-color: rgba(213, 160, 94, 0.35);
+  background: rgba(255, 243, 219, 0.92);
+  color: #8a5e1d;
+}
+
+.request-info-card-muted {
+  border-style: dashed;
+  color: #8a7768;
+}
+
+.request-slot-list {
+  display: grid;
+  gap: 0.65rem;
+  max-height: 20rem;
+  overflow-y: auto;
+  margin-top: 1rem;
+  padding-right: 0.25rem;
+}
+
+.request-slot-button {
+  text-align: left;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fffaf2;
+  color: #513626;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.request-slot-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(181, 127, 92, 0.6);
+  background: #fff4e6;
+}
+
+.request-slot-button-selected {
+  border-color: rgba(181, 127, 92, 0.9);
+  background: rgba(181, 127, 92, 0.16);
+}
+
+.request-detail-list {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(230, 193, 150, 0.7);
+  display: grid;
+  gap: 0.5rem;
+  color: #6b5040;
+  font-size: 0.92rem;
+}
+
+.request-detail-strong {
+  font-weight: 700;
+  color: #452b1e;
+}
+
+.request-modal-actions {
+  align-items: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(230, 193, 150, 0.7);
+}
+
+.request-action-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.request-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.85rem;
+  padding: 0.8rem 1.15rem;
+  border-radius: 1rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.request-button-secondary {
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fff8ef;
+  color: #6f4a35;
+}
+
+.request-button-primary {
+  border: 1px solid rgba(126, 78, 53, 0.24);
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 48%, #6e4330 100%);
+  color: #fff8eb;
+}
+
+@media (min-width: 1280px) {
+  .appointments-content {
+    padding: 1.7rem 2rem 2.2rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .request-reschedule-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .appointments-content {
+    padding: 1rem 1rem 1.5rem;
+  }
+
+  .panel-head,
+  .request-modal-head,
+  .request-card-head,
+  .request-modal-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .request-action-buttons {
+    width: 100%;
+  }
+
+  .appointment-button,
+  .request-button {
+    width: 100%;
+  }
+
+  .request-modal-overlay {
+    align-items: flex-start;
+  }
+}
+</style>
