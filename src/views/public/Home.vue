@@ -58,7 +58,7 @@
             to="/register"
             class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gold-700 text-white text-xs sm:text-sm tracking-widest uppercase hover:bg-gold-800 transition"
           >
-            Free Trial
+            Register
           </router-link>
         </div>
 
@@ -123,7 +123,7 @@
                 @click="closeMobileMenu"
                 class="px-4 py-3 rounded-full bg-gold-700 text-white text-center transition hover:bg-gold-800"
               >
-                Free Trial
+                Register
               </router-link>
             </div>
           </div>
@@ -445,15 +445,11 @@
               Join modern aesthetic centers using intelligent systems to manage bookings, treatment journeys, staff visibility, and clinic growth in one elegant platform.
             </p>
             <div class="footer-cta-actions">
-              <button @click="showSubscriptionPopup = true" class="footer-primary-btn">
-                Try 14-Day Free Trial
-              </button>
               <router-link to="/subscription-features" class="footer-secondary-btn">
                 View Plans
               </router-link>
             </div>
             <div class="footer-cta-highlights">
-              <span class="footer-highlight-chip">14-day free trial</span>
               <span class="footer-highlight-chip">Clinic-ready setup</span>
             </div>
           </div>
@@ -747,8 +743,46 @@ export default {
 </script>
 
 <style scoped>
-body {
+:global(body) {
   font-family: "Playfair Display", serif;
+}
+
+.public-glass-nav {
+  background:
+    linear-gradient(180deg, rgba(255, 251, 244, 0.86) 0%, rgba(255, 248, 235, 0.74) 100%);
+  border-bottom: 1px solid rgba(198, 148, 108, 0.28);
+  box-shadow:
+    0 8px 24px rgba(54, 34, 22, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.public-brand-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.public-nav-mark {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #9f6946 0%, #d7aa7d 100%);
+  box-shadow:
+    0 0 0 4px rgba(255, 248, 235, 0.55),
+    0 8px 18px rgba(111, 63, 42, 0.18);
+}
+
+.public-nav-brand {
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  background: linear-gradient(120deg, #3c2519 0%, #9f6946 42%, #c99673 70%, #744a33 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .hero-editorial-title {
