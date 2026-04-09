@@ -106,8 +106,8 @@
 
           <div class="flex-1 overflow-y-auto p-5 flex flex-col text-xs tracking-[0.2em] uppercase text-charcoal-700">
             <div class="flex flex-col gap-2">
-              <a class="py-2 border-b border-gold-200/70 transition-all duration-200 hover:text-gold-700 hover:pl-1">Features</a>
-              <a class="py-2 border-b border-gold-200/70 transition-all duration-200 hover:text-gold-700 hover:pl-1">Solutions</a>
+              <button type="button" @click="closeMobileMenu" class="py-2 border-b border-gold-200/70 text-left transition-all duration-200 hover:text-gold-700 hover:pl-1">Features</button>
+              <button type="button" @click="closeMobileMenu" class="py-2 border-b border-gold-200/70 text-left transition-all duration-200 hover:text-gold-700 hover:pl-1">Solutions</button>
               <router-link to="/subscription-features" @click="closeMobileMenu" class="py-2 border-b border-gold-200/70 transition-all duration-200 hover:text-gold-700 hover:pl-1">Pricing</router-link>
               <router-link to="/centers" @click="closeMobileMenu" class="py-2 border-b border-gold-200/70 transition-all duration-200 hover:text-gold-700 hover:pl-1">Centers</router-link>
             </div>
@@ -215,7 +215,7 @@
         loop
         playsinline
       >
-        <source src="@/assets/home_vid.mp4" type="video/mp4" />
+        <source :src="homeVideo" type="video/mp4" />
       </video>
       <div class="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,11,9,0.38)_0%,rgba(24,16,12,0.18)_34%,rgba(21,14,11,0.18)_66%,rgba(16,11,9,0.34)_100%)]"></div>
       <div class="absolute inset-0 bg-black/18"></div>
@@ -549,9 +549,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useAuth } from "@/composables/useAuth";
 import Modal from "@/components/common/Modal.vue";
 import SubscriptionPopup from "@/components/common/SubscriptionPopup.vue";
-import placeholder from '@/assets/placeholder.svg'
 import homePicture from '@/assets/home_picture.jpg'
 import bg from '@/assets/bg.jpg'
+import homeVideo from '@/assets/home_vid.mp4'
 
 export default {
   name: "HomePage",
@@ -603,7 +603,7 @@ export default {
         description: "Track usage per service, monitor stock thresholds, and avoid treatment delays with real-time supply visibility.",
         miniEyebrow: "Clinic Ops",
         miniTitle: "Inventory",
-        image: placeholder,
+        image: homePicture,
       },
       {
         eyebrow: "Team Visibility",
@@ -611,7 +611,7 @@ export default {
         description: "Review practitioner productivity, service completion rates, and schedule utilization across your branches.",
         miniEyebrow: "People",
         miniTitle: "Staff Insights",
-        image: homePicture,
+        image: bg,
       },
       {
         eyebrow: "Growth Intelligence",
@@ -619,7 +619,7 @@ export default {
         description: "Visualize top-performing services, monthly trends, and conversion metrics to guide better business decisions.",
         miniEyebrow: "Growth",
         miniTitle: "Analytics",
-        image: bg,
+        image: homePicture,
       },
     ];
 
@@ -739,7 +739,7 @@ export default {
 </script>
 
 <style scoped>
-body {
+:global(body) {
   font-family: "Playfair Display", serif;
 }
 
