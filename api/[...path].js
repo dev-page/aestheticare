@@ -39,7 +39,7 @@ const normalizeEmail = (value) => String(value || '').trim().toLowerCase()
 
 const getPath = (req) => {
   const url = new URL(req.url || '/', 'http://localhost')
-  return url.pathname.replace(/^\/api/, '') || '/'
+  return (url.pathname.replace(/^\/api/, '') || '/').replace(/\/+$/, '') || '/'
 }
 
 const getSendGridConfig = () => {
