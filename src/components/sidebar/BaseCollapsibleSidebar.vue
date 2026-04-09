@@ -113,8 +113,11 @@
             </button>
 
             <ul
-              v-if="!isSmallScreen && !collapsed && isGroupOpen(item)"
-              class="mt-1 ml-4 space-y-1"
+              v-if="!collapsed && isGroupOpen(item)"
+              :class="[
+                'mt-1 space-y-1',
+                isSmallScreen ? 'ml-2 border-l border-[#3a2417] pl-2' : 'ml-4'
+              ]"
             >
               <li v-for="child in item.children" :key="child.to">
                 <component
@@ -152,7 +155,6 @@
               </li>
             </ul>
 
-            <!-- mobile submenu uses the same expanded in-flow accordion as desktop -->
           </template>
 
           <template v-else>
@@ -499,9 +501,10 @@ export default {
     }
 
     const handleItemNavigation = () => {
-      if (isSmallScreen.value) {
+      if (!isSmallScreen.value) return
+      requestAnimationFrame(() => {
         closeSidebar()
-      }
+      })
     }
 
     const iconName = (name) => {
