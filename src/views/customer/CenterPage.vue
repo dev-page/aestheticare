@@ -1,8 +1,8 @@
 <template>
-  <div class="customer-center-page flex customer-theme min-h-screen bg-slate-900">
+  <div class="customer-center-page flex customer-theme min-h-screen">
     <CustomerSidebar class="flex-shrink-0" />
 
-    <main class="flex-1 p-4 md:p-8">
+    <main class="customer-center-main flex-1 p-4 md:p-8">
       <button
         type="button"
         class="mb-4 inline-flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
@@ -12,26 +12,30 @@
         <span class="text-sm font-medium">Back</span>
       </button>
 
-      <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="relative h-56 md:h-64 bg-slate-700">
-          <img v-if="center.bannerPicture" :src="center.bannerPicture" alt="Clinic banner" class="w-full h-full object-cover" />
-          <div v-else class="absolute inset-0 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-500"></div>
+      <div class="customer-center-shell overflow-hidden">
+        <div class="customer-center-banner relative h-56 md:h-64">
+          <img v-if="center.bannerPicture" :src="center.bannerPicture" alt="Clinic banner" class="h-full w-full object-cover" />
+          <div v-else class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(249,213,175,0.95),_rgba(200,147,108,0.82)_45%,_rgba(117,75,51,0.94)_100%)]"></div>
+          <div class="absolute inset-0 bg-gradient-to-t from-[rgba(39,23,14,0.78)] via-[rgba(39,23,14,0.14)] to-transparent"></div>
         </div>
 
-        <div class="px-4 md:px-8 pb-8">
-          <div class="relative -mt-16 md:-mt-20 z-10 flex flex-col md:flex-row md:items-end gap-4">
-            <div class="h-28 w-28 md:h-36 md:w-36 rounded-full border-4 border-slate-800 bg-slate-700 overflow-hidden shadow-xl">
-              <img v-if="center.profilePicture" :src="center.profilePicture" alt="Clinic profile" class="w-full h-full object-cover" />
+        <div class="customer-center-body px-4 md:px-8 pb-8">
+          <div class="customer-center-identity relative -mt-16 md:-mt-20 z-10 flex flex-col md:flex-row md:items-end gap-4">
+            <div class="customer-center-avatar h-28 w-28 md:h-36 md:w-36 rounded-full overflow-hidden shadow-xl">
+              <img v-if="center.profilePicture" :src="center.profilePicture" alt="Clinic profile" class="h-full w-full object-cover" />
+              <div v-else class="customer-center-avatar-fallback flex h-full w-full items-center justify-center text-3xl font-bold text-white">
+                {{ center.name ? center.name.charAt(0) : 'C' }}
+              </div>
             </div>
             <div class="flex-1 pt-1 md:pt-0">
-              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div class="customer-center-hero-copy flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h1 class="text-2xl md:text-5xl font-bold text-white">{{ center.name || 'Center' }}</h1>
-                  <p class="text-slate-300 mt-1">{{ center.location || 'Location not set' }}</p>
+                  <h1 class="customer-center-title">{{ center.name || 'Center' }}</h1>
+                  <p class="customer-center-location mt-1">{{ center.location || 'Location not set' }}</p>
                 </div>
                 <button
                   type="button"
-                  class="inline-flex items-center gap-2 self-start rounded-full border border-rose-300/70 bg-rose-500/25 px-4 py-2 text-sm font-semibold text-rose-50 shadow-lg shadow-rose-950/25 transition hover:bg-rose-500/35 hover:border-rose-200 hover:text-white"
+                  class="customer-report-button inline-flex items-center gap-2 self-start px-4 py-2 text-sm font-semibold"
                   title="Report this center"
                   @click="openReportModal"
                 >
@@ -42,10 +46,10 @@
             </div>
           </div>
 
-          <div v-if="branchOptions.length > 1" class="mt-5 rounded-2xl border border-slate-600 bg-slate-900/50 p-4">
+          <div v-if="branchOptions.length > 1" class="customer-center-branch-panel mt-5 p-4">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Branch Selector</p>
+                <p class="customer-section-kicker">Branch Selector</p>
                 <p class="mt-1 text-sm text-slate-300">
                   Choose a branch to view its products, services, and booking availability.
                 </p>
@@ -53,7 +57,7 @@
               <div class="w-full md:w-[340px]">
                 <select
                   v-model="selectedBranchId"
-                  class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"
+                  class="customer-center-select w-full px-3 py-2"
                   @change="selectBranch"
                 >
                   <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
@@ -62,22 +66,20 @@
                 </select>
               </div>
             </div>
-            <p class="mt-3 text-xs text-slate-400">
+            <p class="customer-center-showing mt-3 text-xs">
               Showing: <span class="text-slate-200">{{ selectedBranchLabel }}</span>
             </p>
           </div>
 
-          <div class="mt-6 border-t border-slate-700 pt-4">
+          <div class="customer-center-tabs mt-6 pt-4">
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="tab in tabs"
                 :key="tab"
                 @click="activeTab = tab"
                 :class="[
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                  activeTab === tab
-                    ? 'bg-gold-700 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  'customer-center-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                  activeTab === tab ? 'is-active' : ''
                 ]"
               >
                 {{ tab }}
@@ -87,20 +89,20 @@
 
           <div class="mt-6">
           <div v-if="activeTab === 'About Us'">
-            <div class="bg-slate-700/60 rounded-xl p-5 border border-slate-600">
-              <h3 class="text-white font-semibold mb-2">Description</h3>
+            <div class="customer-center-info-card p-5">
+              <h3 class="customer-center-card-title mb-2">Description</h3>
               <p class="text-slate-200 leading-relaxed">
                 {{ center.description || 'No description available yet.' }}
               </p>
             </div>
 
-            <div class="mt-4 bg-slate-700/60 rounded-xl p-5 border border-slate-600">
-              <h3 class="text-white font-semibold mb-2">Offered Services</h3>
+            <div class="customer-center-info-card mt-4 p-5">
+              <h3 class="customer-center-card-title mb-2">Offered Services</h3>
               <div v-if="center.services.length" class="flex flex-wrap gap-2">
                 <span
                   v-for="(service, index) in center.services"
                   :key="`center-service-${index}-${service}`"
-                  class="inline-flex items-center px-3 py-1 rounded-full border border-[#9a7d5c] bg-[#d8c2a2] text-[#4d3724] text-xs font-medium"
+                  class="customer-center-service-chip inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
                 >
                   {{ service }}
                 </span>
@@ -109,13 +111,13 @@
             </div>
 
             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="bg-slate-700/60 rounded-xl p-5 border border-slate-600">
-                <h4 class="text-slate-200 font-medium mb-2">Contact</h4>
+              <div class="customer-center-info-card p-5">
+                <h4 class="customer-center-card-title mb-2">Contact</h4>
                 <p class="text-slate-300 text-sm">Email: {{ center.businessEmail || center.email || 'Not set' }}</p>
                 <p class="text-slate-300 text-sm mt-1">Phone: {{ center.contactNumber || 'Not set' }}</p>
               </div>
-              <div class="bg-slate-700/60 rounded-xl p-5 border border-slate-600">
-                <h4 class="text-slate-200 font-medium mb-2">Address</h4>
+              <div class="customer-center-info-card p-5">
+                <h4 class="customer-center-card-title mb-2">Address</h4>
                 <p class="text-slate-300 text-sm">{{ center.location || 'Not set' }}</p>
               </div>
             </div>
@@ -2916,14 +2918,156 @@ const formatChatTime = (timestamp) => {
 
 <style scoped>
 .customer-center-page {
-  color: #f8fafc;
+  color: #3d281d;
 }
 
-.customer-center-page main {
+.customer-center-main {
   background:
-    radial-gradient(circle at top left, rgba(217, 119, 6, 0.14), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.35), transparent 28%),
-    linear-gradient(180deg, #1b120d 0%, #120c09 100%);
+    radial-gradient(circle at top left, rgba(241, 212, 170, 0.34), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(198, 148, 108, 0.2), transparent 20%),
+    linear-gradient(180deg, #fbf5e8 0%, #f8ecd9 52%, #f4e1c6 100%);
+}
+
+.customer-back-link {
+  color: #8c6d55;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.customer-back-link:hover {
+  color: #62341f;
+  transform: translateX(-1px);
+}
+
+.customer-back-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: rgba(255, 248, 239, 0.88);
+  color: #6f4a35;
+}
+
+.customer-center-shell,
+.customer-center-branch-panel,
+.customer-center-info-card {
+  border-radius: 1.75rem;
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.customer-center-shell {
+  overflow: hidden;
+}
+
+.customer-center-banner {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f8e5bd 0%, #bc8a65 100%);
+}
+
+.customer-center-body {
+  position: relative;
+}
+
+.customer-center-avatar {
+  border: 4px solid #243447;
+  background: linear-gradient(135deg, #ead6b8 0%, #dcb489 48%, #c6946c 100%);
+  box-shadow: 0 18px 36px rgba(64, 42, 29, 0.22);
+}
+
+.customer-center-avatar-fallback {
+  background: linear-gradient(135deg, rgba(111, 74, 53, 0.96), rgba(77, 55, 36, 0.96));
+}
+
+.customer-center-hero-copy {
+  align-items: flex-start;
+}
+
+.customer-center-title {
+  margin: 0;
+  color: #fff3e3;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: clamp(2.15rem, 4vw, 4.25rem);
+  line-height: 1;
+  text-shadow: 0 2px 10px rgba(61, 40, 29, 0.2);
+}
+
+.customer-center-location {
+  margin: 0.45rem 0 0;
+  color: rgba(255, 243, 227, 0.88);
+  font-size: 1rem;
+}
+
+.customer-report-button {
+  border-radius: 9999px;
+  border: 1px solid rgba(230, 193, 150, 0.85);
+  background: linear-gradient(120deg, rgba(181, 127, 92, 0.52), rgba(111, 67, 48, 0.74));
+  color: #fff8eb;
+  box-shadow: 0 14px 26px rgba(111, 63, 42, 0.14);
+}
+
+.customer-section-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8c6d55;
+}
+
+.customer-center-select {
+  min-height: 3.35rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(230, 193, 150, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: #342419;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.customer-center-select:focus {
+  border-color: rgba(198, 148, 108, 0.9);
+  box-shadow: 0 0 0 4px rgba(214, 169, 123, 0.16);
+}
+
+.customer-center-showing {
+  color: rgba(76, 54, 40, 0.76);
+}
+
+.customer-center-tabs {
+  border-top: 1px solid rgba(230, 193, 150, 0.8);
+}
+
+.customer-center-tab {
+  border: 1px solid rgba(230, 193, 150, 0.75);
+  background: rgba(255, 248, 239, 0.86);
+  color: #7c5b44;
+  box-shadow: 0 8px 18px rgba(87, 56, 35, 0.06);
+}
+
+.customer-center-tab.is-active {
+  border-color: rgba(126, 78, 53, 0.24);
+  background: linear-gradient(120deg, #b57f5c 0%, #8d5a3b 48%, #6e4330 100%);
+  color: #fff8eb;
+}
+
+.customer-center-info-card {
+  background: rgba(255, 251, 244, 0.94);
+}
+
+.customer-center-card-title {
+  color: #3d281d;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: 1.1rem;
+}
+
+.customer-center-service-chip {
+  border: 1px solid rgba(230, 193, 150, 0.8);
+  background: #fbf1dc;
+  color: #8a5b3d;
 }
 
 .customer-center-page main :deep(.booking-panel) {
@@ -2932,45 +3076,51 @@ const formatChatTime = (timestamp) => {
   box-shadow: 0 22px 50px rgba(0, 0, 0, 0.22);
 }
 
-.customer-center-page main :deep(.booking-card) {
+.customer-center-main :deep(.booking-panel) {
+  background: rgba(15, 23, 42, 0.92);
+  border-color: rgba(148, 163, 184, 0.22);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.22);
+}
+
+.customer-center-main :deep(.booking-card) {
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
   border-color: rgba(148, 163, 184, 0.25);
 }
 
-.customer-center-page main :deep(.booking-calendar) {
+.customer-center-main :deep(.booking-calendar) {
   background: rgba(15, 23, 42, 0.94);
   border-color: rgba(148, 163, 184, 0.18);
 }
 
-.customer-center-page main :deep(.booking-day) {
+.customer-center-main :deep(.booking-day) {
   background: rgba(30, 41, 59, 0.96);
   color: #f8fafc;
   border-color: rgba(100, 116, 139, 0.35);
 }
 
-.customer-center-page main :deep(.booking-day:hover) {
+.customer-center-main :deep(.booking-day:hover) {
   background: rgba(71, 85, 105, 0.95);
 }
 
-.customer-center-page main :deep(.booking-day.is-selected) {
+.customer-center-main :deep(.booking-day.is-selected) {
   background: linear-gradient(135deg, #0f766e, #14b8a6);
   color: #fff;
   border-color: rgba(45, 212, 191, 0.95);
   box-shadow: 0 12px 28px rgba(13, 148, 136, 0.35);
 }
 
-.customer-center-page main :deep(.booking-day.is-available) {
+.customer-center-main :deep(.booking-day.is-available) {
   background: rgba(16, 185, 129, 0.12);
   color: #d1fae5;
   border-color: rgba(16, 185, 129, 0.45);
 }
 
-.customer-center-page main :deep(.booking-day.is-disabled) {
+.customer-center-main :deep(.booking-day.is-disabled) {
   background: rgba(15, 23, 42, 0.55);
   color: rgba(148, 163, 184, 0.7);
 }
 
-.customer-center-page main :deep(.booking-day-dot) {
+.customer-center-main :deep(.booking-day-dot) {
   width: 0.4rem;
   height: 0.4rem;
   border-radius: 9999px;
@@ -2978,40 +3128,40 @@ const formatChatTime = (timestamp) => {
   transition: transform 0.18s ease, opacity 0.18s ease, background-color 0.18s ease;
 }
 
-.customer-center-page main :deep(.booking-day-dot-available) {
+.customer-center-main :deep(.booking-day-dot-available) {
   background: #34d399;
   opacity: 0.95;
 }
 
-.customer-center-page main :deep(.booking-day-dot-selected) {
+.customer-center-main :deep(.booking-day-dot-selected) {
   background: #fbbf24;
   transform: scale(1.1);
   opacity: 1;
 }
 
-.customer-center-page main :deep(.booking-day-dot-disabled) {
+.customer-center-main :deep(.booking-day-dot-disabled) {
   background: rgba(148, 163, 184, 0.35);
   opacity: 0.6;
 }
 
-.customer-center-page main :deep(.booking-slot) {
+.customer-center-main :deep(.booking-slot) {
   background: rgba(15, 23, 42, 0.94);
   border-color: rgba(100, 116, 139, 0.35);
   color: #f8fafc;
 }
 
-.customer-center-page main :deep(.booking-slot.is-selected) {
+.customer-center-main :deep(.booking-slot.is-selected) {
   background: rgba(217, 119, 6, 0.18);
   border-color: rgba(251, 191, 36, 0.9);
   color: #fff;
 }
 
-.customer-center-page main :deep(.booking-sidecard) {
+.customer-center-main :deep(.booking-sidecard) {
   background: rgba(15, 23, 42, 0.92);
   border-color: rgba(148, 163, 184, 0.22);
 }
 
-.customer-center-page main :deep(.booking-notice) {
+.customer-center-main :deep(.booking-notice) {
   color: #fde68a;
 }
 </style>
