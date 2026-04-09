@@ -244,6 +244,7 @@ export default {
       if (!currentBranchId.value) return
       const snapshot = await getDocs(query(collection(db, 'appointments'), where('branchId', '==', currentBranchId.value)))
       appointments.value = snapshot.docs.map((snap) => ({ id: snap.id, ...snap.data() }))
+      await cleanupExpiredMeetLinks({ silent: true })
     }
 
     const parseDateTime = (dateValue, timeValue) => {
@@ -296,6 +297,7 @@ export default {
             timezone: 'Asia/Manila',
             attendeeEmails: [appointment.clientEmail || appointment.email].filter(Boolean),
             requestId: `appointment-${appointment.id}-${Date.now()}`,
+            replaceEventId: appointment.meetEventId || '',
           }),
         })
 
@@ -326,6 +328,57 @@ export default {
         toast.error(error?.message || 'Failed to create Google Meet link.')
       } finally {
         creatingId.value = ''
+      }
+    }
+
+    const revokeMeetLink = async (appointment, reason = 'expired', { silent = false } = {}) => {
+      if (!appointment?.id) return false
+      if (!appointment?.meetLink && !appointment?.meetEventId) return false
+
+      try {
+        const response = await fetchFromBackend('/google-meet/revoke-consultation-link', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            appointmentId: appointment.id,
+            eventId: appointment.meetEventId || '',
+            reason,
+          }),
+        })
+
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error || 'Failed to revoke Google Meet link.')
+        }
+
+        appointment.meetLink = ''
+        appointment.meetEventId = ''
+        appointment.meetRevokedAt = new Date().toISOString()
+        appointment.meetRevocationReason = reason
+        appointment.meetValidUntil = ''
+        if (!silent) {
+          toast.success('Expired consultation link revoked.')
+        }
+        return true
+      } catch (error) {
+        console.error('Failed to revoke Google Meet link:', error)
+        if (!silent) {
+          toast.error(error?.message || 'Failed to revoke Google Meet link.')
+        }
+        return false
+      }
+    }
+
+    const cleanupExpiredMeetLinks = async ({ silent = false } = {}) => {
+      const expiredAppointments = appointments.value.filter(
+        (appointment) => appointment?.meetLink && isExpiredAppointment(appointment)
+      )
+
+      if (!expiredAppointments.length) return
+
+      for (const appointment of expiredAppointments) {
+        // Best-effort cleanup so expired Meet links are removed from both Firestore and Google Calendar.
+        await revokeMeetLink(appointment, 'expired', { silent })
       }
     }
 
@@ -417,6 +470,7 @@ export default {
     }
 
     let unsubscribeAuth = null
+    let expirySweepTimer = null
 
     onMounted(() => {
       unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -432,10 +486,15 @@ export default {
 
         await loadAppointments()
       })
+
+      expirySweepTimer = window.setInterval(() => {
+        cleanupExpiredMeetLinks({ silent: true })
+      }, 5 * 60 * 1000)
     })
 
     onUnmounted(() => {
       if (unsubscribeAuth) unsubscribeAuth()
+      if (expirySweepTimer) window.clearInterval(expirySweepTimer)
     })
 
     return {

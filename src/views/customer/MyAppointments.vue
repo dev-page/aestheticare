@@ -5,6 +5,80 @@
     <main class="flex-1 p-8">
       <h1 class="text-2xl font-bold text-white mb-6">My Appointments</h1>
 
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold text-cyan-300 mb-4">Online Consultations</h2>
+        <div v-if="loading" class="text-slate-300">Loading consultations...</div>
+        <div v-else-if="!onlineConsultationAppointments.length" class="rounded-xl border border-slate-700 bg-slate-800 p-4 text-slate-400">
+          No online consultations yet.
+        </div>
+        <table v-else class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-700 text-white">
+              <th class="p-3">Service</th>
+              <th class="p-3">Clinic</th>
+              <th class="p-3">Date</th>
+              <th class="p-3">Time</th>
+              <th class="p-3">Meeting Link</th>
+              <th class="p-3">Status</th>
+              <th class="p-3">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="appt in onlineConsultationAppointments" :key="appt.id" class="border-b border-slate-600 text-slate-300 align-top">
+              <td class="p-3">{{ formatAppointmentServices(appt) }}</td>
+              <td class="p-3">{{ appt.clinic }}</td>
+              <td class="p-3">{{ appt.date }}</td>
+              <td class="p-3">{{ appt.time }}</td>
+              <td class="p-3">
+                <div v-if="appt.meetLink && !isMeetLinkExpired(appt)" class="space-y-2">
+                  <a
+                    :href="appt.meetLink"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="block break-all text-sky-300 hover:text-sky-200 underline"
+                  >
+                    {{ appt.meetLink }}
+                  </a>
+                  <button
+                    type="button"
+                    class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs"
+                    @click="copyMeetLink(appt.meetLink)"
+                  >
+                    Copy Link
+                  </button>
+                </div>
+                <span v-else-if="isMeetLinkRevoked(appt)" class="text-slate-300 text-sm">
+                  Link revoked
+                </span>
+                <span v-else-if="appt.consultationMode === 'online' && !appt.meetLink" class="text-amber-300 text-sm">
+                  Waiting for practitioner to create the meeting link.
+                </span>
+                <span v-else-if="isMeetLinkExpired(appt)" class="text-rose-300 text-sm">
+                  Link expired
+                </span>
+                <span v-else class="text-slate-400 text-sm">-</span>
+              </td>
+              <td class="p-3">
+                <span :class="['px-2 py-1 rounded-full text-xs font-medium', consultationStatusClass(appt)]">
+                  {{ consultationStatusLabel(appt) }}
+                </span>
+              </td>
+              <td class="p-3">
+                <button
+                  v-if="appt.meetLink && !isMeetLinkExpired(appt)"
+                  type="button"
+                  class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs"
+                  @click="joinMeetLink(appt.meetLink)"
+                >
+                  Join Call
+                </button>
+                <span v-else class="text-slate-500 text-sm">Unavailable</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <section>
         <h2 class="text-xl font-semibold text-purple-400 mb-4">Upcoming Appointments</h2>
         <div v-if="loading" class="text-slate-300">Loading appointments...</div>
@@ -286,6 +360,66 @@ const requestCalendarWeekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'
 const toDateTime = (date, time) => new Date(`${date}T${time || '00:00'}`)
 
 const normalizeAppointmentStatus = (value) => String(value || '').trim().toLowerCase()
+
+const isOnlineConsultation = (appointment) => {
+  const mode = String(appointment?.consultationMode || '').trim().toLowerCase()
+  return mode === 'online' || Boolean(appointment?.meetLink || appointment?.meetEventId)
+}
+
+const isMeetLinkExpired = (appointment) => {
+  if (!isOnlineConsultation(appointment)) return false
+  const meetValidUntil = appointment?.meetValidUntil ? new Date(appointment.meetValidUntil) : null
+  if (meetValidUntil && !Number.isNaN(meetValidUntil.getTime())) {
+    return Date.now() > meetValidUntil.getTime()
+  }
+  const start = toDateTime(appointment?.date, appointment?.time)
+  if (!start) return false
+  const durationMinutes = Math.max(30, Number(getAppointmentDurationMinutes(appointment) || 0))
+  return Date.now() > new Date(start.getTime() + durationMinutes * 60 * 1000).getTime()
+}
+
+const isMeetLinkRevoked = (appointment) =>
+  Boolean(appointment?.meetRevokedAt || String(appointment?.meetRevocationReason || '').trim())
+
+const consultationStatusLabel = (appointment) => {
+  if (!isOnlineConsultation(appointment)) return 'Offline'
+  if (isMeetLinkRevoked(appointment)) return 'Revoked'
+  if (isMeetLinkExpired(appointment)) return 'Expired'
+  if (appointment?.meetLink) return 'Ready'
+  return 'Waiting'
+}
+
+const consultationStatusClass = (appointment) => {
+  if (!isOnlineConsultation(appointment)) return 'bg-slate-700 text-slate-300'
+  if (isMeetLinkRevoked(appointment)) return 'bg-slate-600 text-slate-200'
+  if (isMeetLinkExpired(appointment)) return 'bg-rose-500/20 text-rose-200'
+  if (appointment?.meetLink) return 'bg-emerald-500/20 text-emerald-200'
+  return 'bg-amber-500/20 text-amber-200'
+}
+
+const joinMeetLink = (meetLink) => {
+  const url = String(meetLink || '').trim()
+  if (!url) return
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+const copyMeetLink = async (meetLink) => {
+  const url = String(meetLink || '').trim()
+  if (!url) return
+  try {
+    await navigator.clipboard.writeText(url)
+    toast.success('Meeting link copied.')
+  } catch (error) {
+    console.error('Failed to copy meet link:', error)
+    toast.error('Failed to copy link.')
+  }
+}
+
+const onlineConsultationAppointments = computed(() =>
+  [...upcomingAppointments.value, ...pastAppointments.value]
+    .filter((appt) => isOnlineConsultation(appt))
+    .sort((a, b) => toDateTime(a.date, a.time) - toDateTime(b.date, b.time))
+)
 
 const parseClockToMinutes = (value) => {
   const raw = String(value || '').trim()

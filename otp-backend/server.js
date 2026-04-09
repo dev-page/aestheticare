@@ -25,19 +25,6 @@ const __dirname = path.dirname(__filename)
 
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 
-console.log("Loaded ENV:", {
-  PORT: process.env.PORT,
-  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY ? "present" : "missing",
-  SENDGRID_SENDER: process.env.SENDGRID_SENDER,
-  PAYMONGO_SECRET_KEY: process.env.PAYMONGO_SECRET_KEY ? "present" : "missing",
-  PAYMONGO_PUBLIC_KEY: process.env.PAYMONGO_PUBLIC_KEY ? "present" : "missing",
-  FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL,
-  GOOGLE_OAUTH_CLIENT_ID: process.env.GOOGLE_OAUTH_CLIENT_ID ? "present" : "missing",
-  GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET ? "present" : "missing",
-  GOOGLE_OAUTH_REFRESH_TOKEN: process.env.GOOGLE_OAUTH_REFRESH_TOKEN ? "present" : "missing",
-  GOOGLE_CALENDAR_ID: process.env.GOOGLE_CALENDAR_ID || "primary",
-});
-
 const allowedOrigins = new Set(
   [
     process.env.FRONTEND_BASE_URL,
@@ -73,11 +60,18 @@ app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))
 app.use(express.json())
 
+app.get('/', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'otp-backend',
+    health: '/health',
+  })
+})
+
 const sendGridApiKey = process.env.SENDGRID_API_KEY
 const senderEmail = process.env.SENDGRID_SENDER
 const payMongoSecretKey = process.env.PAYMONGO_SECRET_KEY || ''
 const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:5173'
-const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || path.join(__dirname, 'serviceAccountKey.json')
 const googleOauthClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || ''
 const googleOauthClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || ''
 const googleOauthRefreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN || ''
@@ -98,9 +92,25 @@ const backupMonthlyDay = Number(process.env.BACKUP_MONTHLY_DAY || 1)
 const backupDailyRetentionDays = Number(process.env.BACKUP_DAILY_RETENTION_DAYS || 30)
 const backupMonthlyRetentionDays = Number(process.env.BACKUP_MONTHLY_RETENTION_DAYS || 365)
 
+const loadFirebaseServiceAccount = () => {
+  const rawJson = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim()
+  if (rawJson) {
+    return JSON.parse(rawJson)
+  }
+
+  const configuredPath = String(process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '').trim()
+  const resolvedPath = configuredPath
+    ? path.isAbsolute(configuredPath)
+      ? configuredPath
+      : path.resolve(__dirname, configuredPath)
+    : path.join(__dirname, 'serviceAccountKey.json')
+
+  const serviceAccountRaw = fs.readFileSync(resolvedPath, 'utf8')
+  return JSON.parse(serviceAccountRaw)
+}
+
 try {
-  const serviceAccountRaw = fs.readFileSync(serviceAccountPath, 'utf8')
-  const serviceAccount = JSON.parse(serviceAccountRaw)
+  const serviceAccount = loadFirebaseServiceAccount()
   firebaseProjectId = String(serviceAccount?.project_id || '').trim()
   firebaseStorageBucket =
     process.env.FIREBASE_STORAGE_BUCKET ||
@@ -112,7 +122,6 @@ try {
     ...(firebaseStorageBucket ? { storageBucket: firebaseStorageBucket } : {}),
   })
   adminReady = true
-  console.log('firebase-admin initialized:', { serviceAccountPath })
 } catch (error) {
   adminReady = false
   adminInitError = error?.message || 'Failed to initialize firebase-admin'
@@ -141,6 +150,18 @@ const getGoogleCalendarClient = () => {
   const oauth2Client = new google.auth.OAuth2(googleOauthClientId, googleOauthClientSecret)
   oauth2Client.setCredentials({ refresh_token: googleOauthRefreshToken })
   return google.calendar({ version: 'v3', auth: oauth2Client })
+}
+
+const deleteGoogleCalendarEvent = async (eventId) => {
+  const cleanEventId = String(eventId || '').trim()
+  if (!cleanEventId) return { deleted: false, skipped: true }
+  const calendar = getGoogleCalendarClient()
+  await calendar.events.delete({
+    calendarId: googleCalendarId,
+    eventId: cleanEventId,
+    sendUpdates: 'none',
+  })
+  return { deleted: true, eventId: cleanEventId }
 }
 
 const sendSendGridMessage = async (message) => {
@@ -780,6 +801,7 @@ app.post('/google-meet/create-consultation-link', requireAuth, requirePermission
     timezone,
     attendeeEmails,
     requestId,
+    replaceEventId,
   } = req.body ?? {}
 
   const cleanSummary = String(summary || '').trim()
@@ -839,6 +861,13 @@ app.post('/google-meet/create-consultation-link', requireAuth, requirePermission
       })
     }
 
+    const cleanReplaceEventId = String(replaceEventId || '').trim()
+    if (cleanReplaceEventId && cleanReplaceEventId !== String(data.id || '').trim()) {
+      deleteGoogleCalendarEvent(cleanReplaceEventId).catch((error) => {
+        console.error('Failed to revoke previous consultation event:', error?.message || error)
+      })
+    }
+
     return res.json({
       success: true,
       data: {
@@ -852,6 +881,60 @@ app.post('/google-meet/create-consultation-link', requireAuth, requirePermission
     return res.status(500).json({
       success: false,
       error: error?.message || 'Failed to create Google Meet link',
+    })
+  }
+})
+
+app.post('/google-meet/revoke-consultation-link', requireAuth, requirePermission('consultations:create'), async (req, res) => {
+  const { eventId, appointmentId, reason } = req.body ?? {}
+  const cleanEventId = String(eventId || '').trim()
+  const cleanAppointmentId = String(appointmentId || '').trim()
+  const cleanReason = String(reason || 'revoked').trim() || 'revoked'
+
+  if (!cleanEventId && !cleanAppointmentId) {
+    return res.status(400).json({
+      success: false,
+      error: 'eventId or appointmentId is required',
+    })
+  }
+
+  try {
+    let deletedEventId = cleanEventId || ''
+    if (!deletedEventId && cleanAppointmentId) {
+      const snap = await admin.firestore().collection('appointments').doc(cleanAppointmentId).get()
+      const data = snap.exists ? snap.data() || {} : {}
+      deletedEventId = String(data.meetEventId || '').trim()
+    }
+
+    if (deletedEventId) {
+      await deleteGoogleCalendarEvent(deletedEventId)
+    }
+
+    if (cleanAppointmentId) {
+      await admin.firestore().collection('appointments').doc(cleanAppointmentId).set(
+        {
+          consultationMode: 'online',
+          meetLink: '',
+          meetEventId: '',
+          meetRevokedAt: admin.firestore.FieldValue.serverTimestamp(),
+          meetRevocationReason: cleanReason,
+        },
+        { merge: true }
+      )
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        revoked: Boolean(deletedEventId),
+        eventId: deletedEventId || '',
+        appointmentId: cleanAppointmentId || '',
+      },
+    })
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Failed to revoke Google Meet link',
     })
   }
 })
