@@ -26,5 +26,7 @@ dist-ssr
 # Ignore environment variables
 .env
 
-# Ignore OTP backend folder
-otp-backend/
+# Keep OTP backend source trackable, but ignore local secrets and dependencies
+otp-backend/.env
+otp-backend/node_modules/
+otp-backend/serviceAccountKey.json
