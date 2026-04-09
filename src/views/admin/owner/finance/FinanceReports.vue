@@ -38,6 +38,42 @@
       </div>
 
       <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-6">
+        <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-xl font-semibold text-white">DSS Insights</h2>
+            <p class="text-slate-400 text-sm">Trend signals based on this month&apos;s transactions, services, and inventory movement.</p>
+          </div>
+          <div class="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Recommended focus</p>
+            <p class="mt-1 text-sm font-semibold text-emerald-300">{{ dssSummary.primaryRecommendation }}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Busiest Day</p>
+            <p class="mt-2 text-lg font-semibold text-white">{{ dssSummary.busiestDay.label }}</p>
+            <p class="text-sm text-slate-400">{{ formatCurrency(dssSummary.busiestDay.value) }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Top Service</p>
+            <p class="mt-2 text-lg font-semibold text-white">{{ dssSummary.topService.label }}</p>
+            <p class="text-sm text-slate-400">{{ formatCurrency(dssSummary.topService.value) }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Top Product</p>
+            <p class="mt-2 text-lg font-semibold text-white">{{ dssSummary.topProduct.label }}</p>
+            <p class="text-sm text-slate-400">{{ formatCurrency(dssSummary.topProduct.value) }}</p>
+          </div>
+          <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Growth Signal</p>
+            <p class="mt-2 text-lg font-semibold text-white">{{ dssSummary.growthLabel }}</p>
+            <p class="text-sm text-slate-400">{{ dssSummary.growthNote }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 mb-6">
         <h2 class="text-xl font-semibold text-white mb-4">Monthly Profit and Loss</h2>
         <div class="space-y-2 text-sm">
           <div class="flex justify-between text-slate-300">
@@ -62,7 +98,7 @@
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
           <div class="px-6 py-4 border-b border-slate-700">
-            <h2 class="text-lg font-semibold text-white">Sales by Staff</h2>
+            <h2 class="text-lg font-semibold text-white">Revenue by Staff</h2>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full">
@@ -87,7 +123,7 @@
 
         <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
           <div class="px-6 py-4 border-b border-slate-700">
-            <h2 class="text-lg font-semibold text-white">Sales by Service</h2>
+            <h2 class="text-lg font-semibold text-white">Revenue by Service / Product</h2>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full">
@@ -173,6 +209,12 @@ export default {
       })
     )
 
+    const monthDayCount = computed(() => {
+      const [year, month] = selectedMonth.value.split('-').map(Number)
+      if (!year || !month) return 30
+      return new Date(year, month, 0).getDate()
+    })
+
     const purchaseTotal = (entry) => {
       const directTotal = Number(entry.totalCost || entry.total || 0)
       if (directTotal > 0) return directTotal
@@ -202,6 +244,95 @@ export default {
         inventoryValuation,
         payrollPercent: revenue > 0 ? (payroll / revenue) * 100 : 0,
         inventoryPercent: revenue > 0 ? (inventoryCost / revenue) * 100 : 0
+      }
+    })
+
+    const trendSourceLabels = computed(() => {
+      const grouped = new Map()
+      monthlyTransactions.value.forEach((tx) => {
+        const amount = Number(tx.amount || 0)
+        if (!amount) return
+        const label =
+          tx.service ||
+          (Array.isArray(tx.items) && tx.items.length
+            ? tx.items.map((item) => String(item.name || '').trim()).filter(Boolean).join(', ')
+            : '') ||
+          (tx.type === 'appointment_payment' ? 'Treatment' : 'Other')
+        grouped.set(label, (grouped.get(label) || 0) + amount)
+      })
+      return Array.from(grouped.entries())
+        .map(([name, total]) => ({ name, total }))
+        .sort((a, b) => b.total - a.total)
+    })
+
+    const topRevenueDrivers = computed(() =>
+      trendSourceLabels.value.slice(0, 5).map((entry, index) => ({
+        ...entry,
+        rank: index + 1
+      }))
+    )
+
+    const topService = computed(() => topRevenueDrivers.value[0] || { name: 'No data', total: 0 })
+    const topProduct = computed(() => {
+      const productEntry = [...trendSourceLabels.value].find((entry) => {
+        const normalized = String(entry.name || '').toLowerCase()
+        return (
+          normalized.includes('product') ||
+          normalized.includes('retail') ||
+          normalized.includes('package') ||
+          normalized.includes('injectable') ||
+          normalized.includes('serum') ||
+          normalized.includes('cleanser') ||
+          normalized.includes('moisturizer') ||
+          normalized.includes('sunscreen')
+        )
+      })
+      return productEntry || { name: 'No data', total: 0 }
+    })
+
+    const previousMonthRevenue = computed(() => {
+      const [year, month] = selectedMonth.value.split('-').map(Number)
+      if (!year || !month) return 0
+      const previous = month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`
+      return transactions.value
+        .filter((tx) => {
+          const date = toDate(tx.createdAt)
+          return date ? monthKey(date) === previous : false
+        })
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
+    })
+
+    const dssSummary = computed(() => {
+      const currentRevenue = report.value.revenue
+      const previousRevenue = previousMonthRevenue.value
+      const growth = previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : 0
+      const growthLabel = growth > 0 ? `+${growth.toFixed(1)}%` : growth < 0 ? `${growth.toFixed(1)}%` : 'No comparison'
+      const growthNote =
+        previousRevenue > 0
+          ? 'Compared with the previous month.'
+          : 'Not enough prior-month data for comparison.'
+      const dailyTotals = new Map()
+      monthlyTransactions.value.forEach((tx) => {
+        const date = toDate(tx.createdAt)
+        if (!date) return
+        const dateKey = monthKey(date) ? `${monthKey(date)}-${String(date.getDate()).padStart(2, '0')}` : ''
+        if (!dateKey) return
+        dailyTotals.set(dateKey, (dailyTotals.get(dateKey) || 0) + Number(tx.amount || 0))
+      })
+      const busiestDayEntry = Array.from(dailyTotals.entries()).sort((a, b) => b[1] - a[1])[0]
+      const busiestDay = busiestDayEntry
+        ? { label: busiestDayEntry[0], value: busiestDayEntry[1] }
+        : { label: 'No data', value: 0 }
+      return {
+        primaryRecommendation:
+          topRevenueDrivers.value.length > 0
+            ? `Focus on ${topRevenueDrivers.value[0].name} and the busiest selling days.`
+            : 'No strong trend detected yet.',
+        busiestDay,
+        topService: { label: topService.value.name, value: topService.value.total },
+        topProduct: { label: topProduct.value.name, value: topProduct.value.total },
+        growthLabel,
+        growthNote,
       }
     })
 
@@ -296,6 +427,7 @@ export default {
       report,
       salesByStaff,
       salesByService,
+      dssSummary,
       formatCurrency,
       percent
     }

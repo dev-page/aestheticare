@@ -205,10 +205,11 @@
                     v-model="newSupplier.phone"
                     type="tel"
                     required
-                    :class="[inputClass(showAddError('phone')), 'pl-12']"
-                    @input="markTouched('phone')"
-                    @blur="markTouched('phone')"
                     inputmode="numeric"
+                    maxlength="10"
+                    :class="[inputClass(showAddError('phone')), 'pl-12']"
+                    @input="newSupplier.phone = sanitizePhone(newSupplier.phone); markTouched('phone')"
+                    @blur="markTouched('phone')"
                   />
                 </div>
                 <p v-if="showAddError('phone')" class="mt-1 text-xs text-red-400">{{ addErrors.phone }}</p>
@@ -290,10 +291,20 @@
               </div>
             </div>
             <div>
-              <label class="block text-slate-400 text-sm mb-2">Address</label>
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-slate-400 text-sm">Address</label>
+                <button
+                  type="button"
+                  @click="openAddressModal('new')"
+                  class="text-xs px-2 py-1 rounded bg-slate-700 text-slate-200 hover:bg-slate-600"
+                >
+                  Pick on Map
+                </button>
+              </div>
               <textarea
                 v-model="newSupplier.address"
                 rows="3"
+                placeholder="Enter or pin an address"
                 :class="inputClass(showAddError('address'))"
                 @input="markTouched('address')"
                 @blur="markTouched('address')"
@@ -349,8 +360,10 @@
                     v-model="editSupplier.phone"
                     type="tel"
                     required
-                    class="w-full bg-slate-700 text-white pl-12 pr-4 py-2 rounded-lg border border-slate-600 focus:border-amber-500 focus:outline-none"
                     inputmode="numeric"
+                    maxlength="10"
+                    @input="editSupplier.phone = sanitizePhone(editSupplier.phone)"
+                    class="w-full bg-slate-700 text-white pl-12 pr-4 py-2 rounded-lg border border-slate-600 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -406,8 +419,22 @@
               </div>
             </div>
             <div>
-              <label class="block text-slate-400 text-sm mb-2">Address</label>
-              <textarea v-model="editSupplier.address" rows="3" class="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:border-amber-500 focus:outline-none"></textarea>
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-slate-400 text-sm">Address</label>
+                <button
+                  type="button"
+                  @click="openAddressModal('edit')"
+                  class="text-xs px-2 py-1 rounded bg-slate-700 text-slate-200 hover:bg-slate-600"
+                >
+                  Pick on Map
+                </button>
+              </div>
+              <textarea
+                v-model="editSupplier.address"
+                rows="3"
+                placeholder="Enter or pin an address"
+                class="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:border-amber-500 focus:outline-none"
+              ></textarea>
             </div>
             <div class="flex justify-end gap-3 mt-6">
               <button type="button" @click="showEditModal = false" class="px-6 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors">Cancel</button>
@@ -418,22 +445,69 @@
           </form>
         </div>
       </div>
+
+      <Modal
+        panelClass="bg-slate-900 text-white w-full max-w-4xl"
+        :isOpen="showAddressModal"
+        :title="'Select Supplier Address'"
+        @close="closeAddressModal"
+        :showConfirm="false"
+      >
+        <div class="space-y-4">
+          <div ref="addressMapCanvas" class="w-full h-[380px] rounded-xl border border-slate-700"></div>
+          <div
+            v-if="addressError"
+            class="rounded-2xl border border-amber-400/50 bg-amber-500/12 px-4 py-3 shadow-lg"
+          >
+            <p class="text-sm font-semibold uppercase tracking-[0.14em] text-amber-200">Map Selection Issue</p>
+            <p class="mt-1 text-sm text-white">{{ addressError }}</p>
+            <p class="mt-2 text-xs text-slate-300">Click a different spot on the map, then use the pin again.</p>
+          </div>
+          <div class="rounded-xl border border-slate-700 bg-slate-800/70 p-4 space-y-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Resolved Address</p>
+              <p class="mt-1 text-sm text-white">{{ modalAddressLabel }}</p>
+            </div>
+            <div class="text-sm text-slate-300">
+              <p>Use the pin to fill the address field for the active supplier form.</p>
+              <p class="mt-1">You can still refine the address manually after closing this map.</p>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white"
+              @click="closeAddressModal"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white"
+              @click="usePinnedAddress"
+            >
+              Use Pin
+            </button>
+          </div>
+        </div>
+      </Modal>
     </main>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp, doc, getDoc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { getApp } from 'firebase/app'
 import { toast } from 'vue3-toastify'
+import Modal from '@/components/common/Modal.vue'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import { logActivity } from '@/utils/activityLogger'
 
 export default {
   name: 'ManagerSuppliers',
-  components: { OwnerSidebar },
+  components: { OwnerSidebar, Modal },
   setup() {
     const db = getFirestore(getApp())
     const auth = getAuth(getApp())
@@ -480,6 +554,237 @@ export default {
       ...getEmptySupplier()
     })
 
+    const showAddressModal = ref(false)
+    const addressMapCanvas = ref(null)
+    const addressError = ref('')
+    const addressModalTarget = ref('new')
+    const modalAddressLabel = computed(() => {
+      const target = addressModalTarget.value === 'edit' ? editSupplier.value : newSupplier.value
+      return String(target.address || '').trim() || 'Pin a location to resolve the supplier address.'
+    })
+
+    let mapsReady = false
+    let addressMap = null
+    let addressMarker = null
+
+    const defaultMapCenter = { lat: 12.8797, lng: 121.7740 }
+    const philippinesBounds = {
+      north: 21.3,
+      south: 4.3,
+      east: 126.8,
+      west: 116.9
+    }
+
+    const loadMapsScript = (apiKey) =>
+      new Promise((resolve, reject) => {
+        if (window.google?.maps) {
+          resolve()
+          return
+        }
+
+        const existing = document.getElementById('google-maps-js')
+        if (existing) {
+          existing.addEventListener('load', () => resolve(), { once: true })
+          existing.addEventListener('error', () => reject(new Error('Failed to load Google Maps JS API.')), { once: true })
+          return
+        }
+
+        const script = document.createElement('script')
+        script.id = 'google-maps-js'
+        script.async = true
+        script.defer = true
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&loading=async&v=weekly`
+        script.onload = () => {
+          const start = Date.now()
+          const waitForMaps = () => {
+            if (window.google?.maps?.Map) {
+              resolve()
+              return
+            }
+            if (Date.now() - start > 5000) {
+              reject(new Error('Google Maps JS API loaded but maps object was not initialized.'))
+              return
+            }
+            setTimeout(waitForMaps, 50)
+          }
+          waitForMaps()
+        }
+        script.onerror = () => reject(new Error('Failed to load Google Maps JS API.'))
+        document.head.appendChild(script)
+      })
+
+    const flattenAddressComponents = (entries = []) => (entries || []).flatMap((entry) => entry?.address_components || [])
+
+    const getAddressComponentValue = (components, type, mode = 'long') => {
+      const preferredTypes = Array.isArray(type) ? type : [type]
+      const match = (components || []).find((component) =>
+        preferredTypes.some((preferredType) => component.types?.includes(preferredType))
+      )
+      if (!match) return ''
+      return mode === 'short'
+        ? String(match.short_name || match.shortName || '')
+        : String(match.long_name || match.longName || '')
+    }
+
+    const getActiveAddressTarget = () => (addressModalTarget.value === 'edit' ? editSupplier.value : newSupplier.value)
+
+    const isWithinPhilippines = (components = []) => {
+      const countryName = getAddressComponentValue(components, 'country')
+      const countryCode = getAddressComponentValue(components, 'country', 'short')
+      return /philippines/i.test(countryName) || String(countryCode || '').toUpperCase() === 'PH'
+    }
+
+    const applyResolvedAddress = (formattedAddress = '', fallbackName = '') => {
+      const target = getActiveAddressTarget()
+      target.address = String(formattedAddress || fallbackName || '').trim()
+    }
+
+    const reverseGeocodeAddress = (lat, lng) => {
+      if (!window.google?.maps?.Geocoder) return Promise.resolve(false)
+      const geocoder = new window.google.maps.Geocoder()
+      return new Promise((resolve) => {
+        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+          if (status !== 'OK' || !results?.length) {
+            addressError.value = 'Unable to resolve a place name for the selected pin.'
+            resolve(false)
+            return
+          }
+
+          const components = flattenAddressComponents(results)
+          if (!isWithinPhilippines(components)) {
+            addressError.value = 'Please pin a location within the Philippines only.'
+            resolve(false)
+            return
+          }
+
+          const streetNumber = getAddressComponentValue(components, 'street_number')
+          const routeName = getAddressComponentValue(components, 'route')
+          const streetAddress = [streetNumber, routeName].filter(Boolean).join(' ').trim()
+          const resolvedAddress = results[0].formatted_address || results[0].name || streetAddress || ''
+
+          applyResolvedAddress(resolvedAddress, streetAddress || resolvedAddress)
+          addressError.value = ''
+          resolve(true)
+        })
+      })
+    }
+
+    const initAddressMap = async () => {
+      if (!addressMapCanvas.value) return
+      addressError.value = ''
+
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+      if (!apiKey) {
+        addressError.value = 'Missing Google Maps API key in frontend env.'
+        return
+      }
+
+      if (!mapsReady) {
+        try {
+          await loadMapsScript(apiKey)
+          mapsReady = true
+        } catch (error) {
+          console.error(error)
+          const existing = document.getElementById('google-maps-js')
+          if (existing) existing.remove()
+          try {
+            await loadMapsScript(apiKey)
+            mapsReady = true
+          } catch (retryError) {
+            console.error(retryError)
+            addressError.value = 'Failed to load Google Maps. Check API key and referrer restrictions.'
+            return
+          }
+        }
+      }
+
+      if (!window.google?.maps?.Map) {
+        addressError.value = 'Google Maps failed to initialize.'
+        return
+      }
+
+      addressMap = new window.google.maps.Map(addressMapCanvas.value, {
+        center: defaultMapCenter,
+        zoom: 13,
+        restriction: { latLngBounds: philippinesBounds, strictBounds: true },
+        streetViewControl: false,
+        fullscreenControl: false,
+        mapTypeControl: false,
+        mapId: import.meta.env.VITE_GOOGLE_MAP_ID
+      })
+
+      if (window.google.maps.importLibrary) {
+        const { AdvancedMarkerElement } = await window.google.maps.importLibrary('marker')
+        addressMarker = new AdvancedMarkerElement({
+          position: defaultMapCenter,
+          map: addressMap,
+          gmpDraggable: true
+        })
+      } else if (window.google.maps.Marker) {
+        addressMarker = new window.google.maps.Marker({
+          position: defaultMapCenter,
+          map: addressMap,
+          draggable: true
+        })
+      }
+
+      addressMap.addListener('click', (event) => {
+        const latLng = event?.latLng
+        if (!latLng) return
+        const lat = latLng.lat()
+        const lng = latLng.lng()
+        if (addressMarker?.position) {
+          addressMarker.position = { lat, lng }
+        } else if (addressMarker?.setPosition) {
+          addressMarker.setPosition({ lat, lng })
+        }
+        reverseGeocodeAddress(lat, lng)
+      })
+
+      if (addressMarker?.addListener) {
+        addressMarker.addListener('dragend', () => {
+          const pos = addressMarker?.getPosition ? addressMarker.getPosition() : addressMarker?.position
+          if (!pos) return
+          const lat = typeof pos.lat === 'function' ? pos.lat() : pos.lat
+          const lng = typeof pos.lng === 'function' ? pos.lng() : pos.lng
+          reverseGeocodeAddress(lat, lng)
+        })
+      }
+    }
+
+    const openAddressModal = async (target = 'new') => {
+      addressModalTarget.value = target
+      showAddressModal.value = true
+      await nextTick()
+      await initAddressMap()
+    }
+
+    const closeAddressModal = () => {
+      showAddressModal.value = false
+      addressError.value = ''
+      addressMap = null
+      addressMarker = null
+    }
+
+    const usePinnedAddress = async () => {
+      if (!addressMarker) {
+        addressError.value = 'Pin a location on the map first.'
+        return
+      }
+      const pos = addressMarker?.position || (addressMarker?.getPosition ? addressMarker.getPosition() : null)
+      if (!pos) {
+        addressError.value = 'Pin a location on the map first.'
+        return
+      }
+      const lat = typeof pos.lat === 'function' ? pos.lat() : pos.lat
+      const lng = typeof pos.lng === 'function' ? pos.lng() : pos.lng
+      const resolved = await reverseGeocodeAddress(lat, lng)
+      if (!resolved) return
+
+      closeAddressModal()
+      toast.success('Supplier address selected successfully.')
+    }
+
     const normalizedCategories = (supplier) => {
       if (Array.isArray(supplier.categories)) return supplier.categories.filter(Boolean)
       if (supplier.category) return [supplier.category]
@@ -490,6 +795,8 @@ export default {
       if (!Array.isArray(supplier.offeredItems)) return []
       return supplier.offeredItems.filter((item) => item?.name)
     }
+
+    const sanitizePhone = (value) => String(value || '').replace(/\D/g, '').slice(0, 10)
 
     const loadSuppliers = async () => {
       if (!currentBranchId.value) {
@@ -530,7 +837,7 @@ export default {
         email: supplier.email,
         phone: supplier.phone,
         status: supplier.status,
-        address: supplier.address,
+        address: String(supplier.address || '').trim(),
         offeredItems: cleanedOfferedItems
       }
     }
@@ -621,9 +928,9 @@ export default {
       if (!newSupplier.value.phone.trim()) {
         errors.phone = 'Phone is required.'
       } else {
-        const digits = newSupplier.value.phone.replace(/\D/g, '')
-        if (digits.length < 7 || digits.length > 15) {
-          errors.phone = 'Enter a valid phone number.'
+        const digits = sanitizePhone(newSupplier.value.phone)
+        if (digits.length !== 10) {
+          errors.phone = 'Enter exactly 10 digits.'
         }
       }
 
@@ -743,12 +1050,17 @@ export default {
         toast.error('Please select at least one category.')
         return
       }
+      const sanitizedPhone = sanitizePhone(editSupplier.value.phone)
+      if (sanitizedPhone.length !== 10) {
+        toast.error('Phone number must be exactly 10 digits.')
+        return
+      }
 
       saving.value = true
       try {
         const supplierName = editSupplier.value.name
         await updateDoc(doc(db, 'suppliers', editSupplier.value.id), {
-          ...getSupplierPayload(editSupplier.value),
+          ...getSupplierPayload({ ...editSupplier.value, phone: sanitizedPhone }),
           updatedAt: serverTimestamp()
         })
         await logActivity(db, {
@@ -838,6 +1150,15 @@ export default {
     watch(showAddModal, (isOpen) => {
       if (!isOpen) {
         resetAddForm()
+        if (addressModalTarget.value === 'new' && showAddressModal.value) {
+          closeAddressModal()
+        }
+      }
+    })
+
+    watch(showEditModal, (isOpen) => {
+      if (!isOpen && addressModalTarget.value === 'edit' && showAddressModal.value) {
+        closeAddressModal()
       }
     })
 
@@ -859,6 +1180,10 @@ export default {
       normalizedOfferedItems,
       newSupplier,
       editSupplier,
+      showAddressModal,
+      addressMapCanvas,
+      addressError,
+      modalAddressLabel,
       addOfferedItemRow,
       removeOfferedItemRow,
       markTouched,
@@ -869,7 +1194,11 @@ export default {
       addSupplier,
       openEditModal,
       saveSupplierEdit,
-      deleteSupplier
+      deleteSupplier,
+      sanitizePhone,
+      openAddressModal,
+      closeAddressModal,
+      usePinnedAddress
     }
   }
 }

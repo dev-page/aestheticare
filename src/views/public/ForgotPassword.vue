@@ -5,9 +5,12 @@ import { db } from '@/config/firebaseConfig'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import axios from 'axios'
 import { toast } from 'vue3-toastify'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
 const router = useRouter()
-const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 
 const step = ref(1)
 const email = ref('')
@@ -38,9 +41,10 @@ const toggleConfirmPassword = () => { confirmPasswordVisible.value = !confirmPas
 const getBackendCandidates = () => {
   const candidates = [
     String(OTP_API_BASE || '').trim(),
-    'http://localhost:3000',
-    'http://localhost:3001',
   ].filter(Boolean)
+  if (import.meta.env.DEV) {
+    candidates.push('http://localhost:3000', 'http://localhost:3001')
+  }
   return [...new Set(candidates)]
 }
 

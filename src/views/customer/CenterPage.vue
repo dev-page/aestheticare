@@ -719,10 +719,14 @@ import { hasExpiredSuspension, restoreExpiredSuspension } from '@/utils/centerSu
 import { buildWeekScheduleMap, resolveWeekAssignments } from '@/utils/employeeSchedules'
 import { calculateCommissionAmount, calculateNetAmount, getServiceCommissionPercent } from '@/utils/transactionFees'
 import CustomerSidebar from '@/components/sidebar/CustomerSidebar.vue'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
 const route = useRoute()
 const router = useRouter()
 const centerId = String(route.params.id || '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 
 const tabs = ['About Us', 'Products & Services', 'Reviews']
 const activeTab = ref('About Us')
@@ -815,7 +819,13 @@ const bookingAvailabilityHint = computed(() => {
   return 'Booking is not available yet because no time slots can be generated from the current schedules.'
 })
 const selectedServiceTotal = computed(() =>
-  selectedServices.value.reduce((sum, service) => sum + Number(service.price || 0), 0)
+  selectedServices.value.reduce((sum, service) => {
+    const serviceType = String(service?.type || '').trim().toLowerCase()
+    const amount = serviceType === 'consultation'
+      ? Number(service.consultationFee ?? service.price ?? 0)
+      : Number(service.price || 0)
+    return sum + amount
+  }, 0)
 )
 const selectedServiceDurationMinutes = computed(() =>
   selectedServices.value.reduce((sum, service) => sum + Number(service.durationMinutes || 0), 0)
@@ -2009,7 +2019,10 @@ const toggleServiceForBooking = (item) => {
     return
   }
 
-  selectedServices.value = [...selectedServices.value, item]
+  const nonConsultationSelections = selectedServices.value.filter(
+    (service) => String(service?.type || '').trim().toLowerCase() !== 'consultation'
+  )
+  selectedServices.value = [...nonConsultationSelections, item]
   if (!bookingForm.value.date && availableDates.value.length) {
     bookingForm.value.date = availableDates.value[0]
   }
@@ -2078,10 +2091,10 @@ const normalizePhilippineMobileNumber = (value) => {
 const normalizePhilippineMobileNumberForPayMongo = (value) => {
   const digits = String(value || '').trim().replace(/\D/g, '')
   if (!digits) return ''
-  if (/^9\d{9}$/.test(digits)) return `09${digits}`
-  if (/^09\d{9}$/.test(digits)) return digits.slice(0, 11)
-  if (/^639\d{9}$/.test(digits)) return `0${digits.slice(3)}`
-  return digits.slice(0, 11)
+  if (/^9\d{9}$/.test(digits)) return digits.slice(0, 10)
+  if (/^09\d{9}$/.test(digits)) return digits.slice(1, 11)
+  if (/^639\d{9}$/.test(digits)) return digits.slice(3, 13)
+  return digits.slice(-10)
 }
 
 const isValidPhilippineMobileNumber = (value) => {
@@ -2153,9 +2166,80 @@ const createBookingReservation = async ({
   consultationFeePeso = 0,
   amountPeso = 0,
 } = {}) => {
+  const user = auth.currentUser
+  if (!user) {
+    throw new Error('Please log in first.')
+  }
+  if (!selectedServices.value.length) {
+    throw new Error('Please select at least one service.')
+  }
+  if (!bookingForm.value.slotKey || !bookingForm.value.date || !bookingForm.value.time || !assignedPractitioner.value) {
+    throw new Error('Please choose an available schedule.')
+  }
+
+  const profile = await resolveCustomerProfile()
+  const customerName = profile?.name || user.email || 'Customer'
+  const response = await fetch(`${OTP_API_BASE}/appointments/reservations`, {
+    method: 'POST',
+    headers: await (async () => {
+      const token = await user.getIdToken()
+      return {
+        'content-type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      }
+    })(),
+    body: JSON.stringify({
+      branchId: activeBranchId.value,
+      centerId: centerId,
+      customerId: user.uid,
+      customerName,
+      customerEmail: user.email || '',
+      practitionerId: assignedPractitioner.value.id,
+      practitionerName: assignedPractitioner.value.fullName,
+      date: bookingForm.value.date,
+      time: bookingForm.value.time,
+      endTime: bookingForm.value.endTime || '',
+      flowType,
+      selectedServices: selectedServices.value,
+      selectedServiceIds: selectedServices.value.map((service) => service.id).filter(Boolean),
+      selectedServiceNames: selectedServices.value.map((service) => service.title || service.name || '').filter(Boolean),
+      serviceDurations: selectedServices.value.map((service) => Number(service.durationMinutes || 0)).filter((value) => value > 0),
+      totalServiceDurationMinutes: selectedServiceDurationMinutes.value,
+      consultationFee: consultationFeePeso,
+      amount: amountPeso,
+      paymentMethod: bookingPaymentMethod.value,
+      paymentCoverage: 'full',
+      commissionPercent: serviceCommissionPercent,
+      commissionAmount: flowType === 'consultation'
+        ? calculateCommissionAmount(Number(amountPeso || 0), serviceCommissionPercent)
+        : selectedServiceCommission.value,
+      netAmount: flowType === 'consultation'
+        ? calculateNetAmount(Number(amountPeso || 0), calculateCommissionAmount(Number(amountPeso || 0), serviceCommissionPercent))
+        : selectedServiceNetAmount.value,
+      requiresConsultationFirst: selectedServicesRequireConsultation.value,
+      followUpAllowed: selectedServicesAllowFollowUp.value,
+      followUpWindowDays: selectedServices.value.find((service) => service.followUpWindowDays != null)?.followUpWindowDays || null,
+      notes: bookingForm.value.notes || '',
+    }),
+  })
+
+  const raw = await response.text()
+  let payload = null
+  try {
+    payload = JSON.parse(raw)
+  } catch (_error) {
+    throw new Error(`Backend returned non-JSON response (${response.status}). Check backend URL/port and ensure /appointments/reservations exists.`)
+  }
+
+  if (!response.ok || !payload?.success) {
+    throw new Error(payload?.error || 'Failed to reserve the selected time.')
+  }
+
   return {
-    id: '',
-    fallback: true,
+    id: payload?.data?.id || '',
+    reservationId: payload?.data?.id || '',
+    expiresAt: payload?.data?.expiresAt || null,
+    fallback: false,
     flowType,
     amountPeso,
     consultationFeePeso,
@@ -2167,7 +2251,7 @@ const releaseBookingReservation = async (reservationId) => {
   try {
     const user = auth.currentUser
     if (!user) return
-    await fetch(`${(import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')}/appointments/reservations/${reservationId}`, {
+    await fetch(`${OTP_API_BASE}/appointments/reservations/${reservationId}`, {
       method: 'DELETE',
       headers: await (async () => {
         const token = await user.getIdToken()
@@ -2237,7 +2321,7 @@ const createBookingPayMongoCheckoutSession = async ({
     throw new Error('GCash payments require a valid mobile number.')
   }
 
-  const response = await fetch(`${(import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')}/paymongo/create-checkout-session`, {
+  const response = await fetch(`${OTP_API_BASE}/paymongo/create-checkout-session`, {
     method: 'POST',
     headers: await (async () => {
       const token = await user.getIdToken()
@@ -2258,7 +2342,7 @@ const createBookingPayMongoCheckoutSession = async ({
         phone: payerPhone,
       },
       metadata: {
-        module: 'customer_order',
+        module: flowType === 'consultation' ? 'customer_consultation' : 'customer_appointment',
         flowType,
         customerId: user.uid,
         customerEmail: user.email || '',
@@ -2338,7 +2422,7 @@ const finalizeSuccessfulBooking = async (pending, payload) => {
   const commissionAmount = Number(pending.commissionAmount || 0)
   const netAmount = Number(pending.netAmount || 0)
   if (pending.reservationId) {
-    const response = await fetch(`${(import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')}/appointments/finalize-booking`, {
+    const response = await fetch(`${OTP_API_BASE}/appointments/finalize-booking`, {
       method: 'POST',
       headers: await (async () => {
         const token = await user.getIdToken()
@@ -2455,7 +2539,7 @@ const handleBookingPayMongoReturn = async () => {
 
   bookingPaymentSaving.value = true
   try {
-    const response = await fetch(`${(import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')}/paymongo/checkout-session/${pending.checkoutSessionId}`, {
+    const response = await fetch(`${OTP_API_BASE}/paymongo/checkout-session/${pending.checkoutSessionId}`, {
       headers: await (async () => {
         const user = auth.currentUser
         if (!user) throw new Error('Please log in first.')
@@ -2522,8 +2606,10 @@ const submitBooking = async () => {
   let heldReservationId = ''
   try {
     bookingPaymentSaving.value = true
-    const flowType = 'booking'
-    const consultationFee = 0
+    const flowType = selectedServices.value.every((service) => String(service?.type || '').trim().toLowerCase() === 'consultation')
+      ? 'consultation'
+      : 'booking'
+    const consultationFee = flowType === 'consultation' ? Number(selectedServiceTotal.value || 0) : 0
     const amountPeso = Number(selectedServiceTotal.value || 0)
     const payerPhone = normalizePhilippineMobileNumberForPayMongo(bookingForm.value.contactNumber)
 

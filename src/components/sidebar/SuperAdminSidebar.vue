@@ -53,7 +53,10 @@ export default {
         key: 'support',
         label: 'Support & Reports',
         icon: 'inbox',
-        children: [{ label: 'User Issues', icon: 'reportIssue', to: '/superadmin/tickets' }]
+        children: [
+          { label: 'User Issues', icon: 'reportIssue', to: '/superadmin/tickets' },
+          { label: 'Center Appeals', icon: 'report', to: '/superadmin/center-appeals' }
+        ]
       }
     ]
 

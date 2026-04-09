@@ -47,6 +47,7 @@ export default {
           { label: 'Item Catalog', icon: 'clipboard', to: '/manager/item-catalog', permission: 'inventory:view' }
         ]
       },
+      { label: 'POS', icon: 'cash', to: '/receptionist/pos', permission: 'payments:create', feature: 'pos_payments' },
       { label: 'Orders', icon: 'cart', to: '/manager/orders', permissionsAny: ['orders:view', 'inventory:view'] },
       { label: 'Product and Service Listing', icon: 'tag', to: '/manager/product-service-listing', feature: 'services', permission: 'services:view' },
       { label: 'Archives', icon: 'archive', to: '/manager/archived-posts', permission: 'services:view' },

@@ -292,7 +292,10 @@ const renderEmployeeChart = () => {
 
     const upcomingAppointments = computed(() =>
       [...appointments.value]
-        .filter((item) => (item.date || '') >= todayKey())
+        .filter((item) => {
+          const status = String(item.status || '').trim().toLowerCase()
+          return (item.date || '') >= todayKey() && status !== 'cancelled'
+        })
         .sort((a, b) => `${a.date || ''} ${a.time || ''}`.localeCompare(`${b.date || ''} ${b.time || ''}`))
         .slice(0, 6)
     )
@@ -418,11 +421,70 @@ const renderEmployeeChart = () => {
       ]
     }
 
+    const buildExportSections = () => ({
+      summary: [
+        { label: 'Total Branches', value: String(totalBranches.value) },
+        { label: 'Total Employees', value: String(totalEmployees.value) },
+        { label: 'Total Revenue', value: formatCurrency(monthlyRevenue.value) },
+        { label: 'Total Clients', value: String(totalClients.value) },
+        { label: "Today's Appointments", value: String(todayAppointments.value) },
+        { label: "Today's Revenue", value: formatCurrency(todaysRevenue.value) },
+        { label: 'Unread Inbox', value: String(unreadMessages.value) },
+        { label: 'Pending Purchase Requests', value: String(pendingRequests.value) },
+        { label: 'Low Stock Alerts', value: String(lowStockCount.value) },
+      ],
+      branches: branches.value.length
+        ? branches.value.map((branch) => ({
+            label: `${branch.clinicBranch || 'Branch'}${branch.clinicLocation ? ` - ${branch.clinicLocation}` : ''}`,
+            value: formatCurrency(branch.revenue || 0),
+            bar: monthlyRevenue.value > 0 ? Math.max(0, Math.min(100, ((branch.revenue || 0) / monthlyRevenue.value) * 100)) : 0,
+          }))
+        : [{ label: 'Status', value: 'No branch data available.', bar: 0 }],
+      appointments: upcomingAppointments.value.length
+        ? upcomingAppointments.value.map((appointment) => ({
+            label: appointment.clientName || 'Unknown Client',
+            value: `${appointment.date || '-'} ${appointment.time || ''}`.trim(),
+          }))
+        : [{ label: 'Status', value: 'No upcoming appointments.' }],
+      transactions: recentTransactions.value.length
+        ? recentTransactions.value.map((transaction) => ({
+            label: transaction.clientName || 'Walk-in Client',
+            value: formatCurrency(transaction.amount),
+          }))
+        : [{ label: 'Status', value: 'No transactions yet.' }],
+      lowStock: lowStockItems.value.length
+        ? lowStockItems.value.map((item) => ({
+            label: item.name || 'Item',
+            value: `${item.currentStock || 0} ${item.unit || 'units'}`,
+          }))
+        : [{ label: 'Status', value: 'No low stock items.' }],
+      requests: recentPurchaseRequests.value.length
+        ? recentPurchaseRequests.value.map((request) => ({
+            label: request.item || '-',
+            value: request.status || 'Pending',
+          }))
+        : [{ label: 'Status', value: 'No purchase requests yet.' }],
+    })
+
     const buildDocumentHtml = () => {
-      const rows = buildExportRows()
-      const tableRows = rows.map((row) => `
+      const sections = buildExportSections()
+      const summaryCards = sections.summary.map((item) => `
+        <div class="card">
+          <div class="label">${escapeHtml(item.label)}</div>
+          <div class="value">${escapeHtml(item.value)}</div>
+        </div>
+      `).join('')
+
+      const branchRows = sections.branches.map((row) => `
         <tr>
-          <td>${escapeHtml(row.section)}</td>
+          <td>${escapeHtml(row.label)}</td>
+          <td>${escapeHtml(row.value)}</td>
+          <td><div class="bar-track"><div class="bar-fill" style="width:${Number(row.bar || 0)}%"></div></div></td>
+        </tr>
+      `).join('')
+
+      const simpleRows = (rows) => rows.map((row) => `
+        <tr>
           <td>${escapeHtml(row.label)}</td>
           <td>${escapeHtml(row.value)}</td>
         </tr>
@@ -433,29 +495,113 @@ const renderEmployeeChart = () => {
         <html>
           <head>
             <meta charset="utf-8" />
-            <title>Clinic Admin Dashboard Report</title>
+            <title>AesthetiCare Branch Overview</title>
             <style>
-              body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
-              h1 { margin: 0 0 6px; font-size: 28px; }
-              p { margin: 0 0 18px; color: #4b5563; }
-              table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+              @page { size: A4; margin: 18mm; }
+              body { font-family: Arial, sans-serif; color: #111827; margin: 0; background: #fff; }
+              .page { padding: 0; }
+              .brand { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid #d4a64f; }
+              .brand h1 { margin: 0; font-size: 26px; color: #111827; }
+              .brand p { margin: 4px 0 0; color: #4b5563; }
+              .stamp { text-align:right; color:#6b7280; font-size:12px; }
+              .section { margin-top: 18px; page-break-inside: avoid; }
+              .section h2 { font-size: 16px; margin: 0 0 10px; color: #111827; }
+              .summary-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+              .card { border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fafafa; }
+              .card .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; }
+              .card .value { font-size: 18px; font-weight: 700; margin-top: 6px; color: #111827; word-break: break-word; }
+              table { width: 100%; border-collapse: collapse; }
               th, td { border: 1px solid #d1d5db; padding: 10px; text-align: left; vertical-align: top; }
               th { background: #f3f4f6; }
+              .bar-track { width: 100%; height: 10px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+              .bar-fill { height: 100%; background: linear-gradient(90deg, #d4a64f, #a16207); }
+              .muted { color: #6b7280; font-size: 12px; }
             </style>
           </head>
           <body>
-            <h1>Clinic Admin Dashboard Report</h1>
-            <p>Generated ${escapeHtml(new Date().toLocaleString())}</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Section</th>
-                  <th>Label</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>${tableRows}</tbody>
-            </table>
+            <div class="page">
+              <div class="brand">
+                <div>
+                  <h1>AesthetiCare</h1>
+                  <p>Branch Overview Report</p>
+                  <p class="muted">Monitor clinic locations, employees, and revenue performance</p>
+                </div>
+                <div class="stamp">
+                  Generated<br />${escapeHtml(new Date().toLocaleString())}
+                </div>
+              </div>
+
+              <div class="section">
+                <h2>Summary</h2>
+                <div class="summary-grid">${summaryCards}</div>
+              </div>
+
+              <div class="section">
+                <h2>Branch Revenue</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Branch</th>
+                      <th>Revenue</th>
+                      <th>Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>${branchRows}</tbody>
+                </table>
+              </div>
+
+              <div class="section">
+                <h2>Upcoming Appointments</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Client</th>
+                      <th>Schedule</th>
+                    </tr>
+                  </thead>
+                  <tbody>${simpleRows(sections.appointments)}</tbody>
+                </table>
+              </div>
+
+              <div class="section">
+                <h2>Recent Transactions</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Client</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>${simpleRows(sections.transactions)}</tbody>
+                </table>
+              </div>
+
+              <div class="section">
+                <h2>Low Stock Items</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Current Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody>${simpleRows(sections.lowStock)}</tbody>
+                </table>
+              </div>
+
+              <div class="section">
+                <h2>Recent Purchase Requests</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>${simpleRows(sections.requests)}</tbody>
+                </table>
+              </div>
+            </div>
           </body>
         </html>
       `
@@ -464,6 +610,8 @@ const renderEmployeeChart = () => {
     const exportCsv = () => {
       const rows = buildExportRows()
       const csvLines = [
+        ['Platform', 'AesthetiCare', 'Branch Overview'].join(','),
+        ['Generated At', new Date().toLocaleString(), ''].join(','),
         'Section,Label,Value',
         ...rows.map((row) => [row.section, row.label, row.value]
           .map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`)

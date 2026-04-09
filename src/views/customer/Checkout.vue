@@ -48,7 +48,15 @@
         <form class="space-y-4" @submit.prevent>
           <input type="text" placeholder="Full Name" v-model="delivery.fullName" class="w-full p-3 rounded bg-slate-700 text-white border border-slate-600" />
           <input type="text" placeholder="Address" v-model="delivery.address" class="w-full p-3 rounded bg-slate-700 text-white border border-slate-600" />
-          <input type="text" placeholder="Phone Number" v-model="delivery.phone" class="w-full p-3 rounded bg-slate-700 text-white border border-slate-600" />
+          <input
+            type="text"
+            placeholder="Phone Number"
+            v-model="delivery.phone"
+            inputmode="numeric"
+            maxlength="10"
+            @input="delivery.phone = sanitizePhone(delivery.phone)"
+            class="w-full p-3 rounded bg-slate-700 text-white border border-slate-600"
+          />
         </form>
       </div>
 
@@ -92,6 +100,7 @@ import { calculateCommissionAmount, calculateNetAmount, getProductCommissionPerc
 import { toast } from 'vue3-toastify'
 import { onAuthStateChanged } from 'firebase/auth'
 import Swal from 'sweetalert2'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
 const router = useRouter()
 const route = useRoute()
@@ -99,7 +108,9 @@ const selectedItems = ref([])
 const paymentMethod = ref('GCash')
 const saving = ref(false)
 
-const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 const PENDING_PAYMONGO_KEY = 'customer_checkout_pending_paymongo'
 
 const delivery = ref({
@@ -107,6 +118,8 @@ const delivery = ref({
   address: '',
   phone: '',
 })
+
+const sanitizePhone = (value) => String(value || '').replace(/\D/g, '').slice(0, 10)
 
 const subtotal = computed(() => selectedItems.value.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0))
 const productCommissionPercent = getProductCommissionPercent()
@@ -202,8 +215,12 @@ const createPayMongoCheckoutSession = async () => {
     throw new Error('You must be logged in to continue.')
   }
 
-  if (paymentMethod.value === 'GCash' && !String(delivery.value.phone || '').trim()) {
+  const phone = sanitizePhone(delivery.value.phone)
+  if (paymentMethod.value === 'GCash' && !phone) {
     throw new Error('Mobile phone number is required for GCash payments.')
+  }
+  if (phone && phone.length !== 10) {
+    throw new Error('Phone number must be exactly 10 digits.')
   }
 
   const paymentMethodType = paymentMethod.value === 'Card' ? 'card' : 'gcash'
@@ -222,7 +239,7 @@ const createPayMongoCheckoutSession = async () => {
       billing: {
         name: delivery.value.fullName,
         email: auth.currentUser?.email || '',
-        phone: String(delivery.value.phone || '').trim(),
+        phone,
       },
       metadata: {
         module: 'customer_order',
@@ -262,11 +279,16 @@ const startPayMongoCheckout = async () => {
     toast.error('No selected items to checkout.')
     return
   }
-  if (!delivery.value.fullName || !delivery.value.address || !delivery.value.phone) {
+  const phone = sanitizePhone(delivery.value.phone)
+  if (!delivery.value.fullName || !delivery.value.address || !phone) {
     toast.error('Please complete delivery details.')
     return
   }
-  if (paymentMethod.value === 'GCash' && !String(delivery.value.phone || '').trim()) {
+  if (phone.length !== 10) {
+    toast.error('Phone number must be exactly 10 digits.')
+    return
+  }
+  if (paymentMethod.value === 'GCash' && !phone) {
     toast.error('Mobile phone number is required for GCash payments.')
     return
   }

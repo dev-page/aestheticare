@@ -355,10 +355,11 @@
 
             <div class="bg-slate-800 rounded-xl border border-slate-700">
               <div class="px-4 py-3 border-b border-slate-700 text-xs uppercase text-slate-400">Breakdown</div>
-              <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300">
+              <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-300">
                 <div>
                   <div class="text-slate-400 text-xs uppercase mb-2">Earnings</div>
                   <div class="flex justify-between"><span>Hours Worked</span><span>{{ selectedPayslip?.earnings?.hoursWorked ?? '-' }}</span></div>
+                  <div class="flex justify-between"><span>Attendance Hours</span><span>{{ selectedPayslip?.earnings?.attendanceHours ?? '-' }}</span></div>
                   <div class="flex justify-between"><span>Hourly Rate</span><span>{{ formatCurrency(selectedPayslip?.earnings?.hourlyRate || 0) }}</span></div>
                   <div class="flex justify-between"><span>Commission</span><span>{{ formatCurrency(selectedPayslip?.earnings?.commission || 0) }}</span></div>
                   <div class="flex justify-between font-semibold text-white mt-2"><span>Total</span><span>{{ formatCurrency(selectedPayslip?.earnings?.total || 0) }}</span></div>
@@ -370,6 +371,14 @@
                   <div class="flex justify-between"><span>Pag-IBIG</span><span>{{ formatCurrency(selectedPayslip?.deductions?.pagIbig?.amount || 0) }}</span></div>
                   <div class="flex justify-between"><span>Income Tax</span><span>{{ formatCurrency(selectedPayslip?.deductions?.incomeTax?.amount || 0) }}</span></div>
                   <div class="flex justify-between font-semibold text-white mt-2"><span>Total</span><span>{{ formatCurrency(selectedPayslip?.totalDeductions || 0) }}</span></div>
+                </div>
+                <div>
+                  <div class="text-slate-400 text-xs uppercase mb-2">Leave Adjustments</div>
+                  <div class="flex justify-between"><span>Paid Leave Days</span><span>{{ selectedPayslip?.leaveAdjustments?.paidLeaveDays || 0 }}</span></div>
+                  <div class="flex justify-between"><span>Paid Leave Hours</span><span>{{ selectedPayslip?.leaveAdjustments?.paidLeaveHours || 0 }}</span></div>
+                  <div class="flex justify-between"><span>Unpaid Leave Days</span><span>{{ selectedPayslip?.leaveAdjustments?.unpaidLeaveDays || 0 }}</span></div>
+                  <div class="flex justify-between"><span>Unpaid Leave Hours</span><span>{{ selectedPayslip?.leaveAdjustments?.unpaidLeaveHours || 0 }}</span></div>
+                  <div class="flex justify-between font-semibold text-white mt-2"><span>Net Leave Impact</span><span>{{ formatCurrency((selectedPayslip?.leaveAdjustments?.paidLeaveHours || 0) * (selectedPayslip?.earnings?.hourlyRate || 0) - (selectedPayslip?.leaveAdjustments?.unpaidLeaveHours || 0) * (selectedPayslip?.earnings?.hourlyRate || 0)) }}</span></div>
                 </div>
               </div>
             </div>
@@ -404,7 +413,7 @@ import { toast } from 'vue3-toastify'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import PageSectionSkeleton from '@/components/common/PageSectionSkeleton.vue'
 import { logActivity } from '@/utils/activityLogger'
-import { hasAnyAssignedShift } from '@/utils/employeeSchedules'
+import { hasAnyAssignedShift, normalizeAssignments, parseShiftDurationHours } from '@/utils/employeeSchedules'
 
 export default {
   name: 'PayrollAndPayslipManagement',
@@ -446,6 +455,9 @@ export default {
 
     const employees = ref([])
     const payrolls = ref([])
+    const branchShiftDurationMap = ref({})
+    const recurringWeekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    const calendarWeekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
     const selectedEmployeeId = ref('')
     const hoursWorked = ref(0)
@@ -559,9 +571,20 @@ export default {
                 <h3>Earnings</h3>
                 <table>
                   <tr><th>Hours Worked</th><td>${slip.earnings?.hoursWorked ?? '-'}</td></tr>
+                  <tr><th>Attendance Hours</th><td>${slip.earnings?.attendanceHours ?? '-'}</td></tr>
                   <tr><th>Hourly Rate</th><td>${formatCurrency(slip.earnings?.hourlyRate || 0)}</td></tr>
                   <tr><th>Commission</th><td>${formatCurrency(slip.earnings?.commission || 0)}</td></tr>
                   <tr><th>Total</th><td>${formatCurrency(slip.earnings?.total || 0)}</td></tr>
+                </table>
+              </div>
+              <div>
+                <h3>Leave Adjustments</h3>
+                <table>
+                  <tr><th>Paid Leave Days</th><td>${slip.leaveAdjustments?.paidLeaveDays || 0}</td></tr>
+                  <tr><th>Paid Leave Hours</th><td>${slip.leaveAdjustments?.paidLeaveHours || 0}</td></tr>
+                  <tr><th>Unpaid Leave Days</th><td>${slip.leaveAdjustments?.unpaidLeaveDays || 0}</td></tr>
+                  <tr><th>Unpaid Leave Hours</th><td>${slip.leaveAdjustments?.unpaidLeaveHours || 0}</td></tr>
+                  <tr><th>Net Leave Impact</th><td>${formatCurrency((Number(slip.leaveAdjustments?.paidLeaveHours || 0) - Number(slip.leaveAdjustments?.unpaidLeaveHours || 0)) * Number(slip.earnings?.hourlyRate || 0))}</td></tr>
                 </table>
               </div>
               <div>
@@ -633,6 +656,7 @@ export default {
       const rowHeight = 18
       const earningsRows = [
         ['Hours Worked', String(slip.earnings?.hoursWorked ?? '-')],
+        ['Attendance Hours', String(slip.earnings?.attendanceHours ?? '-')],
         ['Hourly Rate', formatCurrency(slip.earnings?.hourlyRate || 0)],
         ['Commission', formatCurrency(slip.earnings?.commission || 0)],
         ['Total Earnings', formatCurrency(slip.earnings?.total || 0)]
@@ -653,6 +677,35 @@ export default {
         rowY -= rowHeight
       })
       y = earningsTop - earningsHeight - 28
+
+      // Leave adjustments table
+      addText('Leave Adjustments', left, y, 12)
+      y -= 12
+      const leaveTop = y
+      const leaveAdjustments = slip.leaveAdjustments || {}
+      const leaveRows = [
+        ['Paid Leave Days', String(leaveAdjustments.paidLeaveDays || 0)],
+        ['Paid Leave Hours', String(leaveAdjustments.paidLeaveHours || 0)],
+        ['Unpaid Leave Days', String(leaveAdjustments.unpaidLeaveDays || 0)],
+        ['Unpaid Leave Hours', String(leaveAdjustments.unpaidLeaveHours || 0)],
+        ['Net Leave Impact', formatCurrency((Number(leaveAdjustments.paidLeaveHours || 0) - Number(leaveAdjustments.unpaidLeaveHours || 0)) * Number(slip.earnings?.hourlyRate || 0))]
+      ]
+      const leaveHeight = (leaveRows.length + 1) * rowHeight
+      drawLine(left, leaveTop, left + tableWidth, leaveTop)
+      drawLine(left, leaveTop - leaveHeight, left + tableWidth, leaveTop - leaveHeight)
+      drawLine(left, leaveTop, left, leaveTop - leaveHeight)
+      drawLine(left + tableWidth, leaveTop, left + tableWidth, leaveTop - leaveHeight)
+      drawLine(colSplit, leaveTop, colSplit, leaveTop - leaveHeight)
+      addText('Item', left + 6, leaveTop - 13, 10)
+      addText('Amount', colSplit + 6, leaveTop - 13, 10)
+      rowY = leaveTop - rowHeight
+      leaveRows.forEach((row) => {
+        drawLine(left, rowY, left + tableWidth, rowY)
+        addText(row[0], left + 6, rowY - 13, 10)
+        addText(row[1], colSplit + 6, rowY - 13, 10)
+        rowY -= rowHeight
+      })
+      y = leaveTop - leaveHeight - 28
 
       // Deductions table
       addText('Deductions', left, y, 12)
@@ -760,6 +813,7 @@ export default {
           payPeriod: approvalMonthLabel.value,
           earnings: {
             hoursWorked: Number(entry.hoursWorked || 0),
+            attendanceHours: Number(entry.attendanceHours || 0),
             hourlyRate: Number(entry.hourlyRate || 0),
             commission: Number(entry.commission || 0),
             total: Number(entry.totalPay || 0)
@@ -768,6 +822,14 @@ export default {
           totalEarnings: Number(entry.totalPay || 0),
           totalDeductions: Number(entry.totalDeductions || 0),
           netPay: Number(entry.netPay || 0),
+          leaveAdjustments: entry.leaveAdjustments || {
+            paidLeaveDays: 0,
+            unpaidLeaveDays: 0,
+            paidLeaveHours: 0,
+            unpaidLeaveHours: 0,
+            paidLeaveCount: 0,
+            unpaidLeaveCount: 0
+          },
           dateGenerated: serverTimestamp(),
           createdBy: currentUserId.value,
           payrollEntryId: entry.id
@@ -884,6 +946,197 @@ export default {
     const roundToQuarterHour = (hours) => Math.round((Number(hours) || 0) * 4) / 4
 
     const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2))
+
+    const parseDateValue = (value) => {
+      if (!value) return null
+      if (value?.toDate) return value.toDate()
+      if (value?.seconds) return new Date(value.seconds * 1000)
+      const parsed = new Date(value)
+      return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+
+    const getMonthDateRange = (monthKey) => {
+      const [yearStr, monthStr] = String(monthKey || '').split('-')
+      const year = Number(yearStr)
+      const month = Number(monthStr)
+      if (!year || !month) return null
+
+      const start = new Date(year, month - 1, 1)
+      start.setHours(0, 0, 0, 0)
+
+      const end = new Date(year, month, 0)
+      end.setHours(23, 59, 59, 999)
+
+      return { start, end }
+    }
+
+    const eachDateInRange = (startDate, endDate) => {
+      const dates = []
+      if (!startDate || !endDate) return dates
+
+      const cursor = new Date(startDate)
+      cursor.setHours(0, 0, 0, 0)
+      const limit = new Date(endDate)
+      limit.setHours(0, 0, 0, 0)
+
+      while (cursor <= limit) {
+        dates.push(new Date(cursor))
+        cursor.setDate(cursor.getDate() + 1)
+      }
+
+      return dates
+    }
+
+    const parseShiftHoursFromLabel = (label) => {
+      const text = String(label || '').trim()
+      if (!text) return 0
+
+      const rangeText = text.includes('||') ? text.split('||').pop().trim() : text
+      const match = rangeText.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?)\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i)
+      if (!match) return 0
+
+      const startMinutes = parseClockToMinutes(match[1])
+      const endMinutes = parseClockToMinutes(match[2])
+      if (startMinutes === null || endMinutes === null) return 0
+
+      const adjustedEnd = endMinutes < startMinutes ? endMinutes + (24 * 60) : endMinutes
+      return roundToQuarterHour((adjustedEnd - startMinutes) / 60)
+    }
+
+    const getShiftHoursForLabel = (label) => {
+      const key = String(label || '').trim()
+      if (!key) return 0
+      const cached = Number(branchShiftDurationMap.value?.[key] || 0)
+      if (Number.isFinite(cached) && cached > 0) return cached
+      return parseShiftHoursFromLabel(key)
+    }
+
+    const getLeaveDayHours = (scheduleAssignments, dateValue) => {
+      const parsedDate = parseDateValue(dateValue)
+      if (!parsedDate) return 0
+
+      const weekday = calendarWeekDays[parsedDate.getDay()] || ''
+      const shiftLabel = String(scheduleAssignments?.[weekday] || '').trim()
+      if (!shiftLabel || shiftLabel.toLowerCase() === 'off') return 0
+      return getShiftHoursForLabel(shiftLabel)
+    }
+
+    const calculateEffectivePayrollHours = (attendanceHours, leaveAdjustments = {}) => {
+      const paidLeaveHours = Number(leaveAdjustments.paidLeaveHours || 0)
+      const unpaidLeaveHours = Number(leaveAdjustments.unpaidLeaveHours || 0)
+      return roundToQuarterHour(Math.max(0, Number(attendanceHours || 0) + paidLeaveHours - unpaidLeaveHours))
+    }
+
+    const loadBranchShiftTemplates = async () => {
+      if (!currentBranchId.value) {
+        branchShiftDurationMap.value = {}
+        return
+      }
+
+      const shiftsSnap = await getDocs(query(collection(db, 'shifts'), where('branchId', '==', currentBranchId.value)))
+      branchShiftDurationMap.value = shiftsSnap.docs.reduce((acc, snap) => {
+        const data = snap.data() || {}
+        const shiftType = String(data.shiftType || 'Shift').trim()
+        const start = String(data.start || '').trim()
+        const end = String(data.end || '').trim()
+        const label = `${shiftType} || ${start} - ${end}`
+        acc[label] = parseShiftDurationHours({ start, end })
+        return acc
+      }, {})
+    }
+
+    const loadRecurringAssignmentsForEmployee = async (employeeId) => {
+      if (!employeeId || !currentBranchId.value) return normalizeAssignments({}, recurringWeekDays)
+
+      const recurringSnap = await getDoc(doc(db, 'users', employeeId, 'schedules', 'recurring'))
+      const rawAssignments = recurringSnap.exists() ? (recurringSnap.data()?.assignments || {}) : {}
+      return normalizeAssignments(rawAssignments, recurringWeekDays)
+    }
+
+    const getApprovedLeaveRequestsForEmployee = async (employeeId, monthKey) => {
+      if (!employeeId || !currentBranchId.value) return []
+
+      const monthRange = getMonthDateRange(monthKey)
+      if (!monthRange) return []
+
+      const snap = await getDocs(
+        query(collection(db, 'leaveRequests'), where('requesterId', '==', employeeId))
+      )
+
+      return snap.docs
+        .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() }))
+        .filter((request) => String(request.branchId || '').trim() === currentBranchId.value)
+        .filter((request) => String(request.status || '').trim() === 'Approved')
+        .map((request) => ({
+          ...request,
+          start: parseDateValue(`${String(request.startDate || '').trim()}T00:00:00`),
+          end: parseDateValue(`${String(request.endDate || '').trim()}T00:00:00`)
+        }))
+        .filter((request) => request.start && request.end && request.end >= monthRange.start && request.start <= monthRange.end)
+    }
+
+    const computeLeaveAdjustmentsForEmployee = async (employeeId, monthKey) => {
+      const defaults = {
+        paidLeaveDays: 0,
+        unpaidLeaveDays: 0,
+        paidLeaveHours: 0,
+        unpaidLeaveHours: 0,
+        paidLeaveCount: 0,
+        unpaidLeaveCount: 0
+      }
+
+      if (!employeeId || !currentBranchId.value || !monthKey) return defaults
+
+      const monthRange = getMonthDateRange(monthKey)
+      if (!monthRange) return defaults
+
+      try {
+        const [scheduleAssignments, approvedLeaves] = await Promise.all([
+          loadRecurringAssignmentsForEmployee(employeeId),
+          getApprovedLeaveRequestsForEmployee(employeeId, monthKey)
+        ])
+
+        const adjustments = { ...defaults }
+
+        approvedLeaves.forEach((request) => {
+          const leaveStart = request.start < monthRange.start ? monthRange.start : request.start
+          const leaveEnd = request.end > monthRange.end ? monthRange.end : request.end
+          if (!leaveStart || !leaveEnd || leaveEnd < leaveStart) return
+
+          eachDateInRange(leaveStart, leaveEnd).forEach((dateValue) => {
+            const leaveHours = getLeaveDayHours(scheduleAssignments, dateValue)
+            if (!leaveHours || leaveHours <= 0) return
+
+            if (String(request.paymentType || '').trim() === 'Unpaid Leave') {
+              adjustments.unpaidLeaveHours += leaveHours
+              adjustments.unpaidLeaveDays += 1
+              return
+            }
+
+            adjustments.paidLeaveHours += leaveHours
+            adjustments.paidLeaveDays += 1
+          })
+
+          if (String(request.paymentType || '').trim() === 'Unpaid Leave') {
+            adjustments.unpaidLeaveCount += 1
+          } else {
+            adjustments.paidLeaveCount += 1
+          }
+        })
+
+        return {
+          paidLeaveDays: roundToQuarterHour(adjustments.paidLeaveDays),
+          unpaidLeaveDays: roundToQuarterHour(adjustments.unpaidLeaveDays),
+          paidLeaveHours: roundToQuarterHour(adjustments.paidLeaveHours),
+          unpaidLeaveHours: roundToQuarterHour(adjustments.unpaidLeaveHours),
+          paidLeaveCount: adjustments.paidLeaveCount,
+          unpaidLeaveCount: adjustments.unpaidLeaveCount
+        }
+      } catch (error) {
+        console.error('Failed to compute leave adjustments:', error)
+        return defaults
+      }
+    }
 
     const computeIncomeTaxMonthly = (gross) => {
       const income = Number(gross) || 0
@@ -1125,8 +1378,10 @@ export default {
           if (!employee?.id) continue
           if (existingByEmployee.has(employee.id)) continue
 
-          const employeeHours = await computeWorkedHoursFromAttendance(employee.id, monthKey)
-          if (!employeeHours || employeeHours <= 0) continue
+          const attendanceHours = await computeWorkedHoursFromAttendance(employee.id, monthKey)
+          const leaveAdjustments = await computeLeaveAdjustmentsForEmployee(employee.id, monthKey)
+          const effectiveHours = calculateEffectivePayrollHours(attendanceHours, leaveAdjustments)
+          if (!effectiveHours || effectiveHours <= 0) continue
 
           const basePay = Number(employee.basePay || 0)
           if (basePay <= 0) continue
@@ -1137,7 +1392,7 @@ export default {
             commissionAmount = Number(commissionResult.total || 0)
           }
 
-          const totalPay = Number(employeeHours || 0) * basePay + commissionAmount
+          const totalPay = Number(effectiveHours || 0) * basePay + commissionAmount
           const deductions = computeDeductions(totalPay)
           const totalDeductions = roundCurrency(
             Object.values(deductions).reduce((sum, entry) => sum + Number(entry?.amount || 0), 0)
@@ -1151,13 +1406,15 @@ export default {
             branchId: currentBranchId.value,
             employmentType: employee.employmentType || null,
             salaryType,
-            hoursWorked: Number(employeeHours || 0),
+            hoursWorked: Number(effectiveHours || 0),
+            attendanceHours: Number(attendanceHours || 0),
             hourlyRate: Number(basePay || 0),
             commission: commissionAmount,
             totalPay,
             deductions,
             totalDeductions,
             netPay,
+            leaveAdjustments,
             payPeriodMonthKey: monthKey,
             payPeriodStart: monthStart,
             payPeriodEnd: monthEnd,
@@ -1404,7 +1661,9 @@ export default {
         hourlyRate.value = Number(selectedEmployee?.basePay || 0)
         loadingHours.value = true
         try {
-          hoursWorked.value = await computeWorkedHoursFromAttendance(employeeId)
+          const attendanceHours = await computeWorkedHoursFromAttendance(employeeId, approvalMonthKey.value)
+          const leaveAdjustments = await computeLeaveAdjustmentsForEmployee(employeeId, approvalMonthKey.value)
+          hoursWorked.value = calculateEffectivePayrollHours(attendanceHours, leaveAdjustments)
         } catch (error) {
           console.error('Error computing attendance hours:', error)
           toast.error('Failed to auto-compute hours from attendance.')
@@ -1451,11 +1710,6 @@ export default {
         return
       }
 
-      if (hoursWorked.value <= 0) {
-        toast.error('No completed attendance hours found for this employee.')
-        return
-      }
-
       if (employee.isCommissionBased) {
         const start = parseDateInput(commissionRangeStart.value)
         const end = parseDateInput(commissionRangeEnd.value)
@@ -1465,7 +1719,17 @@ export default {
         }
       }
 
-      const basePayTotal = Number(hoursWorked.value || 0) * Number(hourlyRate.value || 0)
+      const payrollMonthKey = approvalMonthKey.value
+      const attendanceHours = await computeWorkedHoursFromAttendance(employee.id, payrollMonthKey)
+      const leaveAdjustments = await computeLeaveAdjustmentsForEmployee(employee.id, payrollMonthKey)
+      const effectiveHours = calculateEffectivePayrollHours(attendanceHours, leaveAdjustments)
+
+      if (effectiveHours <= 0) {
+        toast.error('No payable attendance or leave hours found for this employee.')
+        return
+      }
+
+      const basePayTotal = Number(effectiveHours || 0) * Number(hourlyRate.value || 0)
       const commissionAmount = employee.isCommissionBased ? Number(commissionTotal.value || 0) : 0
       totalPay = basePayTotal + commissionAmount
       const deductions = computeDeductions(totalPay)
@@ -1482,13 +1746,15 @@ export default {
           branchId: currentBranchId.value,
           employmentType: employee.employmentType || null,
           salaryType,
-          hoursWorked: Number(hoursWorked.value || 0),
+          hoursWorked: Number(effectiveHours || 0),
+          attendanceHours: Number(attendanceHours || 0),
           hourlyRate: Number(hourlyRate.value || 0),
           commission: commissionAmount,
           totalPay,
           deductions,
           totalDeductions,
           netPay,
+          leaveAdjustments,
           createdBy: currentUserId.value,
           createdAt: serverTimestamp()
         })
@@ -1500,9 +1766,10 @@ export default {
           employmentType: employee.employmentType || null,
           salaryType,
           branchId: currentBranchId.value,
-          payPeriod: new Date().toLocaleDateString('en-PH'),
+          payPeriod: approvalMonthLabel.value,
           earnings: {
-            hoursWorked: Number(hoursWorked.value || 0),
+            hoursWorked: Number(effectiveHours || 0),
+            attendanceHours: Number(attendanceHours || 0),
             hourlyRate: Number(hourlyRate.value || 0),
             commission: commissionAmount,
             total: totalPay
@@ -1511,6 +1778,7 @@ export default {
           totalEarnings: totalPay,
           totalDeductions,
           netPay,
+          leaveAdjustments,
           dateGenerated: serverTimestamp(),
           createdBy: currentUserId.value
         })
@@ -1544,6 +1812,7 @@ export default {
           currentBranchId.value = ''
           employees.value = []
           payrolls.value = []
+          branchShiftDurationMap.value = {}
           return
         }
 
@@ -1554,6 +1823,7 @@ export default {
         if (!currentBranchId.value) {
           employees.value = []
           payrolls.value = []
+          branchShiftDurationMap.value = {}
           toast.error('Your account has no branch assignment.', { toastId: 'missing-branch-assignment' })
           return
         }
@@ -1561,6 +1831,7 @@ export default {
         await loadEmployees()
         await loadPayrolls()
         await loadPayrollSettings()
+        await loadBranchShiftTemplates()
         await loadPayslips()
         await loadApprovedSummaries()
 
@@ -1597,6 +1868,9 @@ export default {
 
     watch(currentBranchId, (branchId) => {
       if (!branchId) return
+      loadBranchShiftTemplates().catch((error) => {
+        console.error('Failed to load branch shift templates:', error)
+      })
       if (unsubscribeApproval) unsubscribeApproval()
       const summaryId = `${branchId}_${approvalMonthKey.value}`
       unsubscribeApproval = onSnapshot(doc(db, 'payrollSummaries', summaryId), (snap) => {

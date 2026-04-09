@@ -61,7 +61,7 @@
               </div>
             </div>
             <div class="md:pb-2">
-              <div class="flex flex-wrap items-center gap-2">
+              <div v-if="!isSelectedBranchSuspended" class="flex flex-wrap items-center gap-2">
                 <button
                   v-if="!isEditing"
                   @click="startEdit"
@@ -81,6 +81,41 @@
                   {{ selectedBranch.isPublished ? 'Unpublish Page' : 'Publish Page' }}
                 </button>
                 <span v-if="isExpired" class="text-xs text-amber-300">Publishing is disabled when the plan is expired.</span>
+              </div>
+              <div v-else class="text-xs text-rose-200 max-w-sm text-right">
+                Editing and publishing are paused while the suspension is under review. You can submit an appeal below.
+              </div>
+            </div>
+          </div>
+
+          <div v-if="isSelectedBranchSuspended" class="mt-6 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-5 text-rose-50">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div class="space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="rounded-full border border-rose-300/50 bg-rose-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
+                    Suspended
+                  </span>
+                  <span v-if="selectedBranch.appealStatus" class="rounded-full border border-amber-300/50 bg-amber-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-50">
+                    Appeal: {{ selectedBranch.appealStatus }}
+                  </span>
+                </div>
+                <h3 class="text-lg font-semibold">This center is currently suspended</h3>
+                <p class="text-sm text-rose-100/90">
+                  {{ selectedBranch.suspensionReason || 'A suspension is currently in effect for this branch.' }}
+                </p>
+                <p v-if="selectedBranch.appealStatus === 'Pending Review'" class="text-xs text-amber-100">
+                  Your appeal is already pending review. You can still update the details if you need to clarify your case.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                  :disabled="savingAppeal"
+                  @click="openAppealModal"
+                >
+                  {{ selectedBranch.appealStatus === 'Pending Review' ? 'Update Appeal' : 'Submit Appeal' }}
+                </button>
               </div>
             </div>
           </div>
@@ -308,24 +343,80 @@
       </div>
     </main>
   </div>
+
+  <Modal
+    :isOpen="showAppealModal"
+    panelClass="bg-slate-800 text-white w-full max-w-2xl"
+    @close="closeAppealModal"
+  >
+    <template #header>
+      <h2 class="text-xl font-semibold">Submit Suspension Appeal</h2>
+    </template>
+
+    <template #body>
+      <form class="space-y-4" @submit.prevent="submitAppeal">
+        <p class="text-sm text-slate-300">
+          Tell the super admin why the center suspension should be reviewed. Be clear, respectful, and concise.
+        </p>
+
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Appeal Reason</label>
+          <textarea
+            v-model.trim="appealForm.reason"
+            rows="6"
+            maxlength="1000"
+            class="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            placeholder="Explain what happened, any corrective actions taken, and why the center should be restored."
+            required
+          ></textarea>
+          <p class="text-xs text-slate-500">{{ appealForm.reason.length }}/1000 characters</p>
+        </div>
+
+        <div class="space-y-2 rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-sm text-slate-300">
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Current Suspension Details</p>
+          <p><span class="text-slate-400">Reason:</span> {{ selectedBranch?.suspensionReason || 'No reason recorded.' }}</p>
+          <p><span class="text-slate-400">Status:</span> {{ selectedBranch?.moderationStatus || selectedBranch?.status || 'Suspended' }}</p>
+          <p><span class="text-slate-400">Appeal Status:</span> {{ selectedBranch?.appealStatus || 'Not submitted' }}</p>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button
+            type="button"
+            class="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+            @click="closeAppealModal"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="savingAppeal"
+          >
+            {{ savingAppeal ? 'Submitting...' : 'Submit Appeal' }}
+          </button>
+        </div>
+      </form>
+    </template>
+  </Modal>
 </template>
 
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { getFirestore, collection, getDocs, query, where, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { getFirestore, addDoc, collection, getDocs, query, where, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { getApp } from 'firebase/app'
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, storage } from '@/config/firebaseConfig'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import OwnerPageSkeleton from '@/components/common/OwnerPageSkeleton.vue'
+import Modal from '@/components/common/Modal.vue'
 import { toast } from 'vue3-toastify'
 import { useSubscription } from '@/composables/useSubscription'
 import { hasExpiredSuspension, restoreExpiredSuspension } from '@/utils/centerSuspension'
 
 export default {
   name: 'ClinicPage',
-  components: { OwnerSidebar, OwnerPageSkeleton },
+  components: { OwnerSidebar, OwnerPageSkeleton, Modal },
   setup() {
     const db = getFirestore(getApp())
     const { isExpired, initSubscription } = useSubscription()
@@ -354,6 +445,11 @@ export default {
     const bannerImageFile = ref(null)
     const profilePreviewUrl = ref('')
     const bannerPreviewUrl = ref('')
+    const showAppealModal = ref(false)
+    const savingAppeal = ref(false)
+    const appealForm = ref({
+      reason: '',
+    })
 
     const tabs = [
       { id: 'about', label: 'About Us' },
@@ -364,6 +460,12 @@ export default {
     const selectedBranch = computed(() =>
       branches.value.find((branch) => branch.id === selectedBranchId.value) || null
     )
+
+    const isSelectedBranchSuspended = computed(() => {
+      const status = String(selectedBranch.value?.status || '').trim().toLowerCase()
+      const moderationStatus = String(selectedBranch.value?.moderationStatus || '').trim().toLowerCase()
+      return status.includes('suspend') || moderationStatus.includes('suspend')
+    })
 
     const displayClinicName = computed(() => {
       if (isEditing.value && editForm.value.clinicName) return editForm.value.clinicName
@@ -469,6 +571,7 @@ export default {
       if (!branchId || selectedBranchId.value === branchId) return
       selectedBranchId.value = branchId
       isEditing.value = false
+      closeAppealModal()
       hydrateEditForm()
       await loadBranchPostsAndReviews(branchId)
     }
@@ -693,6 +796,103 @@ export default {
       }
     }
 
+    const resetAppealForm = () => {
+      appealForm.value = {
+        reason: ''
+      }
+    }
+
+    const openAppealModal = () => {
+      if (!selectedBranch.value?.id) return
+      if (!isSelectedBranchSuspended.value) {
+        toast.info('Appeals are only available for suspended centers.')
+        return
+      }
+      appealForm.value.reason = String(selectedBranch.value?.appealReason || '').trim()
+      showAppealModal.value = true
+    }
+
+    const closeAppealModal = () => {
+      showAppealModal.value = false
+      resetAppealForm()
+    }
+
+    const submitAppeal = async () => {
+      if (!selectedBranch.value?.id || savingAppeal.value) return
+      const appealReason = String(appealForm.value.reason || '').trim()
+      if (!appealReason) {
+        toast.error('Please enter your appeal reason.')
+        return
+      }
+
+      const user = auth.currentUser
+      if (!user) {
+        toast.error('You need to be signed in to submit an appeal.')
+        return
+      }
+
+      savingAppeal.value = true
+      try {
+        const clinicId = selectedBranch.value.id
+        const ownerName =
+          String(selectedBranch.value.branchAdminName || ownerEmail.value || 'Clinic Owner').trim() || 'Clinic Owner'
+        const appealRef = await addDoc(collection(db, 'centerAppeals'), {
+          centerId: clinicId,
+          centerName: selectedBranch.value.clinicName || selectedBranch.value.clinicBranch || 'Center',
+          ownerId: user.uid,
+          ownerEmail: user.email || ownerEmail.value || '',
+          ownerName,
+          reason: appealReason,
+          status: 'Pending Review',
+          submittedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          currentSuspensionReason: selectedBranch.value.suspensionReason || '',
+          currentModerationStatus: selectedBranch.value.moderationStatus || '',
+          currentStatus: selectedBranch.value.status || '',
+        })
+
+        await updateDoc(doc(db, 'clinics', clinicId), {
+          appealStatus: 'Pending Review',
+          appealReason,
+          appealSubmittedAt: serverTimestamp(),
+          appealUpdatedAt: serverTimestamp(),
+          appealId: appealRef.id,
+          updatedAt: serverTimestamp(),
+        })
+
+        await addDoc(collection(db, 'notifications'), {
+          recipientRole: 'Superadmin',
+          senderId: user.uid,
+          type: 'center_appeal',
+          title: 'Center Appeal Submitted',
+          message: `${selectedBranch.value.clinicName || selectedBranch.value.clinicBranch || 'A center'} submitted an appeal for suspension review.`,
+          link: '/superadmin/center-appeals',
+          read: false,
+          createdAt: serverTimestamp(),
+        })
+
+        branches.value = branches.value.map((branch) =>
+          branch.id === clinicId
+            ? {
+                ...branch,
+                appealStatus: 'Pending Review',
+                appealReason,
+                appealSubmittedAt: new Date(),
+                appealId: appealRef.id,
+              }
+            : branch
+        )
+
+        toast.success('Your appeal has been submitted for review.')
+        closeAppealModal()
+      } catch (error) {
+        console.error('Failed to submit suspension appeal:', error)
+        toast.error('Failed to submit appeal. Please try again.')
+      } finally {
+        savingAppeal.value = false
+      }
+    }
+
     let unsubscribeAuth = null
     onMounted(() => {
       unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -738,15 +938,21 @@ export default {
       saveEdit,
       togglePublish,
       selectBranch,
+      openAppealModal,
+      closeAppealModal,
+      submitAppeal,
       serviceInput,
       handleServiceKeydown,
       commitServiceInput,
       removeServiceTag,
       handleProfileUpload,
       handleBannerUpload,
-      isExpired
+      isExpired,
+      isSelectedBranchSuspended,
+      showAppealModal,
+      savingAppeal,
+      appealForm,
     }
   }
 }
 </script>
-

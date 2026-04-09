@@ -76,6 +76,9 @@
                   <input
                     v-model.trim="profile.phoneNumber"
                     type="text"
+                    inputmode="numeric"
+                    maxlength="10"
+                    @input="profile.phoneNumber = sanitizePhone(profile.phoneNumber)"
                     class="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-cyan-400"
                   />
                 </label>
@@ -125,6 +128,8 @@ import { doc, getDoc, getFirestore, serverTimestamp, updateDoc } from 'firebase/
 import { toast } from 'vue3-toastify'
 import DashboardSkeleton from '@/components/common/DashboardSkeleton.vue'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
+
+const sanitizePhone = (value) => String(value || '').replace(/\D/g, '').slice(0, 10)
 
 export default {
   name: 'EmployeeProfileSelf',
@@ -190,6 +195,11 @@ export default {
         toast.error('First name and last name are required.')
         return
       }
+      const phone = sanitizePhone(profile.value.phoneNumber)
+      if (phone && phone.length !== 10) {
+        toast.error('Phone number must be exactly 10 digits.')
+        return
+      }
 
       saving.value = true
       try {
@@ -197,7 +207,7 @@ export default {
           firstName: profile.value.firstName,
           lastName: profile.value.lastName,
           fullName: `${profile.value.firstName} ${profile.value.lastName}`.trim(),
-          phoneNumber: profile.value.phoneNumber || '',
+          phoneNumber: phone || '',
           address: profile.value.address || '',
           updatedAt: serverTimestamp(),
         })

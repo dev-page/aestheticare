@@ -579,6 +579,7 @@ const permissionGroups = [
       { key: 'staff:view', label: 'View Staff', description: 'Open employee profiles and staff listings.', icon: 'mdi:account-group-outline' },
       { key: 'staff:create', label: 'Create Staff', description: 'Add employee accounts under the clinic.', icon: 'mdi:account-plus-outline' },
       { key: 'staff:update', label: 'Update Staff', description: 'Edit staff details and role assignments.', icon: 'mdi:account-edit-outline' },
+      { key: 'staff:review', label: 'Review Employee Approvals', description: 'Approve or reject employee approval requests.', icon: 'mdi:account-check-outline' },
       { key: 'attendance:view', label: 'View Attendance', description: 'See attendance records and logs.', icon: 'mdi:clipboard-text-clock-outline' },
       { key: 'attendance:create', label: 'Create Attendance', description: 'Record attendance entries and attendance actions.', icon: 'mdi:calendar-check-outline' },
     ],
@@ -595,6 +596,7 @@ const permissionGroups = [
       { key: 'appointments:review', label: 'Review Appointment Requests', description: 'Approve or reject cancellation and reschedule requests.', icon: 'mdi:calendar-check-outline' },
       { key: 'inbox:view', label: 'View Inbox', description: 'Access branch inbox and messages.', icon: 'mdi:inbox-outline' },
       { key: 'consultations:view', label: 'View Online Consultations', description: 'Access online consultation screens.', icon: 'mdi:video-outline' },
+      { key: 'consultations:create', label: 'Create Online Consultation Links', description: 'Generate Google Meet consultation links for appointments.', icon: 'mdi:video-plus-outline' },
     ],
   },
   {
@@ -631,6 +633,8 @@ const permissionGroups = [
       { key: 'payments:create', label: 'Create Payments', description: 'Process POS or payment entries.', icon: 'mdi:cash-register' },
       { key: 'reports:view', label: 'View Reports', description: 'Access clinic performance and reports.', icon: 'mdi:chart-box-outline' },
       { key: 'payroll:view', label: 'View Payroll Summary', description: 'Open payroll summaries and payroll approval screens.', icon: 'mdi:file-chart-outline' },
+      { key: 'payroll:review', label: 'Review Payroll Summaries', description: 'Approve or reject payroll summaries.', icon: 'mdi:file-check-outline' },
+      { key: 'refunds:review', label: 'Review Refund Requests', description: 'Approve or reject customer refund requests.', icon: 'mdi:cash-refund' },
     ],
   },
   {
@@ -665,19 +669,19 @@ const permissionSuggestionRules = [
   },
   {
     match: ['practitioner', 'doctor', 'dentist', 'nurse', 'therapist', 'clinician'],
-    permissions: ['appointments:view', 'appointments:review', 'clients:view', 'consultations:view', 'leave:create', 'notifications:view', 'support:view', 'profile:view', 'password:update'],
+    permissions: ['appointments:view', 'appointments:review', 'clients:view', 'consultations:view', 'consultations:create', 'leave:create', 'notifications:view', 'support:view', 'profile:view', 'password:update'],
   },
   {
     match: ['hr', 'human resources'],
-    permissions: ['staff:view', 'staff:create', 'staff:update', 'attendance:view', 'attendance:create', 'hr:view', 'hr:create', 'hr:update', 'leave:create', 'leave:review', 'notifications:view', 'support:view', 'profile:view', 'password:update'],
+    permissions: ['staff:view', 'staff:create', 'staff:update', 'staff:review', 'attendance:view', 'attendance:create', 'hr:view', 'hr:create', 'hr:update', 'leave:create', 'leave:review', 'notifications:view', 'support:view', 'profile:view', 'password:update'],
   },
   {
     match: ['finance', 'accounting', 'cashier'],
-    permissions: ['payments:view', 'payments:create', 'reports:view', 'payroll:view', 'leave:create', 'notifications:view', 'support:view', 'profile:view', 'password:update'],
+    permissions: ['payments:view', 'payments:create', 'reports:view', 'payroll:view', 'payroll:review', 'refunds:review', 'leave:create', 'notifications:view', 'support:view', 'profile:view', 'password:update'],
   },
   {
     match: ['manager', 'operations', 'supervisor'],
-    permissions: ['staff:view', 'appointments:view', 'inventory:view', 'inventory:review', 'orders:view', 'services:view', 'reports:view', 'leave:create', 'leave:review', 'notifications:view', 'support:view', 'profile:view', 'password:update'],
+    permissions: ['staff:view', 'staff:review', 'appointments:view', 'inventory:view', 'inventory:review', 'orders:view', 'services:view', 'reports:view', 'payroll:review', 'refunds:review', 'leave:create', 'leave:review', 'notifications:view', 'support:view', 'profile:view', 'password:update'],
   },
   {
     match: ['supply', 'inventory', 'warehouse', 'stock'],
@@ -685,7 +689,7 @@ const permissionSuggestionRules = [
   },
   {
     match: ['admin', 'owner', 'administrator'],
-    permissions: [fullAccessPermissionKey, 'clinic_profile:view', 'clinic_profile:update', 'branches:view', 'staff:view', 'appointments:view', 'reports:view', 'leave:create', 'leave:review', 'inventory:review', 'inbox:view', 'orders:view', 'subscription:view', 'backup:view', 'profile:view', 'password:update', 'activities:view', 'notifications:view', 'support:view'],
+    permissions: [fullAccessPermissionKey, 'clinic_profile:view', 'clinic_profile:update', 'branches:view', 'staff:view', 'staff:review', 'appointments:view', 'consultations:view', 'consultations:create', 'reports:view', 'payroll:review', 'refunds:review', 'leave:create', 'leave:review', 'inventory:review', 'inbox:view', 'orders:view', 'subscription:view', 'backup:view', 'profile:view', 'password:update', 'activities:view', 'notifications:view', 'support:view'],
   },
 ]
 
@@ -761,6 +765,7 @@ export default {
       'staff:view': 'staff_management',
       'staff:create': 'staff_management',
       'staff:update': 'staff_management',
+      'staff:review': 'staff_management',
       'attendance:view': 'attendance',
       'attendance:create': 'attendance',
       'branches:view': 'multi_branch',
@@ -774,6 +779,7 @@ export default {
       'payments:view': 'reports',
       'payments:create': 'pos_payments',
       'reports:view': 'reports',
+      'payroll:review': 'payroll',
       'inventory:view': 'inventory',
       'inventory:create': 'inventory',
       'inventory:review': 'inventory',
@@ -796,6 +802,7 @@ export default {
       'inbox:view': '',
       'payroll:view': 'payroll',
       'payroll:update': 'payroll',
+      'refunds:review': 'reports',
       [fullAccessPermissionKey]: '',
     }
 
@@ -822,7 +829,7 @@ export default {
         }
       }
 
-      return [fullAccessPermissionKey, 'staff:view', 'appointments:view', 'appointments:review', 'leave:create', 'leave:review', 'inventory:review', 'orders:view', 'inbox:view', 'clients:view', 'subscription:view', 'backup:view', 'profile:view', 'password:update', 'activities:view', 'notifications:view', 'support:view']
+      return [fullAccessPermissionKey, 'staff:view', 'staff:review', 'appointments:view', 'appointments:review', 'leave:create', 'leave:review', 'inventory:review', 'orders:view', 'inbox:view', 'clients:view', 'subscription:view', 'backup:view', 'profile:view', 'password:update', 'activities:view', 'notifications:view', 'support:view', 'payroll:review', 'refunds:review']
         .filter((permission) => allPermissionKeys.includes(permission))
         .filter((permission) => !selectedPermissions.has(permission))
     })

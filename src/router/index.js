@@ -28,7 +28,6 @@ const routes = [
   { path: "/employee/dashboard", name: "employee-dashboard", component: () => import("@/views/admin/owner/employee/EmployeeDashboard.vue"), meta: { requiresAuth: true } },
   { path: "/employee/profile", name: "employee-profile-self", component: () => import("@/views/admin/owner/employee/EmployeeProfileSelf.vue"), meta: { requiresAuth: true, requiresPermission: "profile:view" } },
   { path: "/employee/change-password", name: "employee-change-password", component: () => import("@/views/admin/owner/employee/EmployeeChangePassword.vue"), meta: { requiresAuth: true, requiresPermission: "password:update" } },
-  { path: "/face-reg", name: "face-registration", component: () => import("@/views/clinic/attendance/FaceRegistration.vue"), meta: { requiresAuth: true, requiresPermission: "attendance:create" } },
   { path: "/support/report", name: "support-report", component: () => import("@/views/common/SupportReport.vue"), meta: { requiresAuth: true, requiresPermission: "support:view" } },
   { path: "/notifications", name: "notifications", component: () => import("@/views/common/Notifications.vue"), meta: { requiresAuth: true, requiresPermission: "notifications:view" } },
   { path: "/attendance/scan", name: "attendance-qr-scan", component: () => import("@/views/clinic/attendance/AttendanceQrScan.vue"), meta: { requiresAuth: true, requiresFeature: "attendance" } },
@@ -54,7 +53,7 @@ const routes = [
   { path: "/hr/dashboard", name: "hr-dashboard", component: () => import("@/views/admin/owner/hr/HRDashboard.vue"), meta: { requiresAuth: true, requiresFeature: "hr" } },
   { path: "/hr/employee-profile", name: "hr-employee-profile", component: () => import("@/views/admin/owner/hr/EmployeeProfile.vue"), meta: { requiresAuth: true, requiresPermission: "staff:view", requiresFeature: "staff_management" } },
   { path: "/hr/add-employee", name: "hr-add-employee", component: () => import("@/views/admin/owner/hr/AddEmployee.vue"), meta: { requiresAuth: true, requiresPermission: "staff:create", requiresFeature: "staff_management" } },
-  { path: "/hr/sales", name: "hr-sales", component: () => import("@/views/admin/owner/hr/HRSales.vue"), meta: { requiresAuth: true, requiresPermission: "reports:view", requiresFeature: "reports" } },
+  { path: "/hr/sales", redirect: "/finance/reports" },
   //{ path: "/hr/schedule", name: "hr-schedule", component: () => import("@/views/clinic/hr/HRSchedule.vue"), meta: { requiresAuth: true } },
   { path: "/hr/add-shift", name: "hr-add-shift", component: () => import("@/views/admin/owner/hr/AddShift.vue"), meta: { requiresAuth: true, requiresPermission: "hr:create", requiresFeature: "hr" } },
   { path: "/hr/schedule-assignment", name: "hr-schedule-assignment", component: () => import("@/views/admin/owner/hr/ScheduleAssignment.vue"), meta: { requiresAuth: true, requiresPermission: "hr:update", requiresFeature: "hr" } },
@@ -81,7 +80,7 @@ const routes = [
   { path: "/owner/staff/add-staff", name: "owner-add-staff", component: () => import("@/views/admin/owner/AddStaff.vue"), meta: { requiresAuth: true, requiresPermission: "staff:create" } },
   { path: "/owner/staff/archived", name: "owner-staff-archived", component: () => import("@/views/admin/owner/ArchivedEmployees.vue"), meta: { requiresAuth: true, requiresPermission: "staff:view" } },
   { path: "/owner/staff/attendance", name: "owner-staff-attendance", component: () => import("@/views/admin/owner/Attendance.vue"), meta: { requiresAuth: true, requiresPermission: "attendance:view", requiresFeature: "attendance" } },
-  { path: "/owner/staff/approve", name: "owner-staff-approve", component: () => import("@/views/admin/owner/hr/ApproveStaff.vue"), meta: { requiresAuth: true, requiresPermission: "staff:update" } },
+  { path: "/owner/staff/approve", name: "owner-staff-approve", component: () => import("@/views/admin/owner/hr/ApproveStaff.vue"), meta: { requiresAuth: true, requiresPermission: "staff:review" } },
   { path: "/owner/staff/roles", name: "owner-staff-roles", component: () => import("@/views/admin/owner/OwnerRoleManagement.vue"), meta: { requiresAuth: true, requiresPermission: "staff:update" } },
   { path: "/owner/finance", name: "owner-finance", component: () => import("@/views/admin/owner/OwnerFinance.vue"), meta: { requiresAuth: true } },
   { path: "/owner/clinic-profile", name: "owner-clinic-profile", component: () => import("@/views/admin/owner/ClinicProfile.vue"), meta: { requiresAuth: true, requiresPermission: "clinic_profile:view" } },
@@ -115,13 +114,13 @@ const routes = [
   { path: "/receptionist/activity-logs", name: "receptionist-activity-logs", component: () => import("@/views/admin/owner/crm/ReceptionistActivityLogs.vue"), meta: { requiresAuth: true } },
   // Finance routes
   { path: "/finance/dashboard", name: "finance-dashboard", component: () => import("@/views/admin/owner/finance/FinanceDashboard.vue"), meta: { requiresAuth: true, requiresFeature: "reports" } },
-  { path: "/finance/sales", name: "finance-sales", component: () => import("@/views/admin/owner/finance/FinanceSales.vue"), meta: { requiresAuth: true, requiresPermission: "reports:view", requiresFeature: "reports" } },
-  { path: "/finance/refunds", name: "finance-refunds", component: () => import("@/views/admin/owner/finance/FinanceRefunds.vue"), meta: { requiresAuth: true, requiresPermission: "payments:view", requiresFeature: "reports" } },
+  { path: "/finance/sales", redirect: "/finance/reports" },
+  { path: "/finance/refunds", name: "finance-refunds", component: () => import("@/views/admin/owner/finance/FinanceRefunds.vue"), meta: { requiresAuth: true, requiresPermission: "refunds:review", requiresFeature: "reports" } },
   { path: "/finance/reports", name: "finance-reports", component: () => import("@/views/admin/owner/finance/FinanceReports.vue"), meta: { requiresAuth: true, requiresPermission: "reports:view", requiresFeature: "reports" } },
   { path: "/finance/inventory-purchases", name: "finance-inventory-purchases", component: () => import("@/views/admin/owner/finance/FinanceInventoryPurchases.vue"), meta: { requiresAuth: true, requiresPermission: "inventory:view", requiresFeature: "reports" } },
   { path: "/finance/accounts-payable", name: "finance-accounts-payable", component: () => import("@/views/admin/owner/finance/FinanceAccountsPayable.vue"), meta: { requiresAuth: true, requiresPermission: "inventory:view", requiresFeature: "reports" } },
   { path: "/finance/payroll-summary", name: "finance-payroll-summary", component: () => import("@/views/admin/owner/finance/FinancePayrollSummary.vue"), meta: { requiresAuth: true, requiresPermission: "payroll:view", requiresFeature: "payroll" } },
-  { path: "/finance/payroll-approval", name: "finance-payroll-approval", component: () => import("@/views/admin/owner/finance/FinancePayrollApproval.vue"), meta: { requiresAuth: true, requiresPermission: "payroll:view", requiresFeature: "payroll" } },
+  { path: "/finance/payroll-approval", name: "finance-payroll-approval", component: () => import("@/views/admin/owner/finance/FinancePayrollApproval.vue"), meta: { requiresAuth: true, requiresPermission: "payroll:review", requiresFeature: "payroll" } },
   // Customer routes
   { path: "/customer/home", name: "customer-home", component: () => import("@/views/customer/CustomerHome.vue"), meta: { requiresAuth: true } },
   { path: "/customer/center/:id", name: "customer-center", component: () => import("@/views/customer/CenterPage.vue"), meta: { requiresAuth: true } },
@@ -144,6 +143,7 @@ const routes = [
   { path: "/superadmin/accounts/users", name: "superadmin-accounts-users", component: () => import("@/views/superAdmin/AccountManagement.vue"), meta: { requiresAuth: true } },
   { path: "/superadmin/activity-logs", name: "superadmin-activity-logs", component: () => import("@/views/superAdmin/ActivityLogs.vue"), meta: { requiresAuth: true } },
   { path: "/superadmin/tickets", name: "superadmin-tickets", component: () => import("@/views/superAdmin/UserTickets.vue"), meta: { requiresAuth: true } },
+  { path: "/superadmin/center-appeals", name: "superadmin-center-appeals", component: () => import("@/views/superAdmin/CenterAppeals.vue"), meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({
@@ -186,8 +186,15 @@ router.beforeEach(async (to, from, next) => {
       const suspendedCenter = await getSuspendedCenterAccess(user.value.uid, userData);
 
       if (suspendedCenter) {
-        await signOut(auth);
-        return next("/login?suspended=1");
+        const suspendedPath = "/owner/clinic-page";
+        if (isOwnerLikeRole(userData.role || userData.userType || "")) {
+          if (to.path !== suspendedPath) {
+            return next(suspendedPath);
+          }
+        } else {
+          await signOut(auth);
+          return next("/login?suspended=1");
+        }
       }
     } catch (error) {
       console.error("Error verifying suspended center access in route guard:", error);

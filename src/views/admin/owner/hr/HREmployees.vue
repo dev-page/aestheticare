@@ -220,6 +220,9 @@
                 <input
                   type="text"
                   v-model="currentEmployee.phoneNumber"
+                  inputmode="numeric"
+                  maxlength="10"
+                  @input="currentEmployee.phoneNumber = sanitizePhone(currentEmployee.phoneNumber)"
                   class="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:border-purple-500 focus:outline-none"
                 />
               </div>
@@ -275,6 +278,8 @@ import { toast } from 'vue3-toastify'
 import { logActivity } from '@/utils/activityLogger'
 import { auth } from '@/config/firebaseConfig'
 import { onAuthStateChanged } from 'firebase/auth'
+
+const sanitizePhone = (value) => String(value || '').replace(/\D/g, '').slice(0, 10)
 
 export default {
   name: 'HREmployees',
@@ -491,6 +496,11 @@ export default {
           toast.error('Please enter a valid email address.')
           return
         }
+        const sanitizedPhone = sanitizePhone(currentEmployee.value.phoneNumber)
+        if (sanitizedPhone && sanitizedPhone.length !== 10) {
+          toast.error('Phone number must be exactly 10 digits.')
+          return
+        }
         if (!currentEmployee.value.id) return
         const employeeRef = doc(db, "users", currentEmployee.value.id)
         const fullName = `${currentEmployee.value.firstName} ${currentEmployee.value.lastName}`.trim()
@@ -500,7 +510,7 @@ export default {
           lastName: currentEmployee.value.lastName,
           fullName,
           email: currentEmployee.value.email,
-          phoneNumber: currentEmployee.value.phoneNumber || '',
+          phoneNumber: sanitizedPhone || '',
           role: selectedRole?.name || currentEmployee.value.role || null,
           customRoleId: currentEmployee.value.customRoleId || null,
           customRoleName: selectedRole?.name || null,
@@ -537,7 +547,8 @@ export default {
       currentEmployee,
       addEmployee,
       editEmployee,
-      saveEmployee
+      saveEmployee,
+      sanitizePhone
     }
   }
 }

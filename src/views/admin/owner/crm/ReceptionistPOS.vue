@@ -269,6 +269,7 @@ import { useRoute, useRouter } from 'vue-router'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import { toast } from 'vue3-toastify'
 import { logActivity } from '@/utils/activityLogger'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
 export default {
   name: 'ReceptionistPOS',
@@ -279,7 +280,9 @@ export default {
     const db = getFirestore(getApp())
     const auth = getAuth(getApp())
 
-    const BACKEND_URL = import.meta.env.VITE_OTP_BACKEND_URL || 'http://localhost:3001'
+    const BACKEND_URL = resolveApiBaseUrl(import.meta.env.VITE_OTP_BACKEND_URL, {
+      devFallbackUrl: 'http://localhost:3001',
+    })
     const PENDING_PAYMONGO_KEY = 'receptionist_pos_pending_paymongo'
 
     const currentUserId = ref('')

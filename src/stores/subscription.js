@@ -2,9 +2,12 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { auth, db } from '@/config/firebaseConfig'
 import { collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
 const GRACE_DAYS = 7
-const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 const PLAN_CACHE_KEY = 'subscription:plan'
 const PLAN_FEATURES_CACHE_PREFIX = 'subscription:features:'
 const PLAN_CACHE_TTL_MS = 5 * 60 * 1000
@@ -12,10 +15,8 @@ const PLAN_CACHE_TTL_MS = 5 * 60 * 1000
 const DEFAULT_FEATURES = {
   free: [
     'subscription',
-    'staff_management',
     'appointments',
     'pos_payments',
-    'inventory',
     'services',
   ],
   basic: [
@@ -25,6 +26,7 @@ const DEFAULT_FEATURES = {
     'pos_payments',
     'inventory',
     'services',
+    'reports',
   ],
   premium: [
     'subscription',
@@ -79,6 +81,12 @@ const isCustomerRole = (roleValue, userTypeValue) => {
   const roleKey = normalizeRoleKey(roleValue)
   const typeKey = normalizeRoleKey(userTypeValue)
   return roleKey === 'customer' || typeKey === 'customer'
+}
+
+const isClinicAdminOwnerRole = (roleValue, userTypeValue) => {
+  const roleKey = normalizeRoleKey(roleValue)
+  const typeKey = normalizeRoleKey(userTypeValue)
+  return roleKey === 'owner' || roleKey === 'clinicadmin' || roleKey === 'clinicadministrator' || typeKey === 'owner'
 }
 
 const isPermissionDenied = (error) => {
@@ -529,6 +537,9 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     if (!feature) return true
     if (feature === 'subscription') return true
     if (isCustomerRole(userRole.value, userType.value)) {
+      return true
+    }
+    if (isClinicAdminOwnerRole(userRole.value, userType.value)) {
       return true
     }
     if (!initialized) {

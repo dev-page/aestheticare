@@ -59,7 +59,10 @@
             <input
               v-model="clinic.contactNumber"
               type="tel"
-              placeholder="+1 234 567 890"
+              inputmode="numeric"
+              maxlength="10"
+              @input="clinic.contactNumber = sanitizePhone(clinic.contactNumber)"
+              placeholder="9XXXXXXXXX"
               class="w-full rounded-lg p-3 bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
@@ -101,6 +104,8 @@ import { getApp } from 'firebase/app';
 import { auth } from '@/config/firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { toast } from 'vue3-toastify';
+
+const sanitizePhone = (value) => String(value || '').replace(/\D/g, '').slice(0, 10)
 
 export default {
   name: 'ClinicProfile',
@@ -315,14 +320,20 @@ export default {
         return;
       }
 
+      const phone = sanitizePhone(clinic.value.contactNumber)
+      if (phone && phone.length !== 10) {
+        toast.error('Phone number must be exactly 10 digits.')
+        return
+      }
+
       const clinicRef = doc(db, 'clinics', user.uid);
-      await updateDoc(clinicRef, { ...clinic.value });
+      await updateDoc(clinicRef, { ...clinic.value, contactNumber: phone || '' });
       toast.success('Clinic profile updated successfully!');
     };
 
     onMounted(loadClinicProfile);
 
-    return { clinic, saveClinicProfile, locationMapEl, hasLocationCoords, businessTypeLabel };
+    return { clinic, saveClinicProfile, locationMapEl, hasLocationCoords, businessTypeLabel, sanitizePhone };
   },
 };
 </script>

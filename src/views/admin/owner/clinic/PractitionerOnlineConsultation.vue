@@ -81,8 +81,9 @@
                     <button
                       type="button"
                       class="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs hover:bg-sky-500 disabled:opacity-60"
-                      :disabled="creatingId === appointment.id || isExpiredAppointment(appointment)"
+                      :disabled="creatingId === appointment.id || isExpiredAppointment(appointment) || !canCreateConsultationLinks"
                       @click="createMeetLink(appointment)"
+                      :title="!canCreateConsultationLinks ? 'Missing consultations:create permission' : ''"
                     >
                       {{ creatingId === appointment.id ? 'Creating...' : (appointment.meetLink ? 'Regenerate Link' : 'Create Link') }}
                     </button>
@@ -96,6 +97,9 @@
                       Join Call
                     </button>
                   </div>
+                  <p v-if="!canCreateConsultationLinks" class="mt-2 text-xs text-amber-300">
+                    You can view consultations, but you do not have permission to create Google Meet links.
+                  </p>
                 </td>
               </tr>
               <tr v-if="assignedAppointments.length === 0">
@@ -120,9 +124,15 @@ import { getApp } from 'firebase/app'
 import { toast } from 'vue3-toastify'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import { Icon } from '@iconify/vue'
+import { usePermissions } from '@/composables/usePermissions'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
-const BACKEND_URL = import.meta.env.VITE_OTP_BACKEND_URL || 'http://localhost:3001'
-const OTP_API_BASE = import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000'
+const BACKEND_URL = resolveApiBaseUrl(import.meta.env.VITE_OTP_BACKEND_URL, {
+  devFallbackUrl: 'http://localhost:3001',
+})
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 
 export default {
   name: 'PractitionerOnlineConsultation',
@@ -139,13 +149,35 @@ export default {
     const appointments = ref([])
     const creatingId = ref('')
     const isSeedingDemo = ref(false)
+    const { hasPermission } = usePermissions()
+    const canCreateConsultationLinks = computed(() => Boolean(hasPermission('consultations:create')))
+
+    const getAppointmentDurationMinutes = (appointment) => {
+      const explicitDuration = Number(
+        appointment?.totalServiceDurationMinutes ||
+        appointment?.consultationForServiceDurationMinutes ||
+        appointment?.consultationDurationMinutes ||
+        appointment?.durationMinutes ||
+        0
+      )
+      if (Number.isFinite(explicitDuration) && explicitDuration > 0) return explicitDuration
+
+      const serviceDurations = Array.isArray(appointment?.serviceDurations)
+        ? appointment.serviceDurations.map((value) => Number(value || 0)).filter((value) => value > 0)
+        : []
+      if (serviceDurations.length) {
+        return serviceDurations.reduce((sum, value) => sum + value, 0)
+      }
+
+      return 60
+    }
 
     const getBackendCandidates = () => {
       const candidates = [
         String(BACKEND_URL || '').trim(),
         String(OTP_API_BASE || '').trim(),
-        'http://localhost:3000',
-        'http://localhost:3001',
+        import.meta.env.DEV ? 'http://localhost:3000' : '',
+        import.meta.env.DEV ? 'http://localhost:3001' : '',
       ].filter(Boolean)
       return [...new Set(candidates)]
     }
@@ -225,19 +257,31 @@ export default {
     }
 
     const isExpiredAppointment = (appointment) => {
+      const meetValidUntil = appointment?.meetValidUntil
+        ? new Date(appointment.meetValidUntil)
+        : null
+      if (meetValidUntil && !Number.isNaN(meetValidUntil.getTime())) {
+        return Date.now() > meetValidUntil.getTime()
+      }
       const start = parseDateTime(appointment?.date, appointment?.time)
       if (!start) return false
-      const end = new Date(start.getTime() + 60 * 60 * 1000)
+      const durationMinutes = Math.max(30, Number(getAppointmentDurationMinutes(appointment) || 0))
+      const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
       return Date.now() > end.getTime()
     }
 
     const createMeetLink = async (appointment) => {
       if (!appointment?.id) return
+      if (!canCreateConsultationLinks.value) {
+        toast.error('You do not have permission to generate consultation links.')
+        return
+      }
       creatingId.value = appointment.id
 
       try {
         const start = parseDateTime(appointment.date, appointment.time) || new Date()
-        const end = new Date(start.getTime() + 60 * 60 * 1000)
+        const durationMinutes = Math.max(30, Number(getAppointmentDurationMinutes(appointment) || 0))
+        const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
         const clientName = appointment.clientName || appointment.patientName || 'Client'
         const serviceName = appointment.service || appointment.type || 'Consultation'
 
@@ -267,6 +311,7 @@ export default {
           consultationMode: 'online',
           meetLink,
           meetEventId: payload?.data?.eventId || '',
+          meetValidUntil: end.toISOString(),
           meetCreatedAt: serverTimestamp(),
           meetCreatedBy: currentUserId.value || '',
         })
@@ -274,6 +319,7 @@ export default {
         appointment.meetLink = meetLink
         appointment.consultationMode = 'online'
         appointment.meetEventId = payload?.data?.eventId || ''
+        appointment.meetValidUntil = end.toISOString()
         toast.success('Google Meet link created successfully.')
       } catch (error) {
         console.error('Failed to create Google Meet link:', error)
@@ -407,6 +453,7 @@ export default {
       copyMeetLink,
       seedDemoConsultation,
       isExpiredAppointment,
+      canCreateConsultationLinks,
     }
   },
 }

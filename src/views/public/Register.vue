@@ -11,11 +11,14 @@ import Modal from '@/components/common/Modal.vue'
 import Terms from '@/components/common/Terms.vue'
 import PrivacyPolicy from '@/components/common/PrivacyPolicy.vue'
 import RegisterCustomer from '@/views/public/RegisterCustomer.vue'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 import axios from 'axios'
 
 const router = useRouter()
 const route = useRoute()
-const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 
 const legacyClinicRoute = computed(() => {
   const name = String(route.name || '')
@@ -816,6 +819,36 @@ const sendOtpEmail = async (toEmail) => {
       'Unexpected OTP send error'
     console.error('Error sending OTP email:', providerError)
     return { success: false, otp: '', error: providerError }
+  }
+}
+
+const sendWelcomeEmail = async (toEmail, fullName, accountType = 'clinic') => {
+  try {
+    const user = auth.currentUser
+    if (!user) {
+      throw new Error('User not authenticated.')
+    }
+
+    const token = await user.getIdToken()
+    const response = await axios.post(
+      `${OTP_API_BASE}/send-account-welcome`,
+      {
+        recipient: toEmail,
+        fullName,
+        accountType,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 10000,
+      }
+    )
+
+    return Boolean(response?.data?.success)
+  } catch (err) {
+    console.error('Error sending welcome email:', err?.response?.data || err?.message || err)
+    return false
   }
 }
 
@@ -2148,6 +2181,16 @@ const registerClinic = async () => {
       saveClinicPromise,
       sendOtpPromise,
     ])
+
+    const welcomeSent = await sendWelcomeEmail(
+      otpRecipientEmail.value,
+      ownerFullName,
+      'clinic'
+    )
+
+    if (!welcomeSent) {
+      toast.warning('Account created, but the welcome email could not be sent.')
+    }
 
     if (otpResult.success) {
       generatedOtp.value = otpResult.otp

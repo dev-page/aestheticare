@@ -385,6 +385,7 @@ import Modal from '@/components/common/Modal.vue'
 import { toast } from 'vue3-toastify'
 import Swal from 'sweetalert2'
 import { storage } from '@/config/firebaseConfig'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
 export default {
   name: 'CustomerOrders',
@@ -392,7 +393,9 @@ export default {
   setup() {
     const db = getFirestore(getApp())
     const auth = getAuth(getApp())
-    const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+    const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+      devFallbackUrl: 'http://localhost:3000',
+    })
 
     const loading = ref(true)
     const search = ref('')
@@ -436,7 +439,7 @@ export default {
     const fetchFromBackend = async (path, options = {}) => {
       const baseUrl = String(OTP_API_BASE || '').trim()
       if (!baseUrl) {
-        throw new Error('VITE_OTP_API_BASE_URL is not set.')
+        throw new Error('OTP backend is not configured.')
       }
       const response = await fetch(`${baseUrl}${path}`, options)
       if (response.status === 404) {

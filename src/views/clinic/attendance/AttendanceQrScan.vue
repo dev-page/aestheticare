@@ -35,10 +35,10 @@
             <button
               type="button"
               class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="isScanning"
+              :disabled="isScanning || attendanceAlreadyCompleted"
               @click="startScanner"
             >
-              {{ isScanning ? 'Scanner Active' : 'Start Scanner' }}
+              {{ attendanceAlreadyCompleted ? 'Attendance Completed' : isScanning ? 'Scanner Active' : 'Start Scanner' }}
             </button>
           </div>
 
@@ -74,6 +74,19 @@
           </section>
 
           <section class="rounded-2xl border border-slate-700 bg-slate-800 p-5">
+            <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Today&apos;s Record</p>
+            <div class="mt-3 space-y-2 text-sm text-slate-300">
+              <p><span class="text-slate-400">Time In:</span> {{ currentAttendanceSummary.timeIn }}</p>
+              <p><span class="text-slate-400">Time Out:</span> {{ currentAttendanceSummary.timeOut }}</p>
+              <p><span class="text-slate-400">Status:</span> {{ currentAttendanceSummary.attendanceStatus }}</p>
+              <p><span class="text-slate-400">Work Hours:</span> {{ currentAttendanceSummary.workHoursStatus }}</p>
+            </div>
+            <p class="mt-3 text-xs text-slate-400">
+              The record stays visible after clock-in and clock-out so you can confirm today&apos;s attendance state.
+            </p>
+          </section>
+
+          <section class="rounded-2xl border border-slate-700 bg-slate-800 p-5">
             <p class="text-xs uppercase tracking-[0.18em] text-slate-500">How It Works</p>
             <ol class="mt-3 space-y-2 text-sm text-slate-300">
               <li>1. Open the scanner and allow camera access.</li>
@@ -91,12 +104,14 @@
 <script>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { Html5Qrcode } from 'html5-qrcode'
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { toast } from 'vue3-toastify'
 import { useRouter } from 'vue-router'
 import { auth, db } from '@/config/firebaseConfig'
 import { classifyAttendanceRecord } from '@/utils/attendanceStatus'
+import { buildWeekScheduleMap, resolveWeekAssignments } from '@/utils/employeeSchedules'
+import { extractShiftWindowMinutes, getWeekStartKey, minutesToTime } from '@/utils/appointmentDss'
 
 const READER_ID = 'attendance-qr-reader'
 
@@ -151,6 +166,28 @@ export default {
       if (statusTone.value === 'error') return 'text-rose-400'
       if (statusTone.value === 'success') return 'text-emerald-400'
       return 'text-slate-400'
+    })
+
+    const attendanceAlreadyCompleted = computed(() =>
+      Boolean(attendanceRecord.value?.timeIn && attendanceRecord.value?.timeOut)
+    )
+
+    const currentAttendanceSummary = computed(() => {
+      const computedMeta = classifyAttendanceRecord({
+        timeIn: attendanceRecord.value?.timeIn || '',
+        timeOut: attendanceRecord.value?.timeOut || '',
+        shiftStart: attendanceRecord.value?.shiftStart || employeeShiftStart.value || '',
+        shiftEnd: attendanceRecord.value?.shiftEnd || employeeShiftEnd.value || '',
+      })
+      const attendanceStatus = String(computedMeta.attendanceStatus || attendanceRecord.value?.attendanceStatus || '').trim() || 'Not recorded yet'
+      const workHoursStatus = String(computedMeta.workHoursStatus || attendanceRecord.value?.workHoursStatus || '').trim() || '-'
+
+      return {
+        timeIn: String(attendanceRecord.value?.timeIn || '').trim() || '-',
+        timeOut: String(attendanceRecord.value?.timeOut || '').trim() || '-',
+        attendanceStatus,
+        workHoursStatus,
+      }
     })
 
     const getFallbackPath = () => {
@@ -209,8 +246,34 @@ export default {
       employeeShiftStart.value = String(data.shiftStart || '').trim()
       employeeShiftEnd.value = String(data.shiftEnd || '').trim()
 
+      try {
+        const schedulesSnap = await getDocs(collection(db, 'users', user.uid, 'schedules'))
+        const weekMap = buildWeekScheduleMap(
+          schedulesSnap.docs.map((snap) => ({ id: snap.id, data: snap.data() || {} }))
+        )
+        const todayDate = new Date()
+        const weekKey = getWeekStartKey(todayKey.value)
+        const dayName = todayDate.toLocaleDateString('en-US', { weekday: 'long' })
+        const assignments = resolveWeekAssignments(weekMap, weekKey)
+        const shiftLabel = String(assignments?.[dayName] || '').trim()
+        const window = extractShiftWindowMinutes(shiftLabel)
+        if (window) {
+          employeeShiftStart.value = minutesToTime(window.start)
+          employeeShiftEnd.value = minutesToTime(window.end)
+        }
+      } catch (error) {
+        console.error('Failed to load employee schedule for attendance:', error)
+      }
+
       const attendanceSnap = await getDoc(getAttendanceDocRef())
       attendanceRecord.value = attendanceSnap.exists() ? attendanceSnap.data() || {} : {}
+      if (attendanceAlreadyCompleted.value) {
+        setStatus('You have already clocked in and clocked out for today.', 'success')
+      } else if (attendanceRecord.value.timeIn) {
+        setStatus('You have already clocked in for today. Scan again to clock out.', 'success')
+      } else {
+        setStatus('Ready to scan today’s attendance QR.')
+      }
     }
 
     const setStatus = (message, tone = 'neutral') => {
@@ -220,6 +283,11 @@ export default {
 
     const processQrPayload = async (decodedText) => {
       if (isProcessing.value) return
+      if (attendanceAlreadyCompleted.value) {
+        setStatus('You have already clocked in and clocked out for today.', 'success')
+        toast.info('Attendance already completed for today.')
+        return
+      }
       isProcessing.value = true
 
       try {
@@ -330,7 +398,12 @@ export default {
     }
 
     const startScanner = async () => {
-      if (isScanning.value) return
+      if (isScanning.value || attendanceAlreadyCompleted.value) {
+        if (attendanceAlreadyCompleted.value) {
+          setStatus('You have already clocked in and clocked out for today.', 'success')
+        }
+        return
+      }
 
       await nextTick()
       try {
@@ -397,10 +470,12 @@ export default {
       employeeName,
       employeeRole,
       goBack,
+      attendanceAlreadyCompleted,
       isScanning,
       lastAttendanceAction,
       lastAttendanceTime,
       liveTime,
+      currentAttendanceSummary,
       startScanner,
       statusClass,
       statusMessage,

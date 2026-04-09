@@ -8,10 +8,13 @@ import { toast } from 'vue3-toastify'
 import Modal from '@/components/common/Modal.vue'
 import Terms from '@/components/common/Terms.vue'
 import PrivacyPolicy from '@/components/common/PrivacyPolicy.vue'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 import axios from 'axios'
 
 const router = useRouter()
-const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 
 const goToRegisterChooser = async () => {
   await router.replace({ name: 'register' })
@@ -396,6 +399,32 @@ const sendOtpEmail = async (toEmail, otp) => {
   }
 }
 
+const sendWelcomeEmail = async (toEmail, fullName) => {
+  try {
+    const user = auth.currentUser
+    if (!user) {
+      throw new Error('User not authenticated.')
+    }
+
+    const token = await user.getIdToken()
+    const response = await axios.post(`${OTP_API_BASE}/send-account-welcome`, {
+      recipient: toEmail,
+      fullName,
+      accountType: 'customer',
+    }, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      timeout: 10000,
+    })
+
+    return Boolean(response?.data?.success)
+  } catch (err) {
+    console.error('Error sending welcome email:', err?.response?.data || err?.message || err)
+    return false
+  }
+}
+
 const setOtpInputRef = (el, index) => {
   if (el) otpInputRefs.value[index] = el
 }
@@ -578,7 +607,15 @@ const register = async () => {
 
     otpRecipientEmail.value = email.value.trim()
     generatedOtp.value = generateOtp()
+    const welcomeSent = await sendWelcomeEmail(
+      otpRecipientEmail.value,
+      `${firstName.value.trim()} ${lastName.value.trim()}`.trim()
+    )
     const sent = await sendOtpEmail(otpRecipientEmail.value, generatedOtp.value)
+
+    if (!welcomeSent) {
+      toast.warning('Account created, but the welcome email could not be sent.')
+    }
 
     otpSent.value = true
     startOtpCountdown()

@@ -240,6 +240,8 @@ export default {
     const isSubmitting = ref(false)
     const currentCalendarMonth = ref(new Date())
     const calendarWeekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const defaultAppointmentDurationMinutes = 60
+    const blockingStatuses = new Set(['scheduled', 'approved', 'paid', 'completed', 'in progress', 'ongoing', 'held'])
 
     const form = ref({
       clientId: '',
@@ -428,6 +430,48 @@ export default {
       })
     })
 
+    const rangesOverlap = (leftStart, leftEnd, rightStart, rightEnd) =>
+      leftStart < rightEnd && leftEnd > rightStart
+
+    const hasScheduleConflict = async ({ practitionerId, date, time }) => {
+      const start = parseClockToMinutes(time)
+      if (start === null) return true
+      const end = start + defaultAppointmentDurationMinutes
+
+      const snapshot = await getDocs(
+        query(
+          collection(db, 'appointments'),
+          where('branchId', '==', currentBranchId.value),
+          where('date', '==', date),
+          where('assignedPractitionerId', '==', practitionerId)
+        )
+      )
+
+      return snapshot.docs.some((snap) => {
+        const data = snap.data() || {}
+        const status = String(data.status || '').trim().toLowerCase()
+        if (!blockingStatuses.has(status)) return false
+
+        const existingStart = parseClockToMinutes(data.time)
+        if (existingStart === null) return false
+
+        const existingEndRaw = parseClockToMinutes(data.endTime)
+        const existingDuration = Number(
+          data.totalServiceDurationMinutes ||
+          data.consultationForServiceDurationMinutes ||
+          data.consultationDurationMinutes ||
+          data.durationMinutes ||
+          defaultAppointmentDurationMinutes
+        )
+        const existingEnd =
+          existingEndRaw !== null && existingEndRaw > existingStart
+            ? existingEndRaw
+            : existingStart + (Number.isFinite(existingDuration) && existingDuration > 0 ? existingDuration : defaultAppointmentDurationMinutes)
+
+        return rangesOverlap(start, end, existingStart, existingEnd)
+      })
+    }
+
     watch(
       availablePractitioners,
       (nextList) => {
@@ -499,6 +543,15 @@ export default {
       const selectedPractitioner = practitioners.value.find((item) => item.id === form.value.practitionerId)
       if (!selectedPractitioner) {
         toast.error('Please select a valid practitioner.')
+        return
+      }
+      const practitionerAvailable = availablePractitioners.value.some((item) => item.id === selectedPractitioner.id)
+      if (!practitionerAvailable) {
+        toast.error('The selected practitioner is not available for that date and time.')
+        return
+      }
+      if (await hasScheduleConflict({ practitionerId: selectedPractitioner.id, date: form.value.date, time: form.value.time })) {
+        toast.error('That schedule was just taken. Please choose another time.')
         return
       }
 

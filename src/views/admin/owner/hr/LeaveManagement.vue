@@ -264,8 +264,14 @@ const loadLeaveRequests = async () => {
 
   let requestsSnap = null
 
-  if (reviewerMode.value && currentOwnerId.value) {
-    requestsSnap = await getDocs(query(collection(db, 'leaveRequests'), where('ownerId', '==', currentOwnerId.value)))
+  if (reviewerMode.value) {
+    if (isClinicAdminOwner.value && currentOwnerId.value) {
+      requestsSnap = await getDocs(query(collection(db, 'leaveRequests'), where('ownerId', '==', currentOwnerId.value)))
+    } else if (currentBranchId.value) {
+      requestsSnap = await getDocs(query(collection(db, 'leaveRequests'), where('branchId', '==', currentBranchId.value)))
+    } else {
+      requestsSnap = { docs: [] }
+    }
   } else {
     requestsSnap = await getDocs(query(collection(db, 'leaveRequests'), where('requesterId', '==', currentUserId.value)))
   }

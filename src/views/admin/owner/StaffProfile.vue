@@ -8,6 +8,8 @@ import Modal from '@/components/common/Modal.vue'
 import { toast } from 'vue3-toastify'
 import Swal from 'sweetalert2'
 
+const sanitizePhone = (value) => String(value || '').replace(/\D/g, '').slice(0, 10)
+
 export default {
   name: 'OwnerStaff',
   components: { OwnerSidebar, Modal },
@@ -196,9 +198,14 @@ export default {
       const { firstName, lastName, email, phoneNumber, clinicBranch, clinicLocation } = currentStaff.value
       const fullName = `${firstName} ${lastName}`
       const selectedRole = customRoles.value.find((entry) => entry.id === currentStaff.value.customRoleId)
+      const sanitizedPhone = sanitizePhone(phoneNumber)
 
-      if (!firstName.trim() || !lastName.trim() || !email.trim() || !phoneNumber.trim() || !clinicBranch.trim() || !clinicLocation.trim()) {
+      if (!firstName.trim() || !lastName.trim() || !email.trim() || !sanitizedPhone || !clinicBranch.trim() || !clinicLocation.trim()) {
         toast.error('All fields are required.')
+        return
+      }
+      if (sanitizedPhone.length !== 10) {
+        toast.error('Phone number must be exactly 10 digits.')
         return
       }
 
@@ -226,7 +233,7 @@ export default {
             lastName: currentStaff.value.lastName.trim(),
             fullName: `${currentStaff.value.firstName.trim()} ${currentStaff.value.lastName.trim()}`.trim(),
             email: currentStaff.value.email.trim(),
-            phoneNumber: currentStaff.value.phoneNumber,
+            phoneNumber: sanitizedPhone,
             role: selectedRole?.name || currentStaff.value.role || null,
             customRoleId: currentStaff.value.customRoleId || null,
             customRoleName: selectedRole?.name || null,
@@ -267,7 +274,8 @@ export default {
       saveStaff,
       searchQuery,
       filteredStaffList,
-      customRoles
+      customRoles,
+      sanitizePhone
     }
   }
 }
@@ -382,7 +390,8 @@ export default {
 
             <div>
               <label class="block text-slate-400 mb-1">Phone Number</label>
-              <input type="text" v-model="currentStaff.phoneNumber" placeholder="Enter phone number"
+              <input type="text" v-model="currentStaff.phoneNumber" placeholder="Enter 10-digit phone number"
+                inputmode="numeric" maxlength="10" @input="currentStaff.phoneNumber = sanitizePhone(currentStaff.phoneNumber)"
                 class="w-full px-3 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
 

@@ -156,8 +156,11 @@ import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestor
 import { getDownloadURL, ref as storageRef } from 'firebase/storage'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import OwnerPageSkeleton from '@/components/common/OwnerPageSkeleton.vue'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
-const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 
 const loading = ref(true)
 const creating = ref(false)

@@ -26,6 +26,60 @@
               <p class="mt-2 text-lg font-semibold text-white">{{ effectivePermissions.length }}</p>
             </div>
           </div>
+
+          <div class="mt-6 rounded-2xl border border-slate-700 bg-slate-900/70 p-4">
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-[0.16em] text-slate-500">Today&apos;s Attendance</p>
+                <p class="mt-2 text-lg font-semibold text-white">{{ attendanceSummary.attendanceStatus }}</p>
+              </div>
+              <div class="text-sm text-slate-300">
+                <p>Work Hours: <span class="font-semibold text-white">{{ attendanceSummary.workHoursStatus }}</span></p>
+                <p>Time In: <span class="font-semibold text-white">{{ attendanceSummary.timeIn }}</span></p>
+                <p>Time Out: <span class="font-semibold text-white">{{ attendanceSummary.timeOut }}</span></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-3xl border border-slate-800 bg-slate-800/80 p-6 shadow-lg">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-semibold text-white">Assigned Shifts</h2>
+              <p class="mt-1 text-sm text-slate-400">Recurring schedule for the employee&apos;s current week.</p>
+            </div>
+            <span class="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs uppercase tracking-[0.18em] text-slate-300">
+              {{ assignedShifts.length }} days
+            </span>
+          </div>
+
+          <div v-if="assignedShifts.length" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <article
+              v-for="shift in assignedShifts"
+              :key="shift.day"
+              class="rounded-2xl border border-slate-700 bg-slate-900/80 p-4"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-white">{{ shift.day }}</p>
+                  <p class="mt-1 text-xs text-slate-400">{{ shift.weekLabel }}</p>
+                </div>
+                <span class="rounded-full px-2 py-1 text-[11px] font-medium" :class="shift.isOff ? 'bg-slate-700 text-slate-300' : 'bg-emerald-500/15 text-emerald-300'">
+                  {{ shift.isOff ? 'Off' : 'Assigned' }}
+                </span>
+              </div>
+              <p class="mt-3 text-sm text-slate-300">
+                {{ shift.label }}
+              </p>
+            </article>
+          </div>
+
+          <div v-else class="mt-6 rounded-2xl border border-dashed border-slate-700 bg-slate-900/70 px-5 py-10 text-center">
+            <h3 class="text-lg font-semibold text-white">No assigned shifts yet</h3>
+            <p class="mt-2 text-sm text-slate-400">
+              This account does not have a recurring schedule assigned for the current week.
+            </p>
+          </div>
         </section>
 
         <section v-if="quickLinks.length" class="rounded-3xl border border-slate-800 bg-slate-800/80 p-6 shadow-lg">
@@ -114,11 +168,17 @@
 import { computed, onMounted, ref } from 'vue'
 import { getApp } from 'firebase/app'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
-import { doc, getDoc, getFirestore } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, getFirestore } from 'firebase/firestore'
 import DashboardSkeleton from '@/components/common/DashboardSkeleton.vue'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import { usePermissions } from '@/composables/usePermissions'
 import { useSubscription } from '@/composables/useSubscription'
+import {
+  buildWeekScheduleMap,
+  resolveWeekAssignments,
+} from '@/utils/employeeSchedules'
+import { getWeekStartKey } from '@/utils/appointmentDss'
+import { classifyAttendanceRecord } from '@/utils/attendanceStatus'
 
 export default {
   name: 'EmployeeDashboard',
@@ -131,6 +191,8 @@ export default {
 
     const loading = ref(true)
     const roleLabel = ref('')
+    const employeeSchedules = ref({})
+    const attendanceRecord = ref({})
 
     const moduleCatalog = [
       {
@@ -185,22 +247,21 @@ export default {
           { label: 'Payroll', to: '/hr/payroll', permission: 'payroll:update', feature: 'payroll', description: 'Run payroll and payslip workflows.' },
           { label: 'Payslip Generation', to: '/hr/payslip-generation', permission: 'payroll:update', feature: 'payroll', description: 'Generate staff payslips.' },
           { label: 'Payroll Summary', to: '/finance/payroll-summary', permission: 'payroll:view', feature: 'payroll', description: 'Review payroll summary results.' },
-          { label: 'Payroll Approval', to: '/finance/payroll-approval', permission: 'payroll:view', feature: 'payroll', description: 'Approve payroll summary items.' },
+          { label: 'Payroll Approval', to: '/finance/payroll-approval', permission: 'payroll:review', feature: 'payroll', description: 'Approve payroll summary items.' },
         ],
       },
-      {
-        key: 'finance',
-        label: 'Finance',
-        description: 'Payments, reports, sales, and financial review.',
-        entries: [
-          { label: 'POS', to: '/receptionist/pos', permission: 'payments:create', feature: 'pos_payments', description: 'Process in-clinic payments.' },
-          { label: 'Transactions', to: '/receptionist/transactions/history', permission: 'payments:view', feature: 'reports', description: 'Review payment history.' },
-          { label: 'Sales', to: '/finance/sales', permission: 'reports:view', feature: 'reports', description: 'Open the sales analytics view.' },
-          { label: 'Refunds', to: '/finance/refunds', permission: 'payments:view', feature: 'reports', description: 'Manage refund workflows.' },
-          { label: 'Reports', to: '/finance/reports', permission: 'reports:view', feature: 'reports', description: 'See finance reports and summaries.' },
-          { label: 'HR Sales', to: '/hr/sales', permission: 'reports:view', feature: 'reports', description: 'Open the HR reports page.' },
-        ],
-      },
+        {
+          key: 'finance',
+          label: 'Finance',
+          description: 'Payments, reports, sales, and financial review.',
+          entries: [
+            { label: 'POS', to: '/receptionist/pos', permission: 'payments:create', feature: 'pos_payments', description: 'Process in-clinic payments.' },
+            { label: 'Transactions', to: '/receptionist/transactions/history', permission: 'payments:view', feature: 'reports', description: 'Review payment history.' },
+            { label: 'Finance Reports', to: '/finance/reports', permission: 'reports:view', feature: 'reports', description: 'Open the shared finance report and DSS insights.' },
+            { label: 'Refunds', to: '/finance/refunds', permission: 'refunds:review', feature: 'reports', description: 'Manage refund workflows.' },
+            { label: 'Reports', to: '/finance/reports', permission: 'reports:view', feature: 'reports', description: 'See finance reports and summaries.' },
+          ],
+        },
       {
         key: 'operations',
         label: 'Operations',
@@ -264,23 +325,79 @@ export default {
       return label || 'Employee'
     })
 
+    const todayKey = computed(() => {
+      const now = new Date()
+      const yyyy = now.getFullYear()
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(now.getDate()).padStart(2, '0')
+      return `${yyyy}-${mm}-${dd}`
+    })
+
+    const attendanceSummary = computed(() => {
+      const record = attendanceRecord.value || {}
+      const computedMeta = classifyAttendanceRecord({
+        timeIn: record.timeIn || '',
+        timeOut: record.timeOut || '',
+        shiftStart: record.shiftStart || '',
+        shiftEnd: record.shiftEnd || '',
+      })
+      const timeIn = String(record.timeIn || '-').trim() || '-'
+      const timeOut = String(record.timeOut || '-').trim() || '-'
+      const attendanceStatus = String(computedMeta.attendanceStatus || record.attendanceStatus || '').trim() || 'Not recorded yet'
+      const workHoursStatus = String(computedMeta.workHoursStatus || record.workHoursStatus || '').trim() || '-'
+
+      return {
+        timeIn,
+        timeOut,
+        attendanceStatus,
+        workHoursStatus,
+      }
+    })
+
+    const assignedShifts = computed(() => {
+      const now = new Date()
+      const weekKey = getWeekStartKey(todayKey.value)
+      const assignments = resolveWeekAssignments(employeeSchedules.value, weekKey)
+      const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      return daysOfWeek.map((day) => {
+        const label = String(assignments?.[day] || '').trim() || 'Off'
+        return {
+          day,
+          weekLabel: weekKey || 'Current week',
+          label,
+          isOff: label.toLowerCase() === 'off',
+        }
+      })
+    })
+
     onMounted(async () => {
       await initSubscription()
       onAuthStateChanged(auth, async (user) => {
         if (!user) {
           roleLabel.value = ''
+          attendanceRecord.value = {}
+          employeeSchedules.value = {}
           loading.value = false
           return
         }
         const userSnap = await getDoc(doc(db, 'users', user.uid))
         const userData = userSnap.exists() ? userSnap.data() || {} : {}
         roleLabel.value = String(userData.customRoleName || userData.role || 'Employee').trim()
+        const attendanceSnap = await getDoc(doc(db, 'attendance', `${user.uid}_${todayKey.value}`))
+        attendanceRecord.value = attendanceSnap.exists() ? attendanceSnap.data() || {} : {}
+
+        const schedulesSnap = await getDocs(collection(db, 'users', user.uid, 'schedules'))
+        employeeSchedules.value = buildWeekScheduleMap(
+          schedulesSnap.docs.map((snap) => ({ id: snap.id, data: snap.data() || {} }))
+        )
         loading.value = false
       })
     })
 
     return {
       accessibleModules,
+      assignedShifts,
+      attendanceSummary,
       effectivePermissions,
       headingTitle,
       loading,

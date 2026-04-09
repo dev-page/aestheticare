@@ -120,6 +120,169 @@ const sendSendGridMessage = async (message) => {
   }
 }
 
+const escapeHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+const normalizeWelcomeAccountType = (value) => {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw.includes('clinic')) return 'clinic'
+  if (raw.includes('staff') || raw.includes('employee') || raw.includes('practitioner') || raw.includes('receptionist') || raw.includes('finance') || raw.includes('hr') || raw.includes('manager') || raw.includes('supply')) {
+    return 'staff'
+  }
+  return 'customer'
+}
+
+const buildWelcomeEmailMessage = ({
+  recipient,
+  fullName,
+  accountType = 'customer',
+  defaultPassword = '',
+}) => {
+  const safeRecipient = String(recipient || '').trim().toLowerCase()
+  const safeName = String(fullName || 'there').trim() || 'there'
+  const safeAccountType = normalizeWelcomeAccountType(accountType)
+  const loginUrl = `${String(frontendBaseUrl || '').replace(/\/$/, '')}/login`
+  const displayName = escapeHtml(safeName)
+  const loginLink = escapeHtml(loginUrl)
+  const recipientLabel = escapeHtml(safeRecipient)
+  const passwordLine = String(defaultPassword || '').trim()
+  const passwordHtml = passwordLine
+    ? `<p><strong>Temporary password:</strong> ${escapeHtml(passwordLine)}</p>`
+    : ''
+
+  if (safeAccountType === 'clinic') {
+    return {
+      to: safeRecipient,
+      from: senderEmail,
+      subject: 'Welcome to AesthetiCare - Your clinic workspace is ready',
+      text:
+        `Hi ${safeName},\n\n` +
+        `Welcome to AesthetiCare. Your clinic account is ready, and your workspace is now one step closer to serving patients with confidence.\n\n` +
+        `Use this email to sign in anytime: ${safeRecipient}\n` +
+        `Login page: ${loginUrl}\n\n` +
+        `Please complete any remaining verification steps inside the platform so your clinic can fully get started.\n\n` +
+        `If you were not expecting this email, please contact AesthetiCare support.`,
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.7;color:#2a1408;background:#fffaf3;padding:28px;border:1px solid #e6c79b;border-radius:20px;max-width:640px;margin:0 auto;">
+          <div style="text-transform:uppercase;letter-spacing:0.16em;font-size:12px;color:#9b5f10;font-weight:700;margin-bottom:10px;">AesthetiCare</div>
+          <h1 style="margin:0 0 14px;font-size:26px;color:#5d3412;">Welcome, ${displayName}.</h1>
+          <p style="margin:0 0 12px;">Your clinic workspace is ready. You can now sign in, continue verification, and begin preparing your branch for patients.</p>
+          <p style="margin:0 0 12px;"><strong>Email:</strong> ${recipientLabel}</p>
+          <p style="margin:0 0 18px;">Please visit the login page below to continue:</p>
+          <p style="margin:0 0 22px;"><a href="${loginLink}" style="display:inline-block;background:#bb7a18;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;">Go to AesthetiCare Login</a></p>
+          <p style="margin:0 0 0;color:#6a4b25;">If you were not expecting this email, please contact AesthetiCare support.</p>
+        </div>
+      `,
+    }
+  }
+
+  if (safeAccountType === 'staff') {
+    return {
+      to: safeRecipient,
+      from: senderEmail,
+      subject: 'Your AesthetiCare Staff Account Is Ready',
+      text:
+        `Hi ${safeName},\n\n` +
+        `Welcome to AesthetiCare. Your staff account has been created and is ready for first sign-in.\n\n` +
+        `Email: ${safeRecipient}\n` +
+        `Temporary password: ${passwordLine}\n\n` +
+        `Login page: ${loginUrl}\n\n` +
+        `Please sign in and change your password right away to keep your account secure.\n\n` +
+        `If you were not expecting this email, please contact your clinic administrator.`,
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.7;color:#2a1408;background:#fffaf3;padding:28px;border:1px solid #e6c79b;border-radius:20px;max-width:640px;margin:0 auto;">
+          <div style="text-transform:uppercase;letter-spacing:0.16em;font-size:12px;color:#9b5f10;font-weight:700;margin-bottom:10px;">AesthetiCare</div>
+          <h1 style="margin:0 0 14px;font-size:26px;color:#5d3412;">Your staff account is ready, ${displayName}.</h1>
+          <p style="margin:0 0 12px;">You can now sign in to the platform and begin using your role-based workspace.</p>
+          <p style="margin:0 0 12px;"><strong>Email:</strong> ${recipientLabel}</p>
+          ${passwordHtml}
+          <p style="margin:0 0 18px;">Please sign in and change your password immediately after your first login.</p>
+          <p style="margin:0 0 22px;"><a href="${loginLink}" style="display:inline-block;background:#bb7a18;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;">Go to AesthetiCare Login</a></p>
+          <p style="margin:0 0 0;color:#6a4b25;">If you were not expecting this email, please contact your clinic administrator.</p>
+        </div>
+      `,
+    }
+  }
+
+  return {
+    to: safeRecipient,
+    from: senderEmail,
+    subject: 'Welcome to AesthetiCare',
+    text:
+      `Hi ${safeName},\n\n` +
+      `Welcome to AesthetiCare — your digital home for effortless bookings, reminders, and a smoother care experience.\n\n` +
+      `Email: ${safeRecipient}\n` +
+      `Login page: ${loginUrl}\n\n` +
+      `We’re glad you’re here. Log in anytime to explore your dashboard, book appointments, and stay connected with the clinic.\n\n` +
+      `If you were not expecting this email, please contact AesthetiCare support.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.7;color:#2a1408;background:#fffaf3;padding:28px;border:1px solid #e6c79b;border-radius:20px;max-width:640px;margin:0 auto;">
+        <div style="text-transform:uppercase;letter-spacing:0.16em;font-size:12px;color:#9b5f10;font-weight:700;margin-bottom:10px;">AesthetiCare</div>
+        <h1 style="margin:0 0 14px;font-size:26px;color:#5d3412;">Welcome aboard, ${displayName}.</h1>
+        <p style="margin:0 0 12px;">Your account is ready, and your care journey can begin.</p>
+        <p style="margin:0 0 12px;"><strong>Email:</strong> ${recipientLabel}</p>
+        <p style="margin:0 0 18px;">Sign in anytime to manage your appointments and stay connected with the platform.</p>
+        <p style="margin:0 0 22px;"><a href="${loginLink}" style="display:inline-block;background:#bb7a18;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;">Go to AesthetiCare Login</a></p>
+        <p style="margin:0 0 0;color:#6a4b25;">If you were not expecting this email, please contact AesthetiCare support.</p>
+      </div>
+    `,
+  }
+}
+
+const buildClinicRejectionEmailMessage = ({ recipient, fullName, clinicName, rejectionReason }) => {
+  const safeRecipient = String(recipient || '').trim().toLowerCase()
+  const safeName = String(fullName || 'there').trim() || 'there'
+  const safeClinicName = String(clinicName || '').trim() || 'your clinic'
+  const safeReason = String(rejectionReason || '').trim() || 'Please review your submission and try again.'
+  const loginUrl = `${String(frontendBaseUrl || '').replace(/\/$/, '')}/login`
+  const registerUrl = `${String(frontendBaseUrl || '').replace(/\/$/, '')}/register`
+  const displayName = escapeHtml(safeName)
+  const clinicLabel = escapeHtml(safeClinicName)
+  const reasonLabel = escapeHtml(safeReason)
+  const loginLink = escapeHtml(loginUrl)
+  const registerLink = escapeHtml(registerUrl)
+  const recipientLabel = escapeHtml(safeRecipient)
+
+  return {
+    to: safeRecipient,
+    from: senderEmail,
+    subject: 'Update on your AesthetiCare registration',
+    text:
+      `Hi ${safeName},\n\n` +
+      `Thank you for applying to join AesthetiCare.\n\n` +
+      `After reviewing ${safeClinicName}, we’re unable to approve the registration at this time.\n\n` +
+      `Reason: ${safeReason}\n\n` +
+      `You may submit a new application again once the required details are ready.\n` +
+      `Login page: ${loginUrl}\n` +
+      `Registration page: ${registerUrl}\n\n` +
+      `If you have questions, please contact AesthetiCare support.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.7;color:#2a1408;background:#fffaf3;padding:28px;border:1px solid #e6c79b;border-radius:20px;max-width:640px;margin:0 auto;">
+        <div style="text-transform:uppercase;letter-spacing:0.16em;font-size:12px;color:#9b5f10;font-weight:700;margin-bottom:10px;">AesthetiCare</div>
+        <h1 style="margin:0 0 14px;font-size:26px;color:#5d3412;">Hello, ${displayName}.</h1>
+        <p style="margin:0 0 12px;">Thank you for submitting <strong>${clinicLabel}</strong> for review.</p>
+        <p style="margin:0 0 12px;">After carefully reviewing your application, we’re unable to approve it at this time.</p>
+        <div style="margin:18px 0;padding:16px 18px;border-radius:16px;background:#fff;border:1px solid #efd3a2;">
+          <p style="margin:0 0 6px;font-weight:700;color:#7a4714;">Reviewer note</p>
+          <p style="margin:0;color:#5d3412;">${reasonLabel}</p>
+        </div>
+        <p style="margin:0 0 12px;">You’re welcome to review the details and submit a new application when you’re ready.</p>
+        <p style="margin:0 0 18px;"><strong>Email:</strong> ${recipientLabel}</p>
+        <p style="margin:0 0 18px;">
+          <a href="${registerLink}" style="display:inline-block;background:#bb7a18;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;margin-right:10px;">Apply Again</a>
+          <a href="${loginLink}" style="display:inline-block;background:#fff;color:#bb7a18;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;border:1px solid #bb7a18;">Go to Login</a>
+        </p>
+        <p style="margin:0;color:#6a4b25;">If you’d like help understanding the feedback, please contact AesthetiCare support.</p>
+      </div>
+    `,
+  }
+}
+
 const requireAuth = async (req, res, next) => {
   if (!adminReady) {
     return res.status(500).json({
@@ -240,6 +403,7 @@ const requirePermission = (permission) => async (req, res, next) => {
 }
 
 const BOOKING_RESERVATIONS_COLLECTION = 'bookingReservations'
+const BOOKING_LOCKS_COLLECTION = 'bookingLocks'
 const BOOKING_RESERVATION_TTL_MINUTES = Math.max(5, Number(process.env.BOOKING_RESERVATION_TTL_MINUTES || 15))
 const BOOKING_BLOCKING_STATUSES = new Set([
   'scheduled',
@@ -250,6 +414,18 @@ const BOOKING_BLOCKING_STATUSES = new Set([
   'ongoing',
   'held',
 ])
+
+const getBookingLockDocId = (branchId, practitionerId, date) =>
+  [branchId, practitionerId, date]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join('__')
+
+const getBookingLockRef = (firestore, branchId, practitionerId, date) =>
+  (() => {
+    const docId = getBookingLockDocId(branchId, practitionerId, date)
+    return docId ? firestore.collection(BOOKING_LOCKS_COLLECTION).doc(docId) : null
+  })()
 
 const parseClockToMinutes = (value) => {
   const raw = String(value || '').trim()
@@ -672,6 +848,35 @@ app.post('/admin/reject-clinic-registration', requireAuth, requireRole(['superad
     const firestore = admin.firestore()
     const userRef = firestore.collection('users').doc(uid)
     const clinicRef = firestore.collection('clinics').doc(uid)
+    const [userSnap, clinicSnap] = await Promise.all([userRef.get(), clinicRef.get()])
+    const userData = userSnap.exists ? userSnap.data() || {} : {}
+    const clinicData = clinicSnap.exists ? clinicSnap.data() || {} : {}
+    const recipient = String(userData.email || clinicData.email || '').trim().toLowerCase()
+    const fullName =
+      String(
+        [
+          userData.firstName || clinicData.firstName || '',
+          userData.lastName || clinicData.lastName || '',
+        ]
+          .map((part) => String(part || '').trim())
+          .filter(Boolean)
+          .join(' ')
+      ).trim() || 'there'
+    const clinicName = String(clinicData.clinicName || clinicData.companyName || userData.companyName || '').trim() || 'your clinic'
+
+    if (recipient && sendGridApiKey && senderEmail) {
+      try {
+        const message = buildClinicRejectionEmailMessage({
+          recipient,
+          fullName,
+          clinicName,
+          rejectionReason,
+        })
+        await sendSendGridMessage(message)
+      } catch (emailError) {
+        console.error('Failed to send clinic rejection email:', emailError?.response?.body?.errors?.[0]?.message || emailError?.message || emailError)
+      }
+    }
 
     // Write rejection audit fields first, then hard delete docs.
     await Promise.all([
@@ -1323,72 +1528,123 @@ app.post(ATTENDANCE_PIN_PATH, requireAuth, requirePermission('staff:create'), as
   }
 })
 
+const dispatchWelcomeEmail = async ({ recipient, fullName, accountType = 'customer', defaultPassword = '' }) => {
+  const normalizedRecipient = String(recipient || '').trim().toLowerCase()
+  const safeName = String(fullName || '').trim() || 'there'
+
+  if (!normalizedRecipient) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'recipient is required',
+    }
+  }
+
+  if (!sendGridApiKey || !senderEmail) {
+    if (isDevelopment) {
+      console.warn(`[DEV WELCOME EMAIL BYPASS] Welcome email not sent to ${normalizedRecipient}.`)
+      return {
+        ok: true,
+        devMode: true,
+      }
+    }
+    return {
+      ok: false,
+      status: 500,
+      error: 'SENDGRID_API_KEY or SENDGRID_SENDER is missing',
+    }
+  }
+
+  const message = buildWelcomeEmailMessage({
+    recipient: normalizedRecipient,
+    fullName: safeName,
+    accountType,
+    defaultPassword,
+  })
+
+  try {
+    const delivery = await sendSendGridMessage(message)
+    return { ok: true, ...delivery }
+  } catch (error) {
+    const providerMessage =
+      error?.response?.body?.errors?.[0]?.message ||
+      error?.message ||
+      'Unknown SendGrid error'
+    return {
+      ok: false,
+      status: 500,
+      error: providerMessage,
+    }
+  }
+}
+
+app.post('/send-account-welcome', requireAuth, async (req, res) => {
+  const { recipient, fullName, accountType } = req.body ?? {}
+  const normalizedRecipient = String(recipient || '').trim().toLowerCase()
+  const signedInEmail = String(req.user?.email || '').trim().toLowerCase()
+
+  if (!normalizedRecipient || !signedInEmail) {
+    return res.status(400).json({
+      success: false,
+      error: 'recipient is required',
+    })
+  }
+
+  if (normalizedRecipient !== signedInEmail) {
+    return res.status(403).json({
+      success: false,
+      error: 'You can only request a welcome email for your own account.',
+    })
+  }
+
+  const result = await dispatchWelcomeEmail({
+    recipient: normalizedRecipient,
+    fullName,
+    accountType,
+  })
+
+  if (!result.ok) {
+    if (isDevelopment && result.devMode) {
+      return res.json({ success: true, devMode: true })
+    }
+    return res.status(result.status || 500).json({
+      success: false,
+      error: result.error || 'Failed to send welcome email',
+    })
+  }
+
+  return res.json({ success: true, statusCode: result.statusCode || null, messageId: result.messageId || null })
+})
+
 app.post(STAFF_WELCOME_PATH, requireAuth, requirePermission('staff:create'), async (req, res) => {
   const { recipient, fullName, defaultPassword } = req.body ?? {}
-
   const normalizedRecipient = String(recipient || '').trim().toLowerCase()
-  const safeName = String(fullName || 'Staff').trim() || 'Staff'
-  const safePassword = String(defaultPassword || '').trim()
 
-  if (!normalizedRecipient || !safePassword) {
+  if (!normalizedRecipient || !String(defaultPassword || '').trim()) {
     return res.status(400).json({
       success: false,
       error: 'recipient and defaultPassword are required',
     })
   }
 
-  if (!sendGridApiKey || !senderEmail) {
-    if (isDevelopment) {
-      console.warn(`[DEV STAFF EMAIL BYPASS] Welcome email not sent to ${normalizedRecipient}. Default password: ${safePassword}`)
+  const result = await dispatchWelcomeEmail({
+    recipient: normalizedRecipient,
+    fullName,
+    accountType: 'staff',
+    defaultPassword,
+  })
+
+  if (!result.ok) {
+    if (isDevelopment && result.devMode) {
       return res.json({ success: true, devMode: true })
     }
-    return res.status(500).json({
+    return res.status(result.status || 500).json({
       success: false,
-      error: 'SENDGRID_API_KEY or SENDGRID_SENDER is missing',
+      error: result.error || 'Failed to send welcome email',
     })
   }
 
-  const loginUrl = `${String(frontendBaseUrl || '').replace(/\/$/, '')}/login`
-  const message = {
-    to: normalizedRecipient,
-    from: senderEmail,
-    subject: 'Your Staff Account Has Been Created',
-    text:
-      `Hi ${safeName},\n\n` +
-      `A staff account has been created for you.\n\n` +
-      `Email: ${normalizedRecipient}\n` +
-      `Default password: ${safePassword}\n\n` +
-      `Please sign in and change your password as soon as possible.\n` +
-      `Login page: ${loginUrl}\n\n` +
-      `If you did not expect this email, please contact your clinic administrator.`,
-    html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#2a1408;">
-        <p>Hi ${safeName},</p>
-        <p>A staff account has been created for you.</p>
-        <p><strong>Email:</strong> ${normalizedRecipient}<br /><strong>Default password:</strong> ${safePassword}</p>
-        <p>Please sign in and change your password as soon as possible.</p>
-        <p><a href="${loginUrl}">Go to Login</a></p>
-        <p>If you did not expect this email, please contact your clinic administrator.</p>
-      </div>
-    `,
-  }
-
-  try {
-    const delivery = await sendSendGridMessage(message)
-    return res.json({ success: true, ...delivery })
-  } catch (error) {
-    const providerMessage =
-      error?.response?.body?.errors?.[0]?.message ||
-      error?.message ||
-      'Unknown SendGrid error'
-
-    console.error('SendGrid error:', providerMessage)
-    if (isDevelopment) {
-      console.warn(`[DEV STAFF EMAIL BYPASS] SendGrid failed for ${normalizedRecipient}. Default password: ${safePassword}`)
-      return res.json({ success: true, devMode: true, warning: providerMessage })
-    }
-    return res.status(500).json({ success: false, error: providerMessage })
-  }
+  return res.json({ success: true, statusCode: result.statusCode || null, messageId: result.messageId || null })
 })
 
 app.post('/send-payment-receipt', async (req, res) => {
@@ -1514,12 +1770,15 @@ app.post('/appointments/reservations', requireAuth, async (req, res) => {
   const firestore = admin.firestore()
   const reservationsCol = firestore.collection(BOOKING_RESERVATIONS_COLLECTION)
   const reservationRef = reservationsCol.doc()
+  const lockRef = getBookingLockRef(firestore, branchId, practitionerId, date)
   const nowMs = Date.now()
   const expiresAt = admin.firestore.Timestamp.fromMillis(nowMs + BOOKING_RESERVATION_TTL_MINUTES * 60 * 1000)
   let responseData = null
 
   try {
     await firestore.runTransaction(async (transaction) => {
+      const lockSnap = await transaction.get(lockRef)
+      const lockData = lockSnap.exists ? lockSnap.data() || {} : {}
       const appointmentsSnap = await transaction.get(
         firestore.collection('appointments')
           .where('branchId', '==', branchId)
@@ -1571,6 +1830,15 @@ app.post('/appointments/reservations', requireAuth, async (req, res) => {
       if (conflictingBlock) {
         throw new Error('That schedule was just taken. Please choose another available time.')
       }
+
+      transaction.set(lockRef, {
+        branchId,
+        practitionerId,
+        date,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastReservationAt: admin.firestore.FieldValue.serverTimestamp(),
+        reservationCount: Number(lockData.reservationCount || 0) + 1,
+      }, { merge: true })
 
       transaction.set(reservationRef, {
         branchId,
@@ -1645,6 +1913,19 @@ app.delete('/appointments/reservations/:id', requireAuth, async (req, res) => {
         throw new Error('Forbidden')
       }
       if (normalizeBookingStatus(data.status) === 'consumed') return
+      const lockRef = getBookingLockRef(firestore, data.branchId || '', data.practitionerId || '', data.date || '')
+      if (lockRef) {
+        const lockSnap = await transaction.get(lockRef)
+        const lockData = lockSnap.exists ? lockSnap.data() || {} : {}
+        transaction.set(lockRef, {
+          branchId: String(data.branchId || '').trim(),
+          practitionerId: String(data.practitionerId || '').trim(),
+          date: String(data.date || '').trim(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastReservationReleaseAt: admin.firestore.FieldValue.serverTimestamp(),
+          reservationCount: Math.max(0, Number(lockData.reservationCount || 0) - 1),
+        }, { merge: true })
+      }
       transaction.update(reservationRef, {
         status: 'cancelled',
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1711,6 +1992,14 @@ app.post('/appointments/finalize-booking', requireAuth, async (req, res) => {
       if (!range) {
         throw new Error('Invalid reservation time.')
       }
+      const lockRef = getBookingLockRef(
+        firestore,
+        reservation.branchId || '',
+        reservation.practitionerId || '',
+        reservation.date || ''
+      )
+      const lockSnap = lockRef ? await transaction.get(lockRef) : null
+      const lockData = lockSnap?.exists ? lockSnap.data() || {} : {}
 
       const appointmentsSnap = await transaction.get(
         firestore.collection('appointments')
@@ -1728,6 +2017,17 @@ app.post('/appointments/finalize-booking', requireAuth, async (req, res) => {
           throw new Error('That schedule was just taken. Please choose another available time.')
         }
       })
+
+      if (lockRef) {
+        transaction.set(lockRef, {
+          branchId: String(reservation.branchId || '').trim(),
+          practitionerId: String(reservation.practitionerId || '').trim(),
+          date: String(reservation.date || '').trim(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastFinalizeAt: admin.firestore.FieldValue.serverTimestamp(),
+          reservationCount: Number(lockData.reservationCount || 0),
+        }, { merge: true })
+      }
 
       const finalAppointmentRef = firestore.collection('appointments').doc()
       const appointmentPayload = buildBookingAppointmentPayload({
@@ -1814,59 +2114,32 @@ app.post('/paymongo/create-checkout-session', optionalAuth, async (req, res) => 
         })
       }
       if (isCustomerBookingCheckout) {
-        const firestore = admin.firestore()
-        if (reservationId) {
-          const reservationSnap = await firestore.collection(BOOKING_RESERVATIONS_COLLECTION).doc(reservationId).get()
-          if (!reservationSnap.exists) {
-            return res.status(404).json({
-              success: false,
-              error: 'Reservation not found',
-            })
-          }
-          const reservationData = reservationSnap.data() || {}
-          if (String(reservationData.customerId || '').trim() !== req.user.uid) {
-            return res.status(403).json({
-              success: false,
-              error: 'Forbidden',
-            })
-          }
-          if (normalizeBookingStatus(reservationData.status) !== 'held' || toMillis(reservationData.expiresAt) <= Date.now()) {
-            return res.status(409).json({
-              success: false,
-              error: 'Reservation is no longer active',
-            })
-          }
-        } else {
-          const branchId = String(metadata?.branchId || '').trim()
-          const practitionerId = String(metadata?.practitionerId || '').trim()
-          const appointmentDate = String(metadata?.appointmentDate || '').trim()
-          const appointmentTime = String(metadata?.appointmentTime || '').trim()
-          const appointmentStart = parseClockToMinutes(appointmentTime)
-          if (!branchId || !practitionerId || !appointmentDate || appointmentStart === null) {
-            return res.status(400).json({
-              success: false,
-              error: 'branchId, practitionerId, appointmentDate, and appointmentTime are required for customer bookings',
-            })
-          }
-          const existingAppointments = await firestore.collection('appointments')
-            .where('branchId', '==', branchId)
-            .where('date', '==', appointmentDate)
-            .where('assignedPractitionerId', '==', practitionerId)
-            .get()
-          const appointmentEnd = appointmentStart + totalServiceDurationMinutes
-          const conflicting = existingAppointments.docs.some((docSnap) => {
-            const data = docSnap.data() || {}
-            const status = normalizeBookingStatus(data.status)
-            if (!BOOKING_BLOCKING_STATUSES.has(status)) return false
-            const range = getBookingRange(data)
-            return range && rangesOverlap(appointmentStart, appointmentEnd, range.start, range.end)
+        if (!reservationId) {
+          return res.status(400).json({
+            success: false,
+            error: 'reservationId is required for customer bookings',
           })
-          if (conflicting) {
-            return res.status(409).json({
-              success: false,
-              error: 'That schedule was just taken. Please choose another available time.',
-            })
-          }
+        }
+        const firestore = admin.firestore()
+        const reservationSnap = await firestore.collection(BOOKING_RESERVATIONS_COLLECTION).doc(reservationId).get()
+        if (!reservationSnap.exists) {
+          return res.status(404).json({
+            success: false,
+            error: 'Reservation not found',
+          })
+        }
+        const reservationData = reservationSnap.data() || {}
+        if (String(reservationData.customerId || '').trim() !== req.user.uid) {
+          return res.status(403).json({
+            success: false,
+            error: 'Forbidden',
+          })
+        }
+        if (normalizeBookingStatus(reservationData.status) !== 'held' || toMillis(reservationData.expiresAt) <= Date.now()) {
+          return res.status(409).json({
+            success: false,
+            error: 'Reservation is no longer active',
+          })
         }
       }
     } else {

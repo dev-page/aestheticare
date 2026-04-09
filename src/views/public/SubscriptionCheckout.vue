@@ -134,12 +134,15 @@ import Swal from 'sweetalert2'
 import { auth, db } from '@/config/firebaseConfig'
 import { onAuthStateChanged } from 'firebase/auth'
 import { useSubscriptionStore } from '@/stores/subscription'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
 const route = useRoute()
 const router = useRouter()
 const subscriptionStore = useSubscriptionStore()
 
-const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 const PENDING_PAYMONGO_KEY = 'subscription_checkout_pending_paymongo'
 
 const saving = ref(false)

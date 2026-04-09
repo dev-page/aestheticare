@@ -49,6 +49,7 @@
                       'px-3 py-1 rounded-full text-xs font-medium',
                       record.workHoursStatus === 'Overtime' ? 'bg-blue-500/20 text-blue-400' :
                       record.workHoursStatus === 'Undertime' ? 'bg-orange-500/20 text-orange-400' :
+                      record.workHoursStatus === 'Completed' ? 'bg-emerald-500/20 text-emerald-400' :
                       record.workHoursStatus === 'No Clock Out' ? 'bg-amber-500/20 text-amber-400' :
                       'bg-slate-500/20 text-slate-300'
                     ]"
@@ -77,6 +78,11 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import { logActivity } from '@/utils/activityLogger'
 import { classifyAttendanceRecord } from '@/utils/attendanceStatus'
+import {
+  buildWeekScheduleMap,
+  resolveWeekAssignments,
+} from '@/utils/employeeSchedules'
+import { extractShiftWindowMinutes, getDayName, getWeekStartKey, minutesToTime } from '@/utils/appointmentDss'
 
 export default {
   name: 'ManagerAttendance',
@@ -88,6 +94,7 @@ export default {
     const currentBranchId = ref('')
     const currentUserId = ref('')
     const attendanceRecords = ref([])
+    const staffSchedules = ref({})
 
     const toDate = (record) => {
       if (record?.date) {
@@ -120,6 +127,7 @@ export default {
     const loadAttendance = async () => {
       if (!currentBranchId.value) {
         attendanceRecords.value = []
+        staffSchedules.value = {}
         return
       }
 
@@ -127,22 +135,59 @@ export default {
         collection(db, 'attendance'),
         where('branchId', '==', currentBranchId.value)
       )
-      const snapshot = await getDocs(attendanceQuery)
+      const [snapshot, usersSnap] = await Promise.all([
+        getDocs(attendanceQuery),
+        getDocs(
+          query(
+            collection(db, 'users'),
+            where('branchId', '==', currentBranchId.value),
+            where('userType', '==', 'Staff')
+          )
+        ),
+      ])
+
+      staffSchedules.value = {}
+      await Promise.all(
+        usersSnap.docs.map(async (userDoc) => {
+          const scheduleSnap = await getDocs(collection(db, 'users', userDoc.id, 'schedules'))
+          staffSchedules.value[userDoc.id] = buildWeekScheduleMap(
+            scheduleSnap.docs.map((snap) => ({ id: snap.id, data: snap.data() || {} }))
+          )
+        })
+      )
+
       attendanceRecords.value = snapshot.docs
         .map((snap) => {
           const data = snap.data() || {}
+          const weekKey = data.date ? getWeekStartKey(data.date) : ''
+          const dayName = data.date ? getDayName(data.date) : ''
+          const assignments = data.employeeId
+            ? resolveWeekAssignments(staffSchedules.value[data.employeeId] || {}, weekKey)
+            : {}
+          const shiftLabel = String(
+            data.shiftStart && data.shiftEnd
+              ? `${data.shiftStart} - ${data.shiftEnd}`
+              : assignments?.[dayName] || ''
+          ).trim()
+          const shiftWindow = extractShiftWindowMinutes(shiftLabel)
+          const shiftStart = data.shiftStart || (shiftWindow ? minutesToTime(shiftWindow.start) : '')
+          const shiftEnd = data.shiftEnd || (shiftWindow ? minutesToTime(shiftWindow.end) : '')
           const computedMeta = classifyAttendanceRecord({
             timeIn: data.timeIn || '',
             timeOut: data.timeOut || '',
-            shiftStart: data.shiftStart || '',
-            shiftEnd: data.shiftEnd || '',
+            shiftStart,
+            shiftEnd,
           })
+          const attendanceStatus = String(computedMeta.attendanceStatus || data.attendanceStatus || '').trim() || 'Logged'
+          const workHoursStatus = String(computedMeta.workHoursStatus || data.workHoursStatus || '').trim() || '-'
 
           return {
             id: snap.id,
             ...data,
-            attendanceStatus: data.attendanceStatus || computedMeta.attendanceStatus,
-            workHoursStatus: data.workHoursStatus || computedMeta.workHoursStatus,
+            shiftStart,
+            shiftEnd,
+            attendanceStatus,
+            workHoursStatus,
           }
         })
         .filter((record) => {

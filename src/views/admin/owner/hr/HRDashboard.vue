@@ -420,10 +420,46 @@ export default {
       ]
     }
 
+    const buildExportSections = () => ({
+      summary: [
+        { label: 'Branch', value: branchLabel.value },
+        { label: 'Total Branches', value: String(totalBranches.value) },
+        { label: 'Total Employees', value: String(totalEmployees.value) },
+        { label: 'Active Employees', value: String(activeEmployees.value) },
+      ],
+      distribution: roleDistribution.value.length
+        ? roleDistribution.value.map((entry) => ({
+            label: entry.name,
+            value: `${entry.employees} employee${entry.employees === 1 ? '' : 's'}`,
+            bar: totalEmployees.value > 0 ? Math.max(0, Math.min(100, (entry.employees / totalEmployees.value) * 100)) : 0,
+          }))
+        : [{ label: 'Status', value: 'No employee distribution data available.', bar: 0 }],
+      schedule: hrSchedule.value.length
+        ? hrSchedule.value.map((entry) => ({
+            label: entry.day,
+            value: entry.shift || 'Off',
+          }))
+        : [{ label: 'Status', value: 'No schedule data available.' }],
+      unassigned: unassignedEmployees.value.length
+        ? unassignedEmployees.value.map((employee) => ({
+            label: employee.fullName || employee.name || 'Unnamed',
+            value: getRoleLabel(employee),
+          }))
+        : [{ label: 'Status', value: 'All employees have at least one assigned shift.' }],
+      activity: recentActivity.value.length
+        ? recentActivity.value.map((activity) => ({
+            label: activity.action,
+            value: activity.time,
+          }))
+        : [{ label: 'Status', value: 'No recent activity.' }],
+    })
+
     const exportCsv = () => {
       const rows = buildExportRows()
       const header = ['Section', 'Label', 'Value']
       const csvLines = [
+        ['Platform', 'AesthetiCare', 'HR Dashboard'].join(','),
+        ['Generated At', new Date().toLocaleString(), ''].join(','),
         header.join(','),
         ...rows.map((row) => [row.section, row.label, row.value]
           .map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`)
@@ -436,10 +472,26 @@ export default {
     }
 
     const buildDocumentHtml = () => {
-      const rows = buildExportRows()
-      const tableRows = rows.map((row) => `
+      const sections = buildExportSections()
+      const summaryCards = sections.summary.map((item) => `
+        <div class="card">
+          <div class="label">${escapeHtml(item.label)}</div>
+          <div class="value">${escapeHtml(item.value)}</div>
+        </div>
+      `).join('')
+
+      const distributionRows = sections.distribution.map((row) => `
         <tr>
-          <td>${escapeHtml(row.section)}</td>
+          <td>${escapeHtml(row.label)}</td>
+          <td>${escapeHtml(row.value)}</td>
+          <td>
+            <div class="bar-track"><div class="bar-fill" style="width:${Number(row.bar || 0)}%"></div></div>
+          </td>
+        </tr>
+      `).join('')
+
+      const simpleRows = (rows) => rows.map((row) => `
+        <tr>
           <td>${escapeHtml(row.label)}</td>
           <td>${escapeHtml(row.value)}</td>
         </tr>
@@ -450,29 +502,100 @@ export default {
         <html>
           <head>
             <meta charset="utf-8" />
-            <title>HR Dashboard Report</title>
+            <title>AesthetiCare HR Dashboard Report</title>
             <style>
-              body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
-              h1 { margin: 0 0 6px; font-size: 28px; }
-              p { margin: 0 0 18px; color: #4b5563; }
-              table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+              @page { size: A4; margin: 18mm; }
+              body { font-family: Arial, sans-serif; color: #111827; margin: 0; background: #fff; }
+              .page { padding: 0; }
+              .brand { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid #d4a64f; }
+              .brand h1 { margin: 0; font-size: 26px; color: #111827; }
+              .brand p { margin: 4px 0 0; color: #4b5563; }
+              .stamp { text-align:right; color:#6b7280; font-size:12px; }
+              .section { margin-top: 18px; page-break-inside: avoid; }
+              .section h2 { font-size: 16px; margin: 0 0 10px; color: #111827; }
+              .summary-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+              .card { border:1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fafafa; }
+              .card .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; }
+              .card .value { font-size: 18px; font-weight: 700; margin-top: 6px; color: #111827; word-break: break-word; }
+              table { width: 100%; border-collapse: collapse; }
               th, td { border: 1px solid #d1d5db; padding: 10px; text-align: left; vertical-align: top; }
               th { background: #f3f4f6; }
+              .bar-track { width: 100%; height: 10px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+              .bar-fill { height: 100%; background: linear-gradient(90deg, #d4a64f, #a16207); }
+              .muted { color: #6b7280; font-size: 12px; }
             </style>
           </head>
           <body>
-            <h1>HR Dashboard Report</h1>
-            <p>${escapeHtml(branchLabel.value)} | Generated ${escapeHtml(new Date().toLocaleString())}</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Section</th>
-                  <th>Label</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>${tableRows}</tbody>
-            </table>
+            <div class="page">
+              <div class="brand">
+                <div>
+                  <h1>AesthetiCare</h1>
+                  <p>HR Dashboard Report</p>
+                  <p class="muted">${escapeHtml(branchLabel.value)}</p>
+                </div>
+                <div class="stamp">
+                  Generated<br />${escapeHtml(new Date().toLocaleString())}
+                </div>
+              </div>
+
+              <div class="section">
+                <h2>Summary</h2>
+                <div class="summary-grid">${summaryCards}</div>
+              </div>
+
+              <div class="section">
+                <h2>Employee Distribution</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Role</th>
+                      <th>Employees</th>
+                      <th>Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>${distributionRows}</tbody>
+                </table>
+              </div>
+
+              <div class="section">
+                <h2>Shift Assignment</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Day</th>
+                      <th>Shift</th>
+                    </tr>
+                  </thead>
+                  <tbody>${simpleRows(sections.schedule)}</tbody>
+                </table>
+              </div>
+
+              <div class="section">
+                <h2>Unassigned Shifts</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Role</th>
+                    </tr>
+                  </thead>
+                  <tbody>${simpleRows(sections.unassigned)}</tbody>
+                </table>
+              </div>
+
+              <div class="section">
+                <h2>Recent Activity</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>${simpleRows(sections.activity)}</tbody>
+                </table>
+              </div>
+            </div>
           </body>
         </html>
       `

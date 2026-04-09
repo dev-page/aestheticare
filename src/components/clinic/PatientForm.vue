@@ -51,10 +51,13 @@
         <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">
           Phone
         </label>
-        <input
+      <input
           id="phone"
           v-model="form.phone"
           type="tel"
+          inputmode="numeric"
+          maxlength="10"
+          @input="form.phone = sanitizePhone(form.phone)"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Enter phone number"
         />
@@ -192,6 +195,9 @@
             id="emergencyPhone"
             v-model="form.emergencyContact.phone"
             type="tel"
+            inputmode="numeric"
+            maxlength="10"
+            @input="form.emergencyContact.phone = sanitizePhone(form.emergencyContact.phone)"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter emergency contact phone"
           />
@@ -284,6 +290,8 @@
 <script setup>
 import { ref, reactive, watch } from 'vue'
 
+const sanitizePhone = (value) => String(value || '').replace(/\D/g, '').slice(0, 10)
+
 const props = defineProps({
   patient: {
     type: Object,
@@ -338,6 +346,14 @@ watch(() => props.patient, (newPatient) => {
 const handleSubmit = async () => {
   loading.value = true
   try {
+    form.phone = sanitizePhone(form.phone)
+    form.emergencyContact.phone = sanitizePhone(form.emergencyContact.phone)
+    if (form.phone && form.phone.length !== 10) {
+      throw new Error('Patient phone number must be exactly 10 digits.')
+    }
+    if (form.emergencyContact.phone && form.emergencyContact.phone.length !== 10) {
+      throw new Error('Emergency contact phone number must be exactly 10 digits.')
+    }
     const patientData = {
       ...form,
       updatedAt: new Date().toISOString()

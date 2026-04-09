@@ -160,8 +160,13 @@ import { getAuth } from 'firebase/auth'
 import Swal from 'sweetalert2'
 import { db } from '@/config/firebaseConfig'
 import SuperAdminSidebar from '@/components/sidebar/SuperAdminSidebar.vue'
-const BACKEND_URL = import.meta.env.VITE_OTP_BACKEND_URL || 'http://localhost:3001'
-const OTP_API_BASE = import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
+const BACKEND_URL = resolveApiBaseUrl(import.meta.env.VITE_OTP_BACKEND_URL, {
+  devFallbackUrl: 'http://localhost:3001',
+})
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 
 const normalizePlanLabel = (value) => {
   const raw = String(value || '').trim().toLowerCase()
@@ -230,8 +235,8 @@ export default {
       const candidates = [
         String(BACKEND_URL || '').trim(),
         String(OTP_API_BASE || '').trim(),
-        'http://localhost:3000',
-        'http://localhost:3001',
+        import.meta.env.DEV ? 'http://localhost:3000' : '',
+        import.meta.env.DEV ? 'http://localhost:3001' : '',
       ].filter(Boolean)
       return [...new Set(candidates)]
     }

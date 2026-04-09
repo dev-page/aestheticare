@@ -106,12 +106,15 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import { usePermissions } from '@/composables/usePermissions'
 import { useSubscription } from '@/composables/useSubscription'
 import EmployeeTopbar from '@/components/common/EmployeeTopbar.vue'
 import disconnectIllustration from '@/assets/disconnect.png'
+import { resolveSidebarKey } from '@/utils/sidebarResolution'
 
 // Initialize auth state globally
 const { isLoading, user, initAuth } = useAuth()
+const { userRole } = usePermissions()
 
 const route = useRoute()
 const { initSubscription, isReadOnly, isExpired, graceEndsAt, activePlan } = useSubscription()
@@ -184,17 +187,7 @@ const connectionMessage = computed(() => {
 
 const sidebarPanelKey = computed(() => {
   const path = String(route.path || '').toLowerCase()
-  if (path.startsWith('/employee')) return 'employee'
-  if (path.startsWith('/manager')) return 'manager'
-  if (path.startsWith('/hr')) return 'hr'
-  if (path.startsWith('/finance')) return 'finance'
-  if (path.startsWith('/receptionist')) return 'receptionist'
-  if (path.startsWith('/practitioner')) return 'practitioner'
-  if (path.startsWith('/cashier')) return 'cashier'
-  if (path.startsWith('/supply')) return 'supply'
-  if (path.startsWith('/owner')) return 'owner'
-  if (path.startsWith('/customer')) return 'customer'
-  return ''
+  return resolveSidebarKey(userRole.value, path)
 })
 
 const showEmployeeTopbar = computed(() => {

@@ -95,6 +95,7 @@
                 <input
                   v-model="form.startDate"
                   type="date"
+                  :min="todayDateKey"
                   required
                   class="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 text-white"
                   :class="fieldErrors.startDate ? 'border-rose-400 focus:border-rose-400' : ''"
@@ -106,6 +107,7 @@
                 <input
                   v-model="form.endDate"
                   type="date"
+                  :min="form.startDate || todayDateKey"
                   required
                   class="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 text-white"
                   :class="fieldErrors.endDate ? 'border-rose-400 focus:border-rose-400' : ''"
@@ -183,6 +185,14 @@ const route = useRoute()
 const router = useRouter()
 const { hasPermission, isClinicAdminOwner } = usePermissions()
 
+const toLocalDateKey = (date = new Date()) => {
+  const value = new Date(date)
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const loading = ref(true)
 const saving = ref(false)
 const branchName = ref('')
@@ -211,6 +221,8 @@ const form = ref({
   endDate: '',
   reason: ''
 })
+
+const todayDateKey = computed(() => toLocalDateKey())
 
 const requestYear = computed(() => {
   if (form.value.startDate) return Number(form.value.startDate.slice(0, 4))
@@ -264,10 +276,16 @@ const validateForm = () => {
   if (!startDate) {
     fieldErrors.value.startDate = 'Start date is required.'
     isValid = false
+  } else if (startDate < todayDateKey.value) {
+    fieldErrors.value.startDate = 'Start date cannot be in the past.'
+    isValid = false
   }
 
   if (!endDate) {
     fieldErrors.value.endDate = 'End date is required.'
+    isValid = false
+  } else if (endDate < todayDateKey.value) {
+    fieldErrors.value.endDate = 'End date cannot be in the past.'
     isValid = false
   }
 
@@ -308,6 +326,8 @@ const canSubmit = computed(() => {
     Boolean(form.value.leaveType) &&
     Boolean(form.value.startDate) &&
     Boolean(form.value.endDate) &&
+    form.value.startDate >= todayDateKey.value &&
+    form.value.endDate >= todayDateKey.value &&
     Boolean(String(form.value.reason || '').trim()) &&
     daysRequested.value > 0 &&
     !paidLeaveWarning.value

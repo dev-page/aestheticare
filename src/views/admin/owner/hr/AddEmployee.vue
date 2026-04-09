@@ -9,8 +9,11 @@ import Swal from 'sweetalert2'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import { logActivity } from '@/utils/activityLogger'
 import { storage } from '@/config/firebaseConfig'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
-const OTP_API_BASE = (import.meta.env.VITE_OTP_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
+  devFallbackUrl: 'http://localhost:3000',
+})
 const DEFAULT_STAFF_PASSWORD = 'password123'
 
 export default {

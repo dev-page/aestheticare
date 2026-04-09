@@ -54,7 +54,7 @@ export const classifyAttendanceRecord = ({
   if (!hasShiftAssignment) {
     if (timeIn) {
       result.attendanceStatus = 'Logged'
-      result.workHoursStatus = timeOut ? 'Completed' : 'No Clock Out'
+      result.workHoursStatus = timeOut ? 'Logged' : 'No Clock Out'
     }
     return result
   }
@@ -75,7 +75,7 @@ export const classifyAttendanceRecord = ({
 
     if (result.overtimeMinutes > 0) result.workHoursStatus = 'Overtime'
     else if (result.undertimeMinutes > 0) result.workHoursStatus = 'Undertime'
-    else result.workHoursStatus = 'On Time'
+    else result.workHoursStatus = 'Completed'
     return result
   }
 

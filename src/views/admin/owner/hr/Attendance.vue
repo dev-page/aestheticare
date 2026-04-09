@@ -109,6 +109,7 @@
                     'px-2 py-1 rounded-full text-xs font-medium',
                     row.workHoursStatus === 'Overtime' ? 'bg-blue-500/20 text-blue-400' :
                     row.workHoursStatus === 'Undertime' ? 'bg-orange-500/20 text-orange-400' :
+                    row.workHoursStatus === 'Completed' ? 'bg-emerald-500/20 text-emerald-400' :
                     row.workHoursStatus === 'No Clock Out' ? 'bg-amber-500/20 text-amber-400' :
                     'bg-slate-600 text-slate-200'
                   ]"
@@ -139,6 +140,11 @@ import { onAuthStateChanged } from 'firebase/auth'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
 import { toast } from 'vue3-toastify'
 import { classifyAttendanceRecord } from '@/utils/attendanceStatus'
+import {
+  buildWeekScheduleMap,
+  resolveWeekAssignments,
+} from '@/utils/employeeSchedules'
+import { extractShiftWindowMinutes, getDayName, getWeekStartKey, minutesToTime } from '@/utils/appointmentDss'
 
 export default {
   name: 'HRAttendanceReports',
@@ -148,6 +154,7 @@ export default {
 
     const attendanceRecords = ref([])
     const staffUsers = ref([])
+    const staffSchedules = ref({})
     const nowRef = ref(new Date())
     const selectedDay = ref('')
     const currentBranchId = ref('')
@@ -190,6 +197,7 @@ export default {
       if (!currentBranchId.value) {
         attendanceRecords.value = []
         staffUsers.value = []
+        staffSchedules.value = {}
         return
       }
 
@@ -211,6 +219,16 @@ export default {
       staffUsers.value = usersSnap.docs
         .map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }))
         .filter((user) => !user.archived)
+
+      staffSchedules.value = {}
+      await Promise.all(
+        staffUsers.value.map(async (staff) => {
+          const scheduleSnap = await getDocs(collection(db, 'users', staff.id, 'schedules'))
+          staffSchedules.value[staff.id] = buildWeekScheduleMap(
+            scheduleSnap.docs.map((snap) => ({ id: snap.id, data: snap.data() || {} }))
+          )
+        })
+      )
     }
 
     const displayRecords = computed(() =>
@@ -243,12 +261,25 @@ export default {
 
           const timeIn = dayRecord?.timeIn || '-'
           const timeOut = dayRecord?.timeOut || '-'
+          const weekKey = getWeekStartKey(selectedKey)
+          const dayName = getDayName(selectedKey)
+          const assignments = resolveWeekAssignments(staffSchedules.value[staff.id] || {}, weekKey)
+          const shiftLabel = String(
+            dayRecord?.shiftStart && dayRecord?.shiftEnd
+              ? `${dayRecord.shiftStart} - ${dayRecord.shiftEnd}`
+              : assignments?.[dayName] || ''
+          ).trim()
+          const shiftWindow = extractShiftWindowMinutes(shiftLabel)
+          const shiftStart = dayRecord?.shiftStart || (shiftWindow ? minutesToTime(shiftWindow.start) : '')
+          const shiftEnd = dayRecord?.shiftEnd || (shiftWindow ? minutesToTime(shiftWindow.end) : '')
           const attendanceMeta = classifyAttendanceRecord({
             timeIn: dayRecord?.timeIn || '',
             timeOut: dayRecord?.timeOut || '',
-            shiftStart: dayRecord?.shiftStart || staff.shiftStart || '',
-            shiftEnd: dayRecord?.shiftEnd || staff.shiftEnd || '',
+            shiftStart,
+            shiftEnd,
           })
+          const attendanceStatus = String(attendanceMeta.attendanceStatus || dayRecord?.attendanceStatus || '').trim() || 'Logged'
+          const workHoursStatus = String(attendanceMeta.workHoursStatus || dayRecord?.workHoursStatus || '').trim() || '-'
 
           return {
             id: `${staff.id}-${selectedKey}`,
@@ -256,8 +287,10 @@ export default {
             date: selectedKey,
             timeIn,
             timeOut,
-            attendanceStatus: dayRecord?.attendanceStatus || attendanceMeta.attendanceStatus,
-            workHoursStatus: dayRecord?.workHoursStatus || attendanceMeta.workHoursStatus,
+            attendanceStatus,
+            workHoursStatus,
+            shiftStart,
+            shiftEnd,
             lateMinutes: Number(dayRecord?.lateMinutes ?? attendanceMeta.lateMinutes ?? 0),
             overtimeMinutes: Number(dayRecord?.overtimeMinutes ?? attendanceMeta.overtimeMinutes ?? 0),
             undertimeMinutes: Number(dayRecord?.undertimeMinutes ?? attendanceMeta.undertimeMinutes ?? 0),

@@ -89,7 +89,7 @@ export default {
           { label: 'Payroll', icon: 'cash', to: '/hr/payroll', permission: 'payroll:update', feature: 'payroll' },
           { label: 'Payslip Generation', icon: 'file', to: '/hr/payslip-generation', permission: 'payroll:update', feature: 'payroll' },
           { label: 'Payroll Summary', icon: 'money', to: '/finance/payroll-summary', permission: 'payroll:view', feature: 'payroll' },
-          { label: 'Payroll Approval', icon: 'check', to: '/finance/payroll-approval', permission: 'payroll:view', feature: 'payroll' }
+          { label: 'Payroll Approval', icon: 'check', to: '/finance/payroll-approval', permission: 'payroll:review', feature: 'payroll' }
         ]
       },
       {
@@ -99,10 +99,8 @@ export default {
         children: [
           { label: 'POS', icon: 'cash', to: '/receptionist/pos', permission: 'payments:create', feature: 'pos_payments' },
           { label: 'Transactions', icon: 'chart', to: '/receptionist/transactions/history', permission: 'payments:view', feature: 'reports' },
-          { label: 'Sales', icon: 'money', to: '/finance/sales', permission: 'reports:view', feature: 'reports' },
-          { label: 'Refunds', icon: 'money', to: '/finance/refunds', permission: 'payments:view', feature: 'reports' },
-          { label: 'Finance Reports', icon: 'chart', to: '/finance/reports', permission: 'reports:view', feature: 'reports' },
-          { label: 'HR Sales', icon: 'chart', to: '/hr/sales', permission: 'reports:view', feature: 'reports' }
+          { label: 'Refunds', icon: 'money', to: '/finance/refunds', permission: 'refunds:review', feature: 'reports' },
+          { label: 'Finance Reports', icon: 'chart', to: '/finance/reports', permission: 'reports:view', feature: 'reports' }
         ]
       },
       {

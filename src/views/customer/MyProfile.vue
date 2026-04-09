@@ -33,7 +33,14 @@
 
           <div>
             <label class="block text-amber-100 text-sm mb-1">Phone Number</label>
-            <input v-model="customer.contactNumber" type="tel" class="w-full rounded-lg p-3 bg-[#3a2417] border border-[#5a3927] text-cream-50" />
+            <input
+              v-model="customer.contactNumber"
+              type="tel"
+              inputmode="numeric"
+              maxlength="10"
+              @input="customer.contactNumber = sanitizePhone(customer.contactNumber)"
+              class="w-full rounded-lg p-3 bg-[#3a2417] border border-[#5a3927] text-cream-50"
+            />
           </div>
 
           <div>
@@ -61,6 +68,8 @@ import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firest
 import { auth, db } from '@/config/firebaseConfig'
 import CustomerSidebar from '@/components/sidebar/CustomerSidebar.vue'
 import { toast } from 'vue3-toastify'
+
+const sanitizePhone = (value) => String(value || '').replace(/\D/g, '').slice(0, 10)
 
 const customer = ref({
   firstName: '',
@@ -117,11 +126,16 @@ const saveCustomerProfile = async () => {
   }
 
   try {
+    const phone = sanitizePhone(customer.value.contactNumber)
+    if (phone && phone.length !== 10) {
+      toast.error('Phone number must be exactly 10 digits.')
+      return
+    }
     await updateDoc(doc(db, 'users', user.uid), {
       firstName: customer.value.firstName || '',
       lastName: customer.value.lastName || '',
       email: customer.value.email || '',
-      contactNumber: customer.value.contactNumber || '',
+      contactNumber: phone || '',
       address: customer.value.address || '',
       bio: customer.value.bio || '',
       profilePicture: customer.value.profilePicture || '',

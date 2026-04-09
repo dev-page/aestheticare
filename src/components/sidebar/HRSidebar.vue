@@ -68,7 +68,6 @@ export default {
           { label: 'Payroll & Payslip', icon: 'money', to: '/hr/payroll', permission: 'payroll:update' }
         ]
       },
-      { label: 'Reports and Analytics', icon: 'chart', to: '/hr/sales', feature: 'hr', permission: 'reports:view' },
       { label: 'Notifications', icon: 'bell', to: '/notifications' },
       { label: 'Report Issue', icon: 'reportIssue', to: '/support/report' }
     ]

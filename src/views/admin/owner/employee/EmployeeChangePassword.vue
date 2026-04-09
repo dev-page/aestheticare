@@ -120,6 +120,7 @@ import { toast } from 'vue3-toastify'
 import axios from 'axios'
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth'
 import OwnerSidebar from '@/components/sidebar/OwnerSidebar.vue'
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl'
 
 export default {
   name: 'EmployeeChangePassword',
@@ -146,7 +147,7 @@ export default {
 
     const sendOtpEmail = async (toEmail, otp) => {
       try {
-        const res = await axios.post('http://localhost:3000/send-otp', {
+        const res = await axios.post(`${resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, { devFallbackUrl: 'http://localhost:3000' })}/send-otp`, {
           recipient: toEmail,
           otp,
         })
