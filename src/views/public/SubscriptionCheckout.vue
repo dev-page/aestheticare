@@ -415,7 +415,7 @@ const cancelUrl = `${window.location.origin}/subscription/checkout?plan=${select
         {
           name: selectedPlan.value.name,
           amount: toCentavos(selectedPlan.value.price),
-          currency: 'PHP', currencyDisplay: 'code',
+          currency: 'PHP',
           quantity: 1,
         },
       ],
@@ -525,7 +525,7 @@ const handlePayMongoReturn = async () => {
       planId: pending.planId,
       planName: pending.planName,
       amount: Number(pending.amount || 0),
-      currency: 'PHP', currencyDisplay: 'code',
+      currency: 'PHP',
       billingCycle: pending.billingCycle || 'month',
       payerFirstName: pending.payerFirstName,
       payerLastName: pending.payerLastName,
@@ -551,7 +551,7 @@ const handlePayMongoReturn = async () => {
           payerName: `${pending.payerFirstName || ''} ${pending.payerLastName || ''}`.trim(),
           planName: pending.planName,
           amount: Number(pending.amount || 0),
-          currency: 'PHP', currencyDisplay: 'code',
+          currency: 'PHP',
           referenceNumber: pending.referenceNumber,
           paymentMethod: paymentMethodType,
         }),
@@ -613,15 +613,20 @@ const handlePayMongoReturn = async () => {
     })
 
     try {
-      sessionStorage.setItem('register_clinic_draft', JSON.stringify({
+      const draft = JSON.stringify({
         email: pending.payerEmail,
         firstName: pending.payerFirstName,
         lastName: pending.payerLastName,
         selectedPlan: pending.planId,
         paymentStatus: 'paid',
         paymentId: paymentDoc.id,
-      }))
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+      localStorage.setItem('register_clinic_draft', draft)
+      sessionStorage.setItem('register_clinic_draft', draft)
       if (pending.payerEmail) {
+        localStorage.setItem('resume_email', pending.payerEmail)
         sessionStorage.setItem('resume_email', pending.payerEmail)
       }
     } catch (_error) {

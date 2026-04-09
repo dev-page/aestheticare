@@ -144,7 +144,7 @@
             </div>
 
             <div v-else class="space-y-8">
-              <section class="rounded-2xl border border-slate-600 bg-slate-700/35 p-5">
+              <section class="customer-media-section rounded-2xl border border-slate-600 bg-slate-700/35 p-5">
                 <div class="mb-5 flex items-center justify-between gap-3">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-gold-300">Products</p>
@@ -156,12 +156,12 @@
                 </div>
 
                 <div v-if="filteredProducts.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div v-for="item in filteredProducts" :key="item.id" class="bg-slate-700/60 rounded-xl border border-slate-600 overflow-hidden">
-                    <img :src="item.imageUrl || fallbackImage" alt="Item image" class="w-full h-40 object-cover rounded mb-4" />
+                  <div v-for="item in filteredProducts" :key="item.id" class="customer-media-card overflow-hidden">
+                    <img :src="item.imageUrl || fallbackImage" alt="Item image" class="customer-media-image w-full h-40 object-cover rounded mb-4" />
                     <div class="p-4">
                       <h3 class="text-xl font-semibold text-white">{{ item.title || item.name }}</h3>
-                      <p class="text-[#5a3925] mt-2">PHP {{ Number(item.price || 0).toFixed(2) }}</p>
-                      <p class="text-slate-300 text-sm mt-1">{{ item.description || 'No description.' }}</p>
+                      <p class="customer-media-price mt-2">PHP {{ Number(item.price || 0).toFixed(2) }}</p>
+                      <p class="customer-media-description text-sm mt-1">{{ item.description || 'No description.' }}</p>
 
                       <div class="mt-4 flex items-center space-x-2">
                         <button @click="addToCart(item)" class="px-3 py-2 rounded-lg bg-gold-700 hover:bg-gold-800 text-white">
@@ -176,7 +176,7 @@
                 <p v-else class="text-sm text-slate-400">No products posted yet.</p>
               </section>
 
-              <section class="rounded-2xl border border-slate-600 bg-slate-700/35 p-5">
+              <section class="customer-media-section rounded-2xl border border-slate-600 bg-slate-700/35 p-5">
                 <div class="mb-5 flex items-center justify-between gap-3">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">Services</p>
@@ -188,12 +188,12 @@
                 </div>
 
                 <div v-if="filteredServices.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div v-for="item in filteredServices" :key="item.id" class="bg-slate-700/60 rounded-xl border border-slate-600 overflow-hidden">
-                    <img :src="item.imageUrl || fallbackImage" alt="Item image" class="w-full h-40 object-cover rounded mb-4" />
+                  <div v-for="item in filteredServices" :key="item.id" class="customer-media-card overflow-hidden">
+                    <img :src="item.imageUrl || fallbackImage" alt="Item image" class="customer-media-image w-full h-40 object-cover rounded mb-4" />
                     <div class="p-4">
                       <h3 class="text-xl font-semibold text-white">{{ item.title || item.name }}</h3>
-                      <p class="text-[#5a3925] mt-2">PHP {{ Number(item.price || 0).toFixed(2) }}</p>
-                      <p class="text-slate-300 text-sm mt-1">{{ item.description || 'No description.' }}</p>
+                      <p class="customer-media-price mt-2">PHP {{ Number(item.price || 0).toFixed(2) }}</p>
+                      <p class="customer-media-description text-sm mt-1">{{ item.description || 'No description.' }}</p>
                       <div class="mt-3 flex flex-wrap gap-2">
                         <span
                           v-if="item.requiresConsultationFirst"
@@ -241,7 +241,7 @@
                 <p v-else class="text-sm text-slate-400">No services posted yet.</p>
               </section>
 
-              <section class="rounded-2xl border border-slate-600 bg-slate-700/35 p-5">
+              <section class="customer-media-section rounded-2xl border border-slate-600 bg-slate-700/35 p-5">
                 <div class="mb-5 flex items-center justify-between gap-3">
                   <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-orange-300">Consultations</p>
@@ -253,12 +253,12 @@
                 </div>
 
                 <div v-if="filteredConsultations.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div v-for="item in filteredConsultations" :key="item.id" class="bg-slate-700/60 rounded-xl border border-slate-600 overflow-hidden">
-                    <img :src="item.imageUrl || fallbackImage" alt="Item image" class="w-full h-40 object-cover rounded mb-4" />
+                  <div v-for="item in filteredConsultations" :key="item.id" class="customer-media-card overflow-hidden">
+                    <img :src="item.imageUrl || fallbackImage" alt="Item image" class="customer-media-image w-full h-40 object-cover rounded mb-4" />
                     <div class="p-4">
                       <h3 class="text-xl font-semibold text-white">{{ item.title || item.name }}</h3>
-                      <p class="text-[#5a3925] mt-2">PHP {{ Number(item.consultationFee || item.price || 0).toFixed(2) }}</p>
-                      <p class="text-slate-300 text-sm mt-1">{{ item.description || 'No description.' }}</p>
+                      <p class="customer-media-price mt-2">PHP {{ Number(item.consultationFee || item.price || 0).toFixed(2) }}</p>
+                      <p class="customer-media-description text-sm mt-1">{{ item.description || 'No description.' }}</p>
                       <div class="mt-3 flex flex-wrap gap-2">
                         <span class="rounded-full border border-amber-300/40 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200">
                           Consultation
@@ -294,7 +294,7 @@
               </section>
             </div>
 
-            <div v-if="selectedServices.length" class="booking-panel mt-8 rounded-2xl border p-6">
+            <div v-if="selectedServices.length" class="booking-panel customer-booking-panel mt-8 rounded-2xl border p-6">
               <div>
                 <h4 class="text-lg font-semibold text-white mb-1">Book Appointment</h4>
                 <p class="text-xs text-slate-300">Choose one or more services, then pick a schedule from the calendar.</p>
@@ -303,7 +303,7 @@
               <div class="mt-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_340px] gap-4 items-start">
                 <div>
                   <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Appointment Date</label>
-                  <div class="booking-calendar rounded-2xl border p-4">
+                  <div class="booking-calendar customer-booking-calendar rounded-2xl border p-4">
                     <p v-if="bookingAvailabilityHint" class="mb-4 rounded-xl border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
                       {{ bookingAvailabilityHint }}
                     </p>
@@ -356,7 +356,7 @@
                   </div>
                 </div>
                 <div class="space-y-4">
-                  <div class="booking-sidecard rounded-2xl border p-4 text-white">
+                  <div class="booking-sidecard customer-booking-sidecard rounded-2xl border p-4 text-white">
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Selected Services</p>
                     <div class="mt-3 flex flex-wrap gap-2">
                       <span
@@ -372,7 +372,7 @@
                     </div>
                     <p v-if="bookingRulesNotice" class="mt-3 text-xs text-amber-200">{{ bookingRulesNotice }}</p>
                   </div>
-                  <div class="booking-sidecard rounded-2xl border p-4 text-white">
+                  <div class="booking-sidecard customer-booking-sidecard rounded-2xl border p-4 text-white">
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Selected Schedule</p>
                     <p class="mt-3 text-sm font-semibold text-white">{{ bookingScheduleSummary }}</p>
                     <p class="mt-2 text-sm text-slate-300">
@@ -2957,6 +2957,75 @@ const formatChatTime = (timestamp) => {
   border: 1px solid rgba(230, 193, 150, 0.8);
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 18px 44px rgba(87, 56, 35, 0.08);
+}
+
+.customer-media-section {
+  border-radius: 1.75rem;
+  border-color: rgba(165, 123, 85, 0.58);
+  background: rgba(185, 188, 193, 0.88);
+  box-shadow: 0 18px 44px rgba(61, 40, 29, 0.12);
+}
+
+.customer-media-section + .customer-media-section {
+  margin-top: 1.25rem;
+}
+
+.customer-media-card {
+  border-radius: 1rem;
+  border: 1px solid rgba(165, 123, 85, 0.55);
+  background: linear-gradient(180deg, #c1a47f 0%, #b5946c 100%);
+  box-shadow: 0 12px 28px rgba(61, 40, 29, 0.12);
+}
+
+.customer-media-image {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.customer-media-card .p-4 {
+  padding: 1.25rem;
+}
+
+.customer-media-card h3 {
+  color: #fff8ef;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: 1.15rem;
+}
+
+.customer-media-price {
+  color: #4b2d19;
+  font-family: "Playfair Display", "Times New Roman", serif;
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+.customer-media-description {
+  color: rgba(255, 245, 231, 0.88);
+}
+
+.customer-media-card .text-slate-300 {
+  color: rgba(255, 243, 227, 0.9);
+}
+
+.customer-media-card .text-slate-400 {
+  color: rgba(255, 243, 227, 0.72);
+}
+
+.customer-media-card button {
+  border-radius: 0.8rem;
+}
+
+.customer-booking-panel {
+  background: #222d46;
+  border-color: rgba(91, 115, 156, 0.22);
+  box-shadow: 0 24px 52px rgba(8, 15, 31, 0.32);
+}
+
+.customer-booking-calendar,
+.customer-booking-sidecard {
+  background: #0f1830;
+  border-color: rgba(91, 115, 156, 0.22);
 }
 
 .customer-center-shell {

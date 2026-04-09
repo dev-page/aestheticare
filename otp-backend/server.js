@@ -91,6 +91,11 @@ const backupDailyHour = Number(process.env.BACKUP_DAILY_HOUR || 2)
 const backupMonthlyDay = Number(process.env.BACKUP_MONTHLY_DAY || 1)
 const backupDailyRetentionDays = Number(process.env.BACKUP_DAILY_RETENTION_DAYS || 30)
 const backupMonthlyRetentionDays = Number(process.env.BACKUP_MONTHLY_RETENTION_DAYS || 365)
+const registrationExpiryDays = Math.max(1, Number(process.env.REGISTRATION_EXPIRY_DAYS || 7))
+const registrationCleanupIntervalMs = Math.max(
+  60 * 60 * 1000,
+  Number(process.env.REGISTRATION_CLEANUP_INTERVAL_MS || 24 * 60 * 60 * 1000)
+)
 
 const loadFirebaseServiceAccount = () => {
   const rawJson = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim()
@@ -180,6 +185,140 @@ const escapeHtml = (value) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+
+const toDateValue = (value) => {
+  if (!value) return null
+  if (typeof value?.toDate === 'function') return value.toDate()
+  if (value instanceof Date) return value
+  if (typeof value === 'number') return new Date(value)
+  if (typeof value === 'string') {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+  return null
+}
+
+const pendingRegistrationStatusKeys = new Set([
+  'pending otp verification',
+  'pending document submission',
+  'pending approval',
+])
+
+const normalizePendingRegistrationStatus = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+
+const isPendingRegistrationRecord = (userData = {}, clinicData = {}) => {
+  const userStatus = normalizePendingRegistrationStatus(userData.status)
+  const clinicStatus = normalizePendingRegistrationStatus(clinicData.approvalStatus)
+  const registrationStatus = normalizePendingRegistrationStatus(
+    userData.registrationStatus || clinicData.registrationStatus
+  )
+  return (
+    pendingRegistrationStatusKeys.has(userStatus) ||
+    pendingRegistrationStatusKeys.has(clinicStatus) ||
+    registrationStatus.startsWith('pending')
+  )
+}
+
+const getRegistrationExpiryAt = (userData = {}, clinicData = {}) => {
+  const explicitExpiry = toDateValue(
+    userData.registrationExpiresAt ||
+      clinicData.registrationExpiresAt ||
+      null
+  )
+  if (explicitExpiry) return explicitExpiry
+
+  const activity = toDateValue(
+    userData.registrationLastActivityAt ||
+      clinicData.registrationLastActivityAt ||
+      userData.createdAt ||
+      clinicData.createdAt ||
+      null
+  )
+  if (!activity) return null
+
+  return new Date(activity.getTime() + registrationExpiryDays * 24 * 60 * 60 * 1000)
+}
+
+const isExpiredRegistrationRecord = (userData = {}, clinicData = {}, now = new Date()) => {
+  if (!isPendingRegistrationRecord(userData, clinicData)) return false
+  const expiryAt = getRegistrationExpiryAt(userData, clinicData)
+  if (!expiryAt) return false
+  return now.getTime() >= expiryAt.getTime()
+}
+
+const purgePendingRegistration = async (uid, { requireExpired = false } = {}) => {
+  const normalizedUid = String(uid || '').trim()
+  if (!normalizedUid || !adminReady) {
+    return { deleted: false, reason: 'invalid-uid' }
+  }
+
+  const firestore = admin.firestore()
+  const userRef = firestore.collection('users').doc(normalizedUid)
+  const clinicRef = firestore.collection('clinics').doc(normalizedUid)
+  const [userSnap, clinicSnap] = await Promise.all([userRef.get(), clinicRef.get()])
+  const userData = userSnap.exists ? userSnap.data() || {} : {}
+  const clinicData = clinicSnap.exists ? clinicSnap.data() || {} : {}
+
+  if (!isPendingRegistrationRecord(userData, clinicData)) {
+    return { deleted: false, reason: 'not-pending' }
+  }
+
+  if (requireExpired && !isExpiredRegistrationRecord(userData, clinicData)) {
+    return { deleted: false, reason: 'not-expired' }
+  }
+
+  await Promise.all([
+    userSnap.exists ? userRef.delete() : Promise.resolve(),
+    clinicSnap.exists ? clinicRef.delete() : Promise.resolve(),
+  ])
+
+  try {
+    await admin.auth().deleteUser(normalizedUid)
+  } catch (authError) {
+    if (authError?.code !== 'auth/user-not-found') {
+      throw authError
+    }
+  }
+
+  return { deleted: true, reason: 'deleted' }
+}
+
+const cleanupExpiredRegistrations = async () => {
+  if (!adminReady) return { deleted: 0 }
+
+  const firestore = admin.firestore()
+  const [usersSnap, clinicsSnap] = await Promise.all([
+    firestore.collection('users').get(),
+    firestore.collection('clinics').get(),
+  ])
+  const clinicsById = new Map(clinicsSnap.docs.map((docSnap) => [docSnap.id, docSnap.data() || {}]))
+
+  let deleted = 0
+  for (const userDoc of usersSnap.docs) {
+    const uid = userDoc.id
+    const userData = userDoc.data() || {}
+    const clinicData = clinicsById.get(uid) || {}
+    if (!isExpiredRegistrationRecord(userData, clinicData)) continue
+    const result = await purgePendingRegistration(uid, { requireExpired: true })
+    if (result.deleted) deleted += 1
+  }
+
+  return { deleted }
+}
+
+if (adminReady) {
+  cleanupExpiredRegistrations().catch((error) => {
+    console.error('Initial registration cleanup failed:', error?.message || error)
+  })
+  setInterval(() => {
+    cleanupExpiredRegistrations().catch((error) => {
+      console.error('Scheduled registration cleanup failed:', error?.message || error)
+    })
+  }, registrationCleanupIntervalMs)
+}
 
 const normalizeWelcomeAccountType = (value) => {
   const raw = String(value || '').trim().toLowerCase()
@@ -1208,6 +1347,10 @@ app.post('/auth/check-registration-status', async (req, res) => {
 
     const userData = userSnap.data() || {}
     const clinicData = clinicSnap.data() || {}
+    if (isExpiredRegistrationRecord(userData, clinicData)) {
+      await purgePendingRegistration(uid, { requireExpired: true })
+      return res.json({ success: true, exists: false, expired: true })
+    }
     const userStatus = String(userData.status || '').toLowerCase()
     const clinicStatus = String(clinicData.approvalStatus || '').toLowerCase()
     const businessType =
@@ -1259,6 +1402,70 @@ app.post('/auth/check-registration-status', async (req, res) => {
   }
 })
 
+app.post('/auth/discard-registration', async (req, res) => {
+  if (!adminReady) {
+    return res.status(500).json({
+      success: false,
+      error: adminInitError || 'firebase-admin is not ready',
+    })
+  }
+
+  const { uid, email } = req.body ?? {}
+  const normalizedUid = String(uid || '').trim()
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+
+  if (!normalizedUid && !normalizedEmail) {
+    return res.status(400).json({
+      success: false,
+      error: 'uid or email is required',
+    })
+  }
+
+  try {
+    const userRecord = normalizedUid
+      ? await admin.auth().getUser(normalizedUid)
+      : await admin.auth().getUserByEmail(normalizedEmail)
+    const resolvedUid = userRecord.uid
+    const recordEmail = String(userRecord?.email || '').trim().toLowerCase()
+
+    if (normalizedEmail && recordEmail && recordEmail !== normalizedEmail) {
+      return res.status(403).json({
+        success: false,
+        error: 'Email does not match user record',
+      })
+    }
+
+    const result = await purgePendingRegistration(resolvedUid, { requireExpired: false })
+    if (!result.deleted) {
+      return res.status(400).json({
+        success: false,
+        error: 'Only pending registrations can be discarded',
+        reason: result.reason,
+      })
+    }
+
+    return res.json({
+      success: true,
+      deleted: true,
+      uid: resolvedUid,
+    })
+  } catch (error) {
+    const code = error?.code || ''
+    if (code === 'auth/user-not-found') {
+      return res.json({
+        success: true,
+        deleted: false,
+        reason: 'user-not-found',
+      })
+    }
+    return res.status(400).json({
+      success: false,
+      error: error?.message || 'Failed to discard registration.',
+      code,
+    })
+  }
+})
+
 app.post('/auth/verify-registration-otp', async (req, res) => {
   const { uid, email } = req.body ?? {}
 
@@ -1294,9 +1501,15 @@ app.post('/auth/verify-registration-otp', async (req, res) => {
         status: 'Pending Document Submission',
         emailVerified: true,
         emailVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        registrationStatus: 'pending_documents',
+        registrationLastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+        registrationExpiresAt: new Date(Date.now() + registrationExpiryDays * 24 * 60 * 60 * 1000),
       }),
       firestore.collection('clinics').doc(normalizedUid).update({
         approvalStatus: 'Pending Document Submission',
+        registrationStatus: 'pending_documents',
+        registrationLastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+        registrationExpiresAt: new Date(Date.now() + registrationExpiryDays * 24 * 60 * 60 * 1000),
       }),
     ])
 
@@ -1339,6 +1552,10 @@ app.post('/auth/registration-profile', async (req, res) => {
 
     const userData = userSnap.exists ? userSnap.data() || {} : {}
     const clinicData = clinicSnap.exists ? clinicSnap.data() || {} : {}
+    if (isExpiredRegistrationRecord(userData, clinicData)) {
+      await purgePendingRegistration(uid, { requireExpired: true })
+      return res.json({ success: true, exists: false, expired: true })
+    }
 
     const safeDate = (value) => {
       if (!value) return null

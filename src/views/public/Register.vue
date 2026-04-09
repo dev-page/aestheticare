@@ -19,6 +19,15 @@ const route = useRoute()
 const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
   devFallbackUrl: 'http://localhost:3000',
 })
+const REGISTRATION_DRAFT_TTL_DAYS = Number(import.meta.env.VITE_REGISTRATION_DRAFT_TTL_DAYS || 7)
+const REGISTRATION_DRAFT_TTL_MS = Math.max(1, REGISTRATION_DRAFT_TTL_DAYS) * 24 * 60 * 60 * 1000
+const REGISTRATION_DRAFT_KEY = 'register_clinic_draft'
+const REGISTRATION_DRAFT_CREATED_AT_KEY = 'register_clinic_draft_created_at'
+const REGISTRATION_DRAFT_UPDATED_AT_KEY = 'register_clinic_draft_updated_at'
+const REGISTRATION_RESUME_EMAIL_KEY = 'resume_email'
+const REGISTRATION_UID_KEY = 'register_clinic_uid'
+const REGISTRATION_OTP_KEY = 'register_clinic_generated_otp'
+const REGISTRATION_OTP_EMAIL_KEY = 'register_clinic_otp_email'
 
 const legacyClinicRoute = computed(() => {
   const name = String(route.name || '')
@@ -71,11 +80,7 @@ const password = ref('')
 const confirmPassword = ref('')
 const resumeInProgress = ref(false)
 const resumeCancelled = ref(false)
-const REGISTRATION_DRAFT_KEY = 'register_clinic_draft'
 const OTP_SENT_AT_KEY = 'register_clinic_otp_sent_at'
-const REGISTRATION_UID_KEY = 'register_clinic_uid'
-const REGISTRATION_OTP_KEY = 'register_clinic_generated_otp'
-const REGISTRATION_OTP_EMAIL_KEY = 'register_clinic_otp_email'
 
 const contactNumber = ref('')
 const clinicName = ref('')
@@ -161,6 +166,7 @@ const emailChecked = ref(false)
 const isCheckingEmail = ref(false)
 const otpVerifiedForRegistration = ref(false)
 const pendingApprovalMode = ref(false)
+const isDiscardingRegistration = ref(false)
 
 const otpDigits = ref(Array(6).fill(''))
 const generatedOtp = ref('')
@@ -650,6 +656,7 @@ onMounted(async () => {
     const qLastName = String(route.query.lastName || '').trim()
     const qEmail = String(route.query.email || '').trim()
     const qResume = String(route.query.resume || '').trim()
+    const storedDraft = loadRegistrationDraft()
 
     const stepParam = parseStepParam(route.params?.step)
     if (stepParam) {
@@ -658,7 +665,15 @@ onMounted(async () => {
 
   if (qFirstName && !firstName.value) firstName.value = qFirstName
   if (qLastName && !lastName.value) lastName.value = qLastName
-  const resumeEmail = qResume ? (qEmail || sessionStorage.getItem('resume_email') || '') : (qEmail || '')
+  if (storedDraft) {
+    applyDraftIfEmpty(storedDraft)
+  }
+
+  const storedResumeEmail =
+    localStorage.getItem(REGISTRATION_RESUME_EMAIL_KEY) ||
+    sessionStorage.getItem(REGISTRATION_RESUME_EMAIL_KEY) ||
+    ''
+  const resumeEmail = qResume ? (qEmail || storedResumeEmail || storedDraft?.email || '') : (qEmail || storedDraft?.email || storedResumeEmail || '')
   if (resumeEmail && !email.value) email.value = String(resumeEmail).toLowerCase()
 
     syncManualBirthDate()
@@ -1118,7 +1133,63 @@ const inferResumeStep = (statusResult, profile) => {
   return 1
 }
 
+const getStoredRegistrationDraft = () => {
+  const rawLocal = localStorage.getItem(REGISTRATION_DRAFT_KEY)
+  const rawSession = sessionStorage.getItem(REGISTRATION_DRAFT_KEY)
+  const raw = rawLocal || rawSession || ''
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch (_error) {
+    return null
+  }
+}
+
+const isRegistrationDraftExpired = (draft) => {
+  const timestamp = Number(draft?.updatedAt || draft?.createdAt || 0)
+  if (!timestamp) return false
+  return Date.now() - timestamp > REGISTRATION_DRAFT_TTL_MS
+}
+
+const getRegistrationExpiryDate = () => new Date(Date.now() + REGISTRATION_DRAFT_TTL_MS)
+
+const persistStoredDraftValue = (key, value) => {
+  if (!value) {
+    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+    return
+  }
+  localStorage.setItem(key, value)
+  sessionStorage.setItem(key, value)
+}
+
+const clearRegistrationDraft = () => {
+  ;[
+    REGISTRATION_DRAFT_KEY,
+    REGISTRATION_DRAFT_CREATED_AT_KEY,
+    REGISTRATION_DRAFT_UPDATED_AT_KEY,
+    REGISTRATION_RESUME_EMAIL_KEY,
+  ].forEach((key) => {
+    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+  })
+}
+
+const loadRegistrationDraft = () => {
+  const draft = getStoredRegistrationDraft()
+  if (!draft) return null
+  if (isRegistrationDraftExpired(draft)) {
+    clearRegistrationDraft()
+    return null
+  }
+  return draft
+}
+
 const saveRegistrationDraft = () => {
+  if (isDiscardingRegistration.value) return
+  const existingDraft = getStoredRegistrationDraft()
+  const now = Date.now()
   const payload = {
     email: String(email.value || '').trim().toLowerCase(),
     firstName: firstName.value || '',
@@ -1136,14 +1207,90 @@ const saveRegistrationDraft = () => {
     authorizedRepPositionOption: authorizedRepPositionOption.value || '',
     authorizedRepPositionOther: authorizedRepPositionOther.value || '',
     companyType: companyType.value || '',
+    createdAt: Number(existingDraft?.createdAt || existingDraft?.updatedAt || now) || now,
+    updatedAt: now,
   }
   try {
-    sessionStorage.setItem(REGISTRATION_DRAFT_KEY, JSON.stringify(payload))
+    persistStoredDraftValue(REGISTRATION_DRAFT_KEY, JSON.stringify(payload))
     if (payload.email) {
-      sessionStorage.setItem('resume_email', payload.email)
+      persistStoredDraftValue(REGISTRATION_RESUME_EMAIL_KEY, payload.email)
+    } else {
+      persistStoredDraftValue(REGISTRATION_RESUME_EMAIL_KEY, '')
     }
+    persistStoredDraftValue(REGISTRATION_DRAFT_CREATED_AT_KEY, String(payload.createdAt))
+    persistStoredDraftValue(REGISTRATION_DRAFT_UPDATED_AT_KEY, String(payload.updatedAt))
   } catch (_error) {
     // Ignore session storage failures
+  }
+}
+
+const discardRegistration = async () => {
+  const confirmed = window.confirm('Discard this registration and clear the saved email?')
+  if (!confirmed) return
+
+  const normalizedEmail = String(email.value || otpRecipientEmail.value || '').trim().toLowerCase()
+  const normalizedUid = String(userUid.value || sessionStorage.getItem(REGISTRATION_UID_KEY) || '').trim()
+
+  isDiscardingRegistration.value = true
+  try {
+    if (normalizedUid || normalizedEmail) {
+      await axios.post(`${OTP_API_BASE}/auth/discard-registration`, {
+        uid: normalizedUid,
+        email: normalizedEmail,
+      })
+    }
+  } catch (error) {
+    console.error('Failed to discard registration on backend:', error)
+    toast.warning('Cleared local draft, but the backend record could not be removed right now.')
+  } finally {
+    clearRegistrationDraft()
+    ;[
+      REGISTRATION_UID_KEY,
+      REGISTRATION_OTP_KEY,
+      REGISTRATION_OTP_EMAIL_KEY,
+      OTP_SENT_AT_KEY,
+    ].forEach((key) => {
+      localStorage.removeItem(key)
+      sessionStorage.removeItem(key)
+    })
+    email.value = ''
+    firstName.value = ''
+    lastName.value = ''
+    birthDate.value = ''
+    manualBirthDate.value = ''
+    contactNumber.value = ''
+    clinicName.value = ''
+    clinicLocation.value = ''
+    clinicLocationLat.value = ''
+    clinicLocationLng.value = ''
+    clinicLocationAddress.value = ''
+    clinicBarangay.value = ''
+    clinicProvince.value = ''
+    clinicPostalCode.value = ''
+    authorizedRepPosition.value = ''
+    authorizedRepPositionOption.value = ''
+    authorizedRepPositionOther.value = ''
+    companyType.value = ''
+    password.value = ''
+    confirmPassword.value = ''
+    otpCode.value = ''
+    generatedOtp.value = ''
+    otpRecipientEmail.value = ''
+    userUid.value = ''
+    emailChecked.value = false
+    pendingApprovalMode.value = false
+    resumeInProgress.value = false
+    resumeCancelled.value = false
+    currentStep.value = 1
+    stopOtpCountdown()
+    stopApprovalCheck()
+    clearOtpInputs()
+    try {
+      await router.replace({ name: 'register' })
+    } finally {
+      isDiscardingRegistration.value = false
+    }
+    toast.info('Registration draft discarded.')
   }
 }
 
@@ -1291,7 +1438,7 @@ const verifyRegistrationEmail = async (options = {}) => {
     return
   }
 
-  sessionStorage.setItem('resume_email', normalizedEmail)
+  persistStoredDraftValue(REGISTRATION_RESUME_EMAIL_KEY, normalizedEmail)
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(normalizedEmail)) {
@@ -2071,7 +2218,7 @@ const registerClinic = async () => {
     companyType: '',
   }
 
-  sessionStorage.setItem('resume_email', String(email.value || '').trim().toLowerCase())
+  persistStoredDraftValue(REGISTRATION_RESUME_EMAIL_KEY, String(email.value || '').trim().toLowerCase())
 
   isSubmitting.value = true
 
@@ -2153,6 +2300,9 @@ const registerClinic = async () => {
       clinicBranch: 'Main Branch',
       role: 'Clinic Admin',
       status: 'Pending OTP Verification',
+      registrationStatus: 'pending_otp',
+      registrationLastActivityAt: serverTimestamp(),
+      registrationExpiresAt: getRegistrationExpiryDate(),
       createdAt: serverTimestamp(),
     })
 
@@ -2175,6 +2325,9 @@ const registerClinic = async () => {
       branchAdminId: uid,
       branchAdminName: ownerFullName || 'Owner',
       approvalStatus: 'Pending OTP Verification',
+      registrationStatus: 'pending_otp',
+      registrationLastActivityAt: serverTimestamp(),
+      registrationExpiresAt: getRegistrationExpiryDate(),
       createdAt: serverTimestamp(),
     })
 
@@ -2300,9 +2453,15 @@ const verifyOtp = async () => {
             status: 'Pending Document Submission',
             emailVerified: true,
             emailVerifiedAt: serverTimestamp(),
+            registrationStatus: 'pending_documents',
+            registrationLastActivityAt: serverTimestamp(),
+            registrationExpiresAt: getRegistrationExpiryDate(),
           })
           await updateDoc(doc(db, 'clinics', userUid.value), {
             approvalStatus: 'Pending Document Submission',
+            registrationStatus: 'pending_documents',
+            registrationLastActivityAt: serverTimestamp(),
+            registrationExpiresAt: getRegistrationExpiryDate(),
           })
         } else {
           const verifyRes = await axios.post(`${OTP_API_BASE}/auth/verify-registration-otp`, {
@@ -2378,6 +2537,9 @@ const submitDocuments = async () => {
 
     await updateDoc(doc(db, 'clinics', userUid.value), {
       approvalStatus: 'Pending Approval',
+      registrationStatus: 'pending_approval',
+      registrationLastActivityAt: serverTimestamp(),
+      registrationExpiresAt: getRegistrationExpiryDate(),
       documentsSubmittedAt: serverTimestamp(),
       submittedDocuments: submittedDocumentsPayload,
       draftDocuments: deleteField(),
@@ -2386,6 +2548,9 @@ const submitDocuments = async () => {
 
     await updateDoc(doc(db, 'users', userUid.value), {
       status: 'Pending Approval',
+      registrationStatus: 'pending_approval',
+      registrationLastActivityAt: serverTimestamp(),
+      registrationExpiresAt: getRegistrationExpiryDate(),
     })
 
     existingSubmittedDocuments.value = submittedDocumentsPayload
@@ -2447,6 +2612,15 @@ const submitDocuments = async () => {
               </div>
             </div>
               <div class="intro-block mb-6">
+                <div class="mb-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-full border border-rose-300/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 transition hover:border-rose-400 hover:bg-rose-50/90"
+                    @click="discardRegistration"
+                  >
+                    Discard Registration
+                  </button>
+                </div>
                 <button
                   type="button"
                   class="inline-flex items-center gap-2 rounded-full border border-gold-300/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-700 transition hover:border-gold-500 hover:text-gold-700 hover:bg-gold-50/90"
