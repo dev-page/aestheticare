@@ -1,4 +1,3 @@
-
 <template>
   <div class="bg-gradient-to-br from-cream-100 via-gold-100 to-cream-200 text-charcoal-800 overflow-x-hidden">
     <nav class="public-glass-nav fixed top-0 inset-x-0 z-50">
@@ -55,12 +54,11 @@
           >
             Login
           </router-link>
-
           <router-link
             to="/register"
             class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gold-700 text-white text-xs sm:text-sm tracking-widest uppercase hover:bg-gold-800 transition"
           >
-            Get Started
+            Free Trial
           </router-link>
         </div>
 
@@ -106,8 +104,8 @@
 
           <div class="flex-1 overflow-y-auto p-5 flex flex-col text-xs tracking-[0.2em] uppercase text-charcoal-700">
             <div class="flex flex-col gap-2">
-              <button type="button" @click="closeMobileMenu" class="py-2 border-b border-gold-200/70 text-left transition-all duration-200 hover:text-gold-700 hover:pl-1">Features</button>
-              <button type="button" @click="closeMobileMenu" class="py-2 border-b border-gold-200/70 text-left transition-all duration-200 hover:text-gold-700 hover:pl-1">Solutions</button>
+              <a class="py-2 border-b border-gold-200/70 transition-all duration-200 hover:text-gold-700 hover:pl-1">Features</a>
+              <a class="py-2 border-b border-gold-200/70 transition-all duration-200 hover:text-gold-700 hover:pl-1">Solutions</a>
               <router-link to="/subscription-features" @click="closeMobileMenu" class="py-2 border-b border-gold-200/70 transition-all duration-200 hover:text-gold-700 hover:pl-1">Pricing</router-link>
               <router-link to="/centers" @click="closeMobileMenu" class="py-2 border-b border-gold-200/70 transition-all duration-200 hover:text-gold-700 hover:pl-1">Centers</router-link>
             </div>
@@ -125,7 +123,7 @@
                 @click="closeMobileMenu"
                 class="px-4 py-3 rounded-full bg-gold-700 text-white text-center transition hover:bg-gold-800"
               >
-                Get Started
+                Free Trial
               </router-link>
             </div>
           </div>
@@ -164,7 +162,7 @@
             </p>
             <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8">
               <button @click="showSubscriptionPopup = true" class="bg-charcoal-900 text-cream-50 px-6 py-3 rounded-full text-xs sm:text-sm tracking-widest uppercase hover:bg-charcoal-800 transition w-full sm:w-auto">
-                Shop Now
+                Get Started
               </button>
               <router-link to="/centers" class="px-6 py-3 rounded-full border border-gold-700 text-gold-700 text-xs sm:text-sm tracking-widest uppercase hover:bg-gold-700 hover:text-white transition w-full sm:w-auto text-center">
                 View Centers
@@ -215,7 +213,7 @@
         loop
         playsinline
       >
-        <source :src="homeVideo" type="video/mp4" />
+        <source src="@/assets/home_vid.mp4" type="video/mp4" />
       </video>
       <div class="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,11,9,0.38)_0%,rgba(24,16,12,0.18)_34%,rgba(21,14,11,0.18)_66%,rgba(16,11,9,0.34)_100%)]"></div>
       <div class="absolute inset-0 bg-black/18"></div>
@@ -352,12 +350,12 @@
 
     <div class="section-wave-divider" aria-hidden="true">
       <svg viewBox="0 0 1440 120" preserveAspectRatio="none">
-        <path fill="#fff8eb" d="M0,88 C190,128 360,34 560,62 C760,90 920,126 1120,92 C1268,66 1368,48 1440,58 L1440,120 L0,120 Z" />
+        <path fill="#fff8ed" d="M0,88 C190,128 360,34 560,62 C760,90 920,126 1120,92 C1268,66 1368,48 1440,58 L1440,120 L0,120 Z" />
       </svg>
     </div>
 
     <!-- FEATURES / PLATFORM CAPABILITIES SHOWCASE -->
-    <section class="capability-section py-16 sm:py-24 md:py-32">
+    <section class="capability-section pb-16 pt-8 sm:pb-24 sm:pt-12 md:pb-32 md:pt-16">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div class="capability-header">
           <p class="capability-section-kicker">Designed for modern clinic teams</p>
@@ -375,20 +373,10 @@
           <div class="capability-showcase-overlay"></div>
           <div class="capability-showcase-sheen" aria-hidden="true"></div>
 
-          <div class="capability-floating-badge">
-            <span>Featured Module</span>
-            <strong>{{ String(currentCapabilityIndex + 1).padStart(2, '0') }} / {{ String(capabilities.length).padStart(2, '0') }}</strong>
-          </div>
-
           <div class="capability-showcase-content" :key="`content-${currentCapabilityIndex}`">
             <p class="capability-eyebrow">{{ currentCapability.eyebrow }}</p>
             <h3 class="capability-showcase-title">{{ currentCapability.title }}</h3>
             <p class="capability-showcase-desc">{{ currentCapability.description }}</p>
-            <div class="capability-meta">
-              <span class="capability-meta-pill">{{ currentCapability.miniEyebrow }}</span>
-              <span class="capability-meta-separator"></span>
-              <span class="capability-meta-note">Elegant control for daily clinic operations</span>
-            </div>
           </div>
 
           <div class="capability-actions">
@@ -440,6 +428,12 @@
       </div>
     </section>
 
+    <div class="section-wave-divider section-wave-divider-footer" aria-hidden="true">
+      <svg viewBox="0 0 1440 120" preserveAspectRatio="none">
+        <path fill="#f8eedf" d="M0,88 C190,128 360,34 560,62 C760,90 920,126 1120,92 C1268,66 1368,48 1440,58 L1440,120 L0,120 Z" />
+      </svg>
+    </div>
+
     <!-- CTA + Footer -->
     <section class="footer-cta-section">
       <div class="footer-cta-shell">
@@ -450,20 +444,32 @@
             <p class="footer-cta-text">
               Join modern aesthetic centers using intelligent systems to manage bookings, treatment journeys, staff visibility, and clinic growth in one elegant platform.
             </p>
+            <div class="footer-cta-actions">
+              <button @click="showSubscriptionPopup = true" class="footer-primary-btn">
+                Try 14-Day Free Trial
+              </button>
+              <router-link to="/subscription-features" class="footer-secondary-btn">
+                View Plans
+              </router-link>
+            </div>
             <div class="footer-cta-highlights">
               <span class="footer-highlight-chip">14-day free trial</span>
-              <span class="footer-highlight-chip">No card required</span>
               <span class="footer-highlight-chip">Clinic-ready setup</span>
             </div>
           </div>
 
-          <div class="footer-cta-actions">
-            <button @click="showSubscriptionPopup = true" class="footer-primary-btn">
-              Try 14-Day Free Trial
-            </button>
-            <router-link to="/subscription-features" class="footer-secondary-btn">
-              View Plans
-            </router-link>
+          <div class="footer-cta-side">
+            <div class="footer-cta-qr" aria-label="Mobile application QR placeholder">
+              <div class="footer-cta-qr-frame">
+                <div class="footer-cta-qr-code">
+                  <span>QR</span>
+                </div>
+              </div>
+              <div class="footer-cta-qr-copy">
+                <p class="footer-cta-qr-title">Mobile App</p>
+                <p class="footer-cta-qr-note">QR placeholder</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -549,9 +555,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useAuth } from "@/composables/useAuth";
 import Modal from "@/components/common/Modal.vue";
 import SubscriptionPopup from "@/components/common/SubscriptionPopup.vue";
-import homePicture from '@/assets/home_picture.jpg'
 import bg from '@/assets/bg.jpg'
-import homeVideo from '@/assets/home_vid.mp4'
+import appointmentLanding from '@/assets/apointment_landing.jpg'
+import inventoryLanding from '@/assets/inventory_landing.jpg'
+import meetingRoomLanding from '@/assets/meetingroom_landing.jpg'
+import staffInsightLanding from '@/assets/staffinsight_landing.jpg'
 
 export default {
   name: "HomePage",
@@ -563,8 +571,8 @@ export default {
     const { user, isLoading, initAuth } = useAuth();
     const showSubscriptionPopup = ref(false);
     const isMobileMenuOpen = ref(false);
-    const currentCapabilityIndex = ref(0);
-    const miniStartIndex = ref(0);
+    const currentCapabilityIndex = ref(3);
+    const miniStartIndex = ref(3);
     const isCapabilitySwitching = ref(false);
     const isMiniSwitching = ref(false);
     const miniMotionTick = ref(0);
@@ -587,7 +595,7 @@ export default {
         description: "Automate bookings, assign practitioners, and reduce no-shows with reminders tuned for high-volume aesthetic clinics.",
         miniEyebrow: "Core System",
         miniTitle: "Appointments",
-        image: homePicture,
+        image: appointmentLanding,
       },
       {
         eyebrow: "Clinical Precision",
@@ -603,7 +611,7 @@ export default {
         description: "Track usage per service, monitor stock thresholds, and avoid treatment delays with real-time supply visibility.",
         miniEyebrow: "Clinic Ops",
         miniTitle: "Inventory",
-        image: homePicture,
+        image: inventoryLanding,
       },
       {
         eyebrow: "Team Visibility",
@@ -611,7 +619,7 @@ export default {
         description: "Review practitioner productivity, service completion rates, and schedule utilization across your branches.",
         miniEyebrow: "People",
         miniTitle: "Staff Insights",
-        image: bg,
+        image: staffInsightLanding,
       },
       {
         eyebrow: "Growth Intelligence",
@@ -619,7 +627,7 @@ export default {
         description: "Visualize top-performing services, monthly trends, and conversion metrics to guide better business decisions.",
         miniEyebrow: "Growth",
         miniTitle: "Analytics",
-        image: homePicture,
+        image: meetingRoomLanding,
       },
     ];
 
@@ -739,7 +747,7 @@ export default {
 </script>
 
 <style scoped>
-:global(body) {
+body {
   font-family: "Playfair Display", serif;
 }
 
@@ -809,9 +817,24 @@ export default {
 
 .capability-section {
   position: relative;
+  overflow: hidden;
+  isolation: isolate;
   background:
     radial-gradient(circle at top center, rgba(241, 212, 170, 0.46), transparent 28%),
     linear-gradient(180deg, #fff8ed 0%, #fdf3e2 54%, #f8ead4 100%);
+}
+.capability-section::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: clamp(120px, 18vw, 190px);
+  background:
+    radial-gradient(ellipse at top center, rgba(255, 249, 241, 0.98) 0%, rgba(255, 248, 237, 0.9) 42%, rgba(255, 248, 237, 0) 100%);
+  pointer-events: none;
+}
+.capability-section > .max-w-7xl {
+  position: relative;
+  z-index: 1;
 }
 
 .capability-header {
@@ -879,47 +902,13 @@ export default {
     linear-gradient(120deg, transparent 48%, rgba(255, 248, 235, 0.08) 58%, transparent 68%);
   pointer-events: none;
 }
-.capability-floating-badge {
-  position: absolute;
-  top: 1.35rem;
-  right: 1.35rem;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.22rem;
-  padding: 0.85rem 1rem;
-  border-radius: 1.15rem;
-  border: 1px solid rgba(255, 248, 235, 0.26);
-  background: rgba(73, 48, 34, 0.38);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 10px 24px rgba(30, 19, 12, 0.14);
-}
-.capability-floating-badge span {
-  font-size: 0.62rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(248, 229, 189, 0.72);
-}
-.capability-floating-badge strong {
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #fff8eb;
-}
 .capability-showcase-content {
   position: relative;
   z-index: 2;
   width: min(56%, 660px);
   margin: clamp(1.35rem, 3vw, 2rem);
   align-self: center;
-  border-radius: 1.9rem;
-  border: 1px solid rgba(255, 248, 235, 0.14);
-  background: linear-gradient(180deg, rgba(58, 38, 27, 0.28) 0%, rgba(58, 38, 27, 0.1) 100%);
-  backdrop-filter: blur(10px);
-  padding: clamp(1.4rem, 3.3vw, 2.4rem);
-  padding-right: clamp(1.4rem, 3.3vw, 2.8rem);
-  padding-bottom: clamp(7.4rem, 8vw, 8.9rem);
+  padding: 0;
   color: #fff8eb;
   display: flex;
   flex-direction: column;
@@ -950,36 +939,7 @@ export default {
   color: rgba(255, 248, 235, 0.9);
   font-size: clamp(1rem, 1.3vw, 1.15rem);
   line-height: 1.6;
-  margin-bottom: 1rem;
-}
-.capability-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-.capability-meta-pill {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  border: 1px solid rgba(248, 229, 189, 0.34);
-  background: rgba(255, 248, 235, 0.12);
-  padding: 0.45rem 0.8rem;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #f8e5bd;
-}
-.capability-meta-separator {
-  width: 2.4rem;
-  height: 1px;
-  background: rgba(255, 248, 235, 0.34);
-}
-.capability-meta-note {
-  color: rgba(255, 248, 235, 0.78);
-  font-size: 0.88rem;
-  letter-spacing: 0.02em;
+  margin-bottom: 0;
 }
 .capability-actions {
   position: absolute;
@@ -1304,40 +1264,52 @@ export default {
 }
 
 .section-wave-divider {
-  background: #fdf3e2;
+  position: relative;
+  z-index: 1;
+  margin-bottom: -2rem;
+  line-height: 0;
+  background: #fbefdc;
 }
 .section-wave-divider svg {
   display: block;
   width: 100%;
   height: 78px;
 }
+.section-wave-divider-footer {
+  background: #f8ead4;
+  margin-top: -1px;
+  margin-bottom: -1px;
+}
 
 .footer-cta-section {
   position: relative;
-  background:
-    radial-gradient(circle at top center, rgba(241, 212, 170, 0.42), transparent 30%),
-    linear-gradient(180deg, #f8eedf 0%, #f4e4cf 48%, #eed7bc 100%);
-  padding: clamp(3.5rem, 8vw, 5.5rem) 1rem 2rem;
+  background: linear-gradient(180deg, #f8eedf 0%, #f4e4cf 48%, #eed7bc 100%);
+  padding: clamp(3.5rem, 8vw, 5.5rem) 0 0;
 }
 
 .footer-cta-shell {
-  max-width: 1180px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .footer-cta-card {
   position: relative;
-  overflow: hidden;
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.2rem;
-  border-radius: 2rem;
-  border: 1px solid rgba(198, 148, 108, 0.22);
-  background:
-    radial-gradient(circle at top right, rgba(255, 248, 235, 0.34), transparent 24%),
-    linear-gradient(135deg, rgba(255, 251, 244, 0.92) 0%, rgba(249, 236, 214, 0.78) 52%, rgba(232, 199, 163, 0.7) 100%);
-  padding: clamp(1.35rem, 4vw, 2.25rem);
-  box-shadow: 0 24px 54px rgba(117, 78, 53, 0.12);
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  padding:
+    clamp(1.5rem, 4vw, 2.5rem)
+    max(1rem, calc((100vw - 1180px) / 2 + 1rem))
+    clamp(1.35rem, 3vw, 2rem);
+  box-shadow: none;
 }
 
 .footer-kicker {
@@ -1354,6 +1326,13 @@ export default {
   color: rgba(84, 58, 41, 0.84);
   font-size: 1rem;
   line-height: 1.7;
+}
+
+.footer-cta-actions {
+  margin-top: 1.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .footer-cta-highlights {
@@ -1375,11 +1354,11 @@ export default {
   font-weight: 600;
 }
 
-.footer-cta-actions {
+.footer-cta-side {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.75rem;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
 }
 
 .footer-primary-btn,
@@ -1392,6 +1371,7 @@ export default {
   padding: 0.95rem 1.15rem;
   font-size: 0.95rem;
   font-weight: 700;
+  min-width: 230px;
   transition: transform 0.22s ease, background 0.22s ease, color 0.22s ease, border-color 0.22s ease;
 }
 
@@ -1416,20 +1396,89 @@ export default {
   background: rgba(255, 248, 235, 0.95);
 }
 
+.footer-cta-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  width: 100%;
+  max-width: 20rem;
+  margin-left: auto;
+}
+
+.footer-cta-qr-frame {
+  flex: 0 0 auto;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 1.8rem;
+  border: 1px solid rgba(198, 148, 108, 0.28);
+  background: rgba(255, 251, 244, 0.82);
+  padding: 1.05rem;
+}
+
+.footer-cta-qr-code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 1rem;
+  border: 1px solid rgba(126, 78, 53, 0.16);
+  background:
+    linear-gradient(90deg, rgba(123, 78, 53, 0.1) 50%, transparent 50%) 0 0 / 1.05rem 1.05rem,
+    linear-gradient(rgba(123, 78, 53, 0.1) 50%, transparent 50%) 0 0 / 1.05rem 1.05rem,
+    linear-gradient(135deg, rgba(255, 248, 235, 0.98) 0%, rgba(242, 222, 196, 0.95) 100%);
+  color: #7b4e35;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
+.footer-cta-qr-copy {
+  min-width: 0;
+  text-align: center;
+}
+
+.footer-cta-qr-title,
+.footer-cta-qr-note {
+  margin: 0;
+}
+
+.footer-cta-qr-title {
+  color: #6a4736;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.footer-cta-qr-note {
+  margin-top: 0.2rem;
+  color: rgba(106, 71, 54, 0.72);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .site-footer {
   margin-top: 1.1rem;
-  border-radius: 1.7rem;
-  border: 1px solid rgba(198, 148, 108, 0.18);
-  background: rgba(79, 52, 40, 0.96);
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  border-radius: 0;
+  border: none;
+  background: linear-gradient(180deg, #6a4736 0%, #5a3d2f 100%);
   color: #f7eadf;
-  padding: clamp(1.25rem, 3vw, 1.8rem);
-  box-shadow: 0 20px 42px rgba(59, 37, 26, 0.18);
+  padding: clamp(1.4rem, 3.6vw, 2rem) 0 clamp(1.1rem, 2.8vw, 1.5rem);
+  box-shadow: none;
 }
 
 .site-footer-grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr 1fr;
   gap: 1.2rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 1rem;
 }
 
 .site-footer-brand {
@@ -1498,6 +1547,11 @@ export default {
   gap: 1rem;
   color: rgba(247, 234, 223, 0.62);
   font-size: 0.82rem;
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 .site-footer-bottom-note {
@@ -1745,34 +1799,34 @@ export default {
 
 @media (max-width: 1023px) {
   .capability-showcase {
-    min-height: 700px;
-    display: block;
+    min-height: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
     border-radius: 1.8rem;
+    padding: 1rem;
   }
   .capability-header {
     margin-bottom: 2.1rem;
   }
   .capability-showcase-content {
-    width: auto;
-    margin: 1rem;
-    padding: 1.15rem 1rem 6.8rem;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
   }
   .capability-showcase-title {
     font-size: clamp(2.1rem, 9vw, 3.5rem);
   }
   .capability-showcase-desc {
     max-width: 100%;
-    margin-bottom: 0.85rem;
-  }
-  .capability-floating-badge {
-    top: auto;
-    right: 1rem;
-    bottom: 12.9rem;
-    padding: 0.7rem 0.85rem;
+    margin-bottom: 0;
   }
   .capability-actions {
-    left: 1rem;
-    bottom: 11rem;
+    position: relative;
+    left: auto;
+    bottom: auto;
+    margin-top: 1.25rem;
   }
   .capability-rail {
     width: auto;
@@ -1781,10 +1835,12 @@ export default {
     gap: 10px;
   }
   .capability-rail-wrap {
-    left: 14px;
-    right: 14px;
-    bottom: 14px;
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
     width: auto;
+    margin-top: 1rem;
   }
   .capability-rail-nav {
     display: none;
@@ -1886,6 +1942,116 @@ export default {
   }
 }
 
+@media (max-width: 767px) {
+  .capability-header {
+    margin-bottom: 1.6rem;
+  }
+
+  .capability-section-subtitle {
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+
+  .capability-showcase {
+    min-height: auto;
+    border-radius: 1.5rem;
+    padding: 0.9rem;
+  }
+
+  .capability-showcase-content {
+    margin-top: 0.15rem;
+  }
+
+  .capability-eyebrow {
+    margin-bottom: 0.7rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.2em;
+  }
+
+  .capability-showcase-title {
+    font-size: clamp(1.9rem, 10vw, 3rem);
+    margin-bottom: 0.8rem;
+  }
+
+  .capability-showcase-desc {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .capability-actions {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .capability-btn-main {
+    min-width: 6.75rem;
+    padding: 0.82rem 1.35rem;
+  }
+
+  .capability-btn-icon {
+    width: 2.8rem;
+    height: 2.8rem;
+  }
+
+  .capability-rail-wrap {
+    margin-top: 0.9rem;
+  }
+
+  .capability-rail {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scroll-snap-type: x proximity;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .capability-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .capability-mini {
+    flex: 0 0 min(12rem, 64vw);
+    min-height: 10rem;
+    scroll-snap-align: start;
+  }
+
+  .capability-mini-title {
+    font-size: 0.98rem;
+  }
+}
+
+@media (max-width: 479px) {
+  .capability-showcase {
+    border-radius: 1.3rem;
+    padding: 0.8rem;
+  }
+
+  .capability-showcase-title {
+    font-size: clamp(1.65rem, 9.6vw, 2.35rem);
+    line-height: 0.94;
+  }
+
+  .capability-showcase-desc {
+    font-size: 0.9rem;
+  }
+
+  .capability-actions {
+    gap: 0.55rem;
+  }
+
+  .capability-btn-main {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .capability-mini {
+    flex-basis: 10.5rem;
+    min-height: 9.25rem;
+  }
+}
+
 /* Mobile sidebar transitions */
 .menu-overlay-enter-active,
 .menu-overlay-leave-active {
@@ -1975,9 +2141,45 @@ export default {
     padding-bottom: 1.4rem;
   }
 
+  .footer-cta-card {
+    padding:
+      1.35rem
+      1rem
+      1.25rem;
+  }
+
   .footer-cta-text {
     font-size: 0.94rem;
     line-height: 1.6;
+  }
+
+  .footer-cta-side {
+    justify-content: flex-start;
+  }
+
+  .footer-cta-qr {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.9rem;
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .footer-cta-qr-frame {
+    width: 5.6rem;
+    padding: 0.65rem;
+    border-radius: 1.2rem;
+  }
+
+  .footer-cta-qr-code {
+    border-radius: 0.8rem;
+    font-size: 1rem;
+    letter-spacing: 0.18em;
+    background:
+      linear-gradient(90deg, rgba(123, 78, 53, 0.1) 50%, transparent 50%) 0 0 / 0.78rem 0.78rem,
+      linear-gradient(rgba(123, 78, 53, 0.1) 50%, transparent 50%) 0 0 / 0.78rem 0.78rem,
+      linear-gradient(135deg, rgba(255, 248, 235, 0.98) 0%, rgba(242, 222, 196, 0.95) 100%);
   }
 
   .site-footer-grid {
@@ -2004,8 +2206,8 @@ export default {
 
 @media (min-width: 960px) {
   .footer-cta-card {
-    grid-template-columns: minmax(0, 1fr) 300px;
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    align-items: start;
   }
 }
 

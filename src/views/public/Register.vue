@@ -3123,6 +3123,10 @@ const submitDocuments = async () => {
 </template>
 
 <style scoped>
+:global(body) {
+  font-family: "Playfair Display", serif;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -3132,9 +3136,10 @@ const submitDocuments = async () => {
 }
 
 .nav-brand {
-  font-family: "Playfair Display", "Times New Roman", serif;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   background: linear-gradient(120deg, #3c2519 0%, #9f6946 42%, #c99673 70%, #744a33 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -3142,9 +3147,10 @@ const submitDocuments = async () => {
 }
 
 .register-title {
-  font-family: "Playfair Display", "Times New Roman", serif;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-family: "Bodoni Moda", "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.03em;
   background: linear-gradient(120deg, #4a2c1e 0%, #996341 40%, #c89066 72%, #7b4e35 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -3159,17 +3165,18 @@ const submitDocuments = async () => {
   justify-content: space-between;
   gap: 1.25rem;
   padding: 1.4rem 1.5rem;
-  border-radius: 1.4rem;
-  border: 1px solid rgba(212, 175, 55, 0.24);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(247, 234, 216, 0.82));
-  box-shadow: 0 14px 36px rgba(54, 34, 22, 0.08);
+  border-radius: 1.55rem;
+  border: 1px solid rgba(198, 148, 108, 0.22);
+  background: linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(250, 241, 227, 0.92));
+  box-shadow: 0 18px 42px rgba(54, 34, 22, 0.1);
+  backdrop-filter: blur(14px);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .choice-card:hover {
   transform: translateY(-3px);
   border-color: rgba(159, 105, 70, 0.42);
-  box-shadow: 0 18px 40px rgba(54, 34, 22, 0.14);
+  box-shadow: 0 22px 46px rgba(54, 34, 22, 0.16);
 }
 
 .choice-kicker {
@@ -3233,23 +3240,24 @@ const submitDocuments = async () => {
   width: 100%;
   min-height: 140px;
   padding: 1.4rem 1.5rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(232, 167, 58, 0.45);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 10px 24px rgba(54, 34, 22, 0.08);
+  border-radius: 1.35rem;
+  border: 1px solid rgba(198, 148, 108, 0.22);
+  background: linear-gradient(180deg, rgba(255, 251, 244, 0.92), rgba(250, 241, 227, 0.88));
+  box-shadow: 0 16px 34px rgba(54, 34, 22, 0.1);
+  backdrop-filter: blur(12px);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .business-type-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(212, 175, 55, 0.8);
-  box-shadow: 0 16px 30px rgba(54, 34, 22, 0.16);
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 0 20px 38px rgba(54, 34, 22, 0.16);
 }
 
 .business-type-selected {
   border-color: rgba(159, 105, 70, 0.8);
-  background: linear-gradient(160deg, rgba(255, 246, 230, 0.9), rgba(248, 231, 205, 0.85));
-  box-shadow: 0 18px 38px rgba(111, 63, 42, 0.2);
+  background: linear-gradient(160deg, rgba(255, 248, 235, 0.96), rgba(242, 222, 196, 0.9));
+  box-shadow: 0 20px 40px rgba(111, 63, 42, 0.2);
 }
 
 .business-type-selected::after {
@@ -3330,6 +3338,8 @@ const submitDocuments = async () => {
 .register-clinic-card {
   display: grid;
   grid-template-columns: 1fr;
+  border: 1px solid rgba(198, 148, 108, 0.22);
+  background: rgba(255, 251, 244, 0.72);
 }
 
 .register-form-panel {
@@ -3651,17 +3661,17 @@ const submitDocuments = async () => {
   width: 100%;
   padding: 1rem 1rem 0.5rem;
   line-height: 1.25rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.45);
-  border: 1px solid rgba(232, 167, 58, 0.35);
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(198, 148, 108, 0.3);
   color: #1c1c1c;
   outline: none;
   transition: all 0.2s;
 }
 .input:focus {
-  border-color: #d4af37;
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+  border-color: #c9a24d;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 0 0 3px rgba(201, 162, 77, 0.2);
 }
 
 .custom-dropdown-trigger {
@@ -3717,16 +3727,16 @@ const submitDocuments = async () => {
 .otp-boxes {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.45rem;
-  max-width: 18.75rem;
+  gap: 0.55rem;
+  max-width: 22rem;
   margin: 0 auto;
 }
 
 .otp-digit {
-  height: 2.95rem;
-  border-radius: 0.75rem;
+  height: 3.15rem;
+  border-radius: 0.95rem;
   border: 1px solid rgba(214, 186, 152, 0.8);
-  background: linear-gradient(180deg, rgba(243, 241, 237, 0.98), rgba(234, 230, 223, 0.95));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 237, 226, 0.96));
   color: #6f3f2a;
   text-align: center;
   font-size: 1.35rem;
@@ -3786,8 +3796,8 @@ const submitDocuments = async () => {
   right: 0;
   top: calc(100% + 0.5rem);
   z-index: 30;
-  border-radius: 0.9rem;
-  border: 1px solid rgba(232, 167, 58, 0.35);
+  border-radius: 1rem;
+  border: 1px solid rgba(198, 148, 108, 0.24);
   background: linear-gradient(180deg, rgba(255, 252, 245, 0.98), rgba(248, 234, 206, 0.98));
   box-shadow: 0 16px 36px rgba(54, 34, 22, 0.18);
   padding: 0.75rem;
