@@ -15,6 +15,9 @@ const router = useRouter()
 const OTP_API_BASE = resolveApiBaseUrl(import.meta.env.VITE_OTP_API_BASE_URL, {
   devFallbackUrl: 'http://localhost:3000',
 })
+const REGISTRATION_UID_KEY = 'register_customer_uid'
+const REGISTRATION_OTP_KEY = 'register_customer_generated_otp'
+const REGISTRATION_OTP_EMAIL_KEY = 'register_customer_otp_email'
 
 const goToRegisterChooser = async () => {
   await router.replace({ name: 'register' })
@@ -358,6 +361,17 @@ const onWindowClick = (event) => {
 
 onMounted(() => {
   syncManualBirthDate()
+  try {
+    const storedUid = sessionStorage.getItem(REGISTRATION_UID_KEY)
+    const storedOtp = sessionStorage.getItem(REGISTRATION_OTP_KEY)
+    const storedEmail = sessionStorage.getItem(REGISTRATION_OTP_EMAIL_KEY)
+
+    if (storedUid && !userUid.value) userUid.value = storedUid
+    if (storedOtp && !generatedOtp.value) generatedOtp.value = storedOtp
+    if (storedEmail && !otpRecipientEmail.value) otpRecipientEmail.value = storedEmail
+  } catch (_error) {
+    // Ignore storage failures and keep the in-memory state only.
+  }
   window.addEventListener('click', onWindowClick)
 })
 
@@ -379,6 +393,13 @@ const resetOtpState = () => {
   generatedOtp.value = ''
   userUid.value = ''
   otpRecipientEmail.value = ''
+  try {
+    sessionStorage.removeItem(REGISTRATION_UID_KEY)
+    sessionStorage.removeItem(REGISTRATION_OTP_KEY)
+    sessionStorage.removeItem(REGISTRATION_OTP_EMAIL_KEY)
+  } catch (_error) {
+    // Ignore storage failures.
+  }
   stopOtpCountdown()
 }
 
@@ -607,6 +628,13 @@ const register = async () => {
 
     otpRecipientEmail.value = email.value.trim()
     generatedOtp.value = generateOtp()
+    try {
+      sessionStorage.setItem(REGISTRATION_UID_KEY, uid)
+      sessionStorage.setItem(REGISTRATION_OTP_KEY, generatedOtp.value)
+      sessionStorage.setItem(REGISTRATION_OTP_EMAIL_KEY, otpRecipientEmail.value)
+    } catch (_error) {
+      // Ignore storage failures and continue with the active session state.
+    }
     const welcomeSent = await sendWelcomeEmail(
       otpRecipientEmail.value,
       `${firstName.value.trim()} ${lastName.value.trim()}`.trim()
@@ -650,7 +678,14 @@ const verifyOtp = async () => {
   if (otpCode.value === generatedOtp.value) {
     try {
       if (!userUid.value) {
-        toast.error('User ID not found. Please register again.')
+        try {
+          userUid.value = sessionStorage.getItem(REGISTRATION_UID_KEY) || ''
+        } catch (_error) {
+          userUid.value = ''
+        }
+      }
+      if (!userUid.value) {
+        toast.error('We could not confirm your registration yet. Please try verifying again.')
         return
       }
 

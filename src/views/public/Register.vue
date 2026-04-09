@@ -691,7 +691,7 @@ onMounted(async () => {
       }
       const storedUid = sessionStorage.getItem(REGISTRATION_UID_KEY)
       if (storedUid && !userUid.value) {
-        userUid.value = storedUid
+        persistRegistrationUid(storedUid)
       }
       syncStepRoute(currentStep.value)
       return
@@ -712,10 +712,7 @@ onMounted(async () => {
         return
       }
 
-      userUid.value = String(statusResult.uid || '').trim()
-      if (userUid.value) {
-        sessionStorage.setItem(REGISTRATION_UID_KEY, userUid.value)
-      }
+      persistRegistrationUid(statusResult.uid)
       email.value = String(resumeEmail).toLowerCase()
       emailChecked.value = true
     otpRecipientEmail.value = String(resumeEmail).toLowerCase()
@@ -949,19 +946,20 @@ const handleDocumentFileChange = async (key, event) => {
     : ''
 
   if (!selectedFile) return
-  if (!userUid.value) {
-    toast.error('User ID not found. Please verify your email again.')
+  const resolvedUid = await resolveRegistrationUid()
+  if (!resolvedUid) {
+    toast.error('We could not confirm your registration yet. Please verify your email first.')
     return
   }
 
   const docKey = previewKey
   documentUploadState.value[docKey] = { uploading: true, error: '' }
   try {
-    const uploadedDoc = await uploadDocumentForClinic(userUid.value, selectedFile, docKey)
+    const uploadedDoc = await uploadDocumentForClinic(resolvedUid, selectedFile, docKey)
     if (!uploadedDoc) throw new Error('Upload failed')
 
     existingSubmittedDocuments.value[docKey] = uploadedDoc
-    await updateDoc(doc(db, 'clinics', userUid.value), {
+    await updateDoc(doc(db, 'clinics', resolvedUid), {
       [`draftDocuments.${docKey}`]: uploadedDoc,
       draftDocumentsUpdatedAt: serverTimestamp(),
     })
@@ -1350,6 +1348,39 @@ const setStoredGeneratedOtp = (otp) => {
   sessionStorage.setItem(REGISTRATION_OTP_KEY, value)
 }
 
+const persistRegistrationUid = (uid) => {
+  const normalized = String(uid || '').trim()
+  if (!normalized) return
+  userUid.value = normalized
+  sessionStorage.setItem(REGISTRATION_UID_KEY, normalized)
+}
+
+const resolveRegistrationUid = async () => {
+  const liveAuthUid = String(auth?.currentUser?.uid || '').trim()
+  if (liveAuthUid) {
+    persistRegistrationUid(liveAuthUid)
+    return liveAuthUid
+  }
+
+  const storedUid = String(sessionStorage.getItem(REGISTRATION_UID_KEY) || '').trim()
+  if (storedUid) {
+    userUid.value = storedUid
+    return storedUid
+  }
+
+  const lookupEmail = String(otpRecipientEmail.value || email.value || '').trim().toLowerCase()
+  if (lookupEmail) {
+    const statusResult = await checkRegistrationStatus(lookupEmail)
+    const resolvedUid = String(statusResult?.uid || '').trim()
+    if (resolvedUid) {
+      persistRegistrationUid(resolvedUid)
+      return resolvedUid
+    }
+  }
+
+  return ''
+}
+
 const markOtpSentNow = () => {
   sessionStorage.setItem(OTP_SENT_AT_KEY, String(Date.now()))
 }
@@ -1481,11 +1512,8 @@ const verifyRegistrationEmail = async (options = {}) => {
         if (profileResult?.profile) {
           applyProfileData(profileResult.profile)
         }
-        userUid.value = String(statusResult.uid || '').trim()
-        if (userUid.value) {
-          sessionStorage.setItem(REGISTRATION_UID_KEY, userUid.value)
-        }
-      emailChecked.value = true
+        persistRegistrationUid(statusResult.uid)
+        emailChecked.value = true
       otpRecipientEmail.value = normalizedEmail
       setStoredOtpRecipientEmail(otpRecipientEmail.value)
 
@@ -1568,7 +1596,7 @@ const verifyRegistrationEmail = async (options = {}) => {
           if (profileResult?.profile) {
             applyProfileData(profileResult.profile)
           }
-          userUid.value = String(statusResult.uid || '').trim()
+          persistRegistrationUid(statusResult.uid)
           emailChecked.value = true
           otpRecipientEmail.value = normalizedEmail
           setStoredOtpRecipientEmail(otpRecipientEmail.value)
@@ -2283,7 +2311,7 @@ const registerClinic = async () => {
     )
 
     const uid = userCredentials.user.uid
-    userUid.value = uid
+    persistRegistrationUid(uid)
     const ownerFullName = `${firstName.value.trim()} ${lastName.value.trim()}`.trim()
 
     // 🔹 Save user
@@ -2387,7 +2415,7 @@ const registerClinic = async () => {
     if (errorCode === 'auth/email-already-in-use') {
       const statusResult = await checkRegistrationStatus(email.value.trim())
       if (statusResult?.exists) {
-        userUid.value = String(statusResult.uid || '').trim()
+        persistRegistrationUid(statusResult.uid)
         emailChecked.value = true
         otpRecipientEmail.value = email.value.trim().toLowerCase()
         setStoredOtpRecipientEmail(otpRecipientEmail.value)
@@ -2426,51 +2454,36 @@ const verifyOtp = async () => {
 
   if (otpCode.value === generatedOtp.value) {
     try {
-      if (!userUid.value) {
-        const storedUid = sessionStorage.getItem(REGISTRATION_UID_KEY)
-        if (storedUid) {
-          userUid.value = storedUid
-        } else {
-          const lookupEmail = String(otpRecipientEmail.value || email.value || '').trim().toLowerCase()
-          if (lookupEmail) {
-            const statusResult = await checkRegistrationStatus(lookupEmail)
-            if (statusResult?.uid) {
-              userUid.value = String(statusResult.uid).trim()
-              sessionStorage.setItem(REGISTRATION_UID_KEY, userUid.value)
-            }
-          }
-        }
-      }
-
-      if (!userUid.value) {
-        toast.error('User ID not found. Please verify your email again.')
+      const resolvedUid = await resolveRegistrationUid()
+      if (!resolvedUid) {
+        toast.error('We could not confirm your registration yet. Please try verifying again.')
         return
       }
 
-        const currentAuthUid = auth?.currentUser?.uid || ''
-        if (currentAuthUid && currentAuthUid === userUid.value) {
-          await updateDoc(doc(db, 'users', userUid.value), {
-            status: 'Pending Document Submission',
-            emailVerified: true,
-            emailVerifiedAt: serverTimestamp(),
-            registrationStatus: 'pending_documents',
-            registrationLastActivityAt: serverTimestamp(),
-            registrationExpiresAt: getRegistrationExpiryDate(),
-          })
-          await updateDoc(doc(db, 'clinics', userUid.value), {
-            approvalStatus: 'Pending Document Submission',
-            registrationStatus: 'pending_documents',
-            registrationLastActivityAt: serverTimestamp(),
-            registrationExpiresAt: getRegistrationExpiryDate(),
-          })
-        } else {
-          const verifyRes = await axios.post(`${OTP_API_BASE}/auth/verify-registration-otp`, {
-            uid: userUid.value,
-            email: String(otpRecipientEmail.value || email.value || '').trim().toLowerCase(),
-          })
-          if (!verifyRes?.data?.success) {
-            throw new Error(verifyRes?.data?.error || 'Failed to verify OTP')
-          }
+      const currentAuthUid = String(auth?.currentUser?.uid || '').trim()
+      if (currentAuthUid && currentAuthUid === resolvedUid) {
+        await updateDoc(doc(db, 'users', resolvedUid), {
+          status: 'Pending Document Submission',
+          emailVerified: true,
+          emailVerifiedAt: serverTimestamp(),
+          registrationStatus: 'pending_documents',
+          registrationLastActivityAt: serverTimestamp(),
+          registrationExpiresAt: getRegistrationExpiryDate(),
+        })
+        await updateDoc(doc(db, 'clinics', resolvedUid), {
+          approvalStatus: 'Pending Document Submission',
+          registrationStatus: 'pending_documents',
+          registrationLastActivityAt: serverTimestamp(),
+          registrationExpiresAt: getRegistrationExpiryDate(),
+        })
+      } else {
+        const verifyRes = await axios.post(`${OTP_API_BASE}/auth/verify-registration-otp`, {
+          uid: resolvedUid,
+          email: String(otpRecipientEmail.value || email.value || '').trim().toLowerCase(),
+        })
+        if (!verifyRes?.data?.success) {
+          throw new Error(verifyRes?.data?.error || 'Failed to verify OTP')
+        }
       }
 
       otpVerifiedForRegistration.value = true
@@ -2513,8 +2526,9 @@ const submitDocuments = async () => {
     return
   }
 
-  if (!userUid.value) {
-    toast.error('User ID not found. Please restart registration.')
+  const resolvedUid = await resolveRegistrationUid()
+  if (!resolvedUid) {
+    toast.error('We could not confirm your registration yet. Please verify your email first.')
     return
   }
 
@@ -2523,7 +2537,7 @@ const submitDocuments = async () => {
   try {
     const uploads = await Promise.all(
       requiredDocumentKeys.value.map((docKey) =>
-        uploadDocumentForClinic(userUid.value, documentFileMap[docKey]?.value, docKey)
+        uploadDocumentForClinic(resolvedUid, documentFileMap[docKey]?.value, docKey)
       )
     )
 
@@ -2535,7 +2549,7 @@ const submitDocuments = async () => {
       submittedDocumentsPayload[docKey] = docPayload
     })
 
-    await updateDoc(doc(db, 'clinics', userUid.value), {
+    await updateDoc(doc(db, 'clinics', resolvedUid), {
       approvalStatus: 'Pending Approval',
       registrationStatus: 'pending_approval',
       registrationLastActivityAt: serverTimestamp(),
@@ -2546,7 +2560,7 @@ const submitDocuments = async () => {
       draftDocumentsUpdatedAt: deleteField(),
     })
 
-    await updateDoc(doc(db, 'users', userUid.value), {
+    await updateDoc(doc(db, 'users', resolvedUid), {
       status: 'Pending Approval',
       registrationStatus: 'pending_approval',
       registrationLastActivityAt: serverTimestamp(),
