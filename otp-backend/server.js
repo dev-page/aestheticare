@@ -38,7 +38,39 @@ console.log("Loaded ENV:", {
   GOOGLE_CALENDAR_ID: process.env.GOOGLE_CALENDAR_ID || "primary",
 });
 
-app.use(cors())
+const allowedOrigins = new Set(
+  [
+    process.env.FRONTEND_BASE_URL,
+    process.env.CORS_ALLOWED_ORIGINS,
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://aestheticare.io',
+    'https://www.aestheticare.io',
+    'https://api.aestheticare.io',
+  ]
+    .flatMap((value) => String(value || '').split(','))
+    .map((value) => String(value || '').trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+)
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true)
+    const normalizedOrigin = String(origin || '').trim().replace(/\/+$/, '')
+    if (allowedOrigins.has(normalizedOrigin)) {
+      return callback(null, true)
+    }
+    return callback(new Error(`Not allowed by CORS: ${normalizedOrigin}`))
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}
+
+app.use(cors(corsOptions))
+app.options('*', cors(corsOptions))
 app.use(express.json())
 
 const sendGridApiKey = process.env.SENDGRID_API_KEY
